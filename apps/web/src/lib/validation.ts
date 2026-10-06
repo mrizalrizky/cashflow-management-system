@@ -1,3 +1,5 @@
+import { isMoneyString } from './money'
+
 /** Mengembalikan pesan kesalahan, atau null bila nilainya sah. */
 export type Rule = (value: unknown) => string | null
 
@@ -46,4 +48,15 @@ export function collectErrors<T extends object>(
     }
   }
   return errors
+}
+
+/** Nominal rupiah dari `MoneyInput`: string digit, atau kosong bila tidak wajib. */
+export function money(
+  label: string,
+  options: { required?: boolean; allowNegative?: boolean } = {},
+): Rule {
+  return (value) => {
+    if (asText(value) === '') return options.required === false ? null : `${label} wajib diisi`
+    return isMoneyString(value, options.allowNegative) ? null : `${label} tidak valid`
+  }
 }

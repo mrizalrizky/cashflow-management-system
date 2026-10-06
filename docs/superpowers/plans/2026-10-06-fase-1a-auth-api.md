@@ -518,7 +518,7 @@ async refresh(rawToken: string | undefined, ip: string | null) {
   - Update changes name, email, role and `isActive`; the audit row `UPDATE` has `before` and `after` without `password_hash`.
   - Deactivating a user revokes their refresh tokens; changing their role revokes them too; changing only their name does not.
   - An admin cannot deactivate themselves or change their own role: 400 `Tidak bisa menonaktifkan atau mengubah peran akun sendiri`.
-  - The last active SUPER_ADMIN cannot be deactivated or demoted by anyone: with two admins A and B, A deactivates B (allowed), then A cannot demote A (self rule); and with B deactivated, reactivating is allowed.
+  - With two admins A and B: A can deactivate B, and A can reactivate B. The last-admin rule is a second line of defence behind the self rule (only an admin can call these routes, so the last active admin is always the caller); cover it with a service-level test that calls `UsersService.update` with a different actor id against the only active SUPER_ADMIN and expects `Harus ada minimal satu SUPER_ADMIN aktif`.
   - Reset password sets `mustChangePassword: true`, revokes the user's refresh tokens, lets them log in with the new password, and writes `RESET_PASSWORD` without the password.
   - Create and update both write their audit row; a failed create (duplicate email) writes none.
 - [ ] **Step 2: Run.** Expected: fail with 404.

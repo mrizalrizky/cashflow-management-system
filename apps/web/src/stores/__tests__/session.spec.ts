@@ -150,6 +150,49 @@ describe('session store', () => {
     expect(session.role).toBe('STAFF')
   })
 
+  describe('when the API refuses a request (403)', () => {
+    async function signedIn() {
+      vi.mocked(authApi.login).mockResolvedValue(SESSION)
+      const session = useSessionStore()
+      await session.login('admin@example.com', 'rahasia-123')
+      const { onForbidden } = vi.mocked(http.bindSessionEvents).mock.calls[0]![0]
+      return { session, onForbidden }
+    }
+
+    it('re-reads the user, picking up a forced password change or a new role', async () => {
+      const { session, onForbidden } = await signedIn()
+      const changed = { ...USER, role: 'STAFF' as const, mustChangePassword: true }
+      vi.mocked(authApi.me).mockResolvedValue({ user: changed })
+
+      onForbidden()
+      await session.resync()
+
+      expect(session.user).toEqual(changed)
+    })
+
+    it('asks the API once however many requests were refused together', async () => {
+      const { session, onForbidden } = await signedIn()
+      vi.mocked(authApi.me).mockResolvedValue({ user: USER })
+
+      onForbidden()
+      onForbidden()
+      onForbidden()
+      await session.resync()
+
+      expect(authApi.me).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps the current user when the check itself fails', async () => {
+      const { session, onForbidden } = await signedIn()
+      vi.mocked(authApi.me).mockRejectedValue(new Error('offline'))
+
+      onForbidden()
+      await session.resync()
+
+      expect(session.user).toEqual(USER)
+    })
+  })
+
   it('never writes to browser storage', async () => {
     const setItem = vi.spyOn(Storage.prototype, 'setItem')
     vi.mocked(authApi.login).mockResolvedValue(SESSION)

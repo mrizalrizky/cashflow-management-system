@@ -1,5 +1,5 @@
 import { request } from './http'
-import type { SessionResponse } from './types'
+import type { AuthUser, SessionResponse } from './types'
 
 export function login(email: string, password: string): Promise<SessionResponse> {
   return request('/auth/login', { method: 'POST', body: { email, password }, auth: false })
@@ -8,6 +8,11 @@ export function login(email: string, password: string): Promise<SessionResponse>
 /** Publik di sisi API: boleh dipanggil walau access token sudah kedaluwarsa. */
 export function logout(): Promise<void> {
   return request('/auth/logout', { method: 'POST', auth: false })
+}
+
+/** User yang sedang login menurut server; boleh dipanggil walau wajib ganti password. */
+export function me(): Promise<{ user: AuthUser }> {
+  return request('/auth/me')
 }
 
 export function changePassword(

@@ -70,6 +70,30 @@ describe('usePagedList', () => {
     expect(list.loading.value).toBe(false)
   })
 
+  it('steps back to the last page that has rows when the current page became empty', async () => {
+    const fetchPage = vi.fn<Fetch>(({ page: requested }) =>
+      Promise.resolve(requested === 3 ? page([], 40) : page(['x'], 40)),
+    )
+    const list = usePagedList(fetchPage, {})
+
+    list.setPage(3, 20)
+    await flushPromises()
+
+    expect(list.page.value).toBe(2)
+    expect(list.items.value).toEqual(['x'])
+    expect(fetchPage).toHaveBeenLastCalledWith({ page: 2, pageSize: 20 })
+  })
+
+  it('stays on an empty first page', async () => {
+    const fetchPage = vi.fn<Fetch>().mockResolvedValue(page([], 0))
+    const list = usePagedList(fetchPage, {})
+
+    await list.reload()
+
+    expect(list.page.value).toBe(1)
+    expect(fetchPage).toHaveBeenCalledTimes(1)
+  })
+
   it('reports an error and keeps what was already shown', async () => {
     const fetchPage = vi
       .fn<Fetch>()

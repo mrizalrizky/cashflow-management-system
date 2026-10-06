@@ -41,8 +41,14 @@ export function usePagedList<T, F extends object>(
       const params = { ...(filters as F), page: page.value, pageSize: pageSize.value }
       const result = await fetchPage(params)
       if (request !== latestRequest) return
-      items.value = result.data
       total.value = result.meta.total
+      if (result.data.length === 0 && result.meta.total > 0 && page.value > 1) {
+        // Halaman ini baru saja kosong (mis. baris terakhirnya tersaring keluar):
+        // pindah ke halaman terakhir yang berisi; perubahan halaman memicu muat ulang.
+        page.value = Math.ceil(result.meta.total / pageSize.value)
+        return
+      }
+      items.value = result.data
     } catch (cause) {
       if (request !== latestRequest) return
       error.value = errorMessage(cause, 'Gagal memuat data')

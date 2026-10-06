@@ -21,6 +21,11 @@ export interface SessionEvents {
   onRefreshed(session: SessionResponse): void
   /** Sesi yang tadinya aktif tidak bisa diperpanjang lagi. */
   onExpired(): void
+  /**
+   * API menolak sebuah request (403). Bisa berarti hak akses user baru saja berubah,
+   * mis. password direset atau perannya diganti oleh admin.
+   */
+  onForbidden(): void
 }
 
 export class ApiError extends Error {
@@ -157,9 +162,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   try {
     return await send<T>(path, options)
   } catch (error) {
-    const tokenRejected =
-      error instanceof ApiError && error.statusCode === 401 && options.auth !== false
-    if (!tokenRejected || !(await refreshSession())) throw error
+    if (!(error instanceof ApiError) || options.auth === false) throw error
+    if (error.statusCode === 403) sessionEvents?.onForbidden()
+    if (error.statusCode !== 401 || !(await refreshSession())) throw error
     return send<T>(path, options)
   }
 }

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createTestRouter } from '@/test/mount'
+import { reconcileRoute } from '../reconcile'
 import type { AuthUser, Role } from '@/api/types'
 import { resolveNavigation, safeRedirect } from '../guards'
 import { menuFor } from '../navigation'
@@ -95,5 +97,30 @@ describe('safeRedirect', () => {
     [['/a', '/b'], null],
   ])('maps %j to %j', (input, expected) => {
     expect(safeRedirect(input)).toBe(expected)
+  })
+})
+
+describe('reconcileRoute', () => {
+  async function at(path: string) {
+    const router = createTestRouter()
+    await router.push(path)
+    await router.isReady()
+    return router
+  }
+
+  it('moves a user whose password was reset to the change-password page', async () => {
+    const router = await at('/transaksi')
+
+    await reconcileRoute(router, user('STAFF', true))
+
+    expect(router.currentRoute.value.path).toBe('/ganti-password')
+  })
+
+  it('leaves the user where they are when the page is still allowed', async () => {
+    const router = await at('/transaksi')
+
+    await reconcileRoute(router, user('STAFF'))
+
+    expect(router.currentRoute.value.path).toBe('/transaksi')
   })
 })

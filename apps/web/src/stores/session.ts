@@ -14,6 +14,7 @@ export const useSessionStore = defineStore('session', () => {
   const role = computed<Role | null>(() => user.value?.role ?? null)
 
   let restoring: Promise<void> | null = null
+  let resyncing: Promise<void> | null = null
   let expiredListener: (() => void) | null = null
 
   function apply(session: SessionResponse): void {
@@ -39,6 +40,24 @@ export const useSessionStore = defineStore('session', () => {
       }
     })()
     return restoring
+  }
+
+  /**
+   * Membaca ulang data user dari server. Dipanggil saat API menolak sebuah request, karena
+   * itu bisa berarti password baru direset atau peran baru diganti. Request yang ditolak
+   * bersamaan menunggu satu pembacaan yang sama.
+   */
+  function resync(): Promise<void> {
+    resyncing ??= (async () => {
+      try {
+        user.value = (await authApi.me()).user
+      } catch {
+        // Tidak bisa memastikan; biarkan data yang ada.
+      } finally {
+        resyncing = null
+      }
+    })()
+    return resyncing
   }
 
   async function login(email: string, password: string): Promise<void> {
@@ -74,7 +93,19 @@ export const useSessionStore = defineStore('session', () => {
       clear()
       expiredListener?.()
     },
+    onForbidden: () => void resync(),
   })
 
-  return { user, ready, isAuthenticated, role, restore, login, changePassword, logout, onExpired }
+  return {
+    user,
+    ready,
+    isAuthenticated,
+    role,
+    restore,
+    resync,
+    login,
+    changePassword,
+    logout,
+    onExpired,
+  }
 })

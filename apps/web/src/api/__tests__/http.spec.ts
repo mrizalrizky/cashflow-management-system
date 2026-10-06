@@ -5,6 +5,12 @@ type FetchMock = ReturnType<typeof vi.fn<typeof fetch>>
 
 const SESSION = { accessToken: 'token-baru', user: { id: 'u1' } }
 
+const QUIET = {
+  onExpired: () => undefined,
+  onRefreshed: () => undefined,
+  onForbidden: () => undefined,
+}
+
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -157,7 +163,7 @@ describe('http client', () => {
 
     it('tells the session listener who the refreshed session belongs to', async () => {
       const onRefreshed = vi.fn<(session: unknown) => void>()
-      http.bindSessionEvents({ onExpired: () => undefined, onRefreshed })
+      http.bindSessionEvents({ ...QUIET, onRefreshed })
       http.setAccessToken('token-lama')
       respond((url, init) => {
         if (url.endsWith('/auth/refresh')) return json(200, SESSION)
@@ -216,7 +222,7 @@ describe('http client', () => {
 
     it('gives up after two failed refreshes and reports the expired session exactly once', async () => {
       const expired = vi.fn<() => void>()
-      http.bindSessionEvents({ onExpired: expired, onRefreshed: () => undefined })
+      http.bindSessionEvents({ ...QUIET, onExpired: expired })
       http.setAccessToken('token-lama')
       respond(() => unauthorized())
 
@@ -234,7 +240,7 @@ describe('http client', () => {
 
     it('stops refreshing when the server is unreachable, without ending the session', async () => {
       const expired = vi.fn<() => void>()
-      http.bindSessionEvents({ onExpired: expired, onRefreshed: () => undefined })
+      http.bindSessionEvents({ ...QUIET, onExpired: expired })
       http.setAccessToken('token-lama')
       respond((url) => {
         if (url.endsWith('/auth/refresh')) throw new TypeError('Failed to fetch')
@@ -264,6 +270,34 @@ describe('http client', () => {
     })
   })
 
+  describe('forbidden responses', () => {
+    const forbidden = () => json(403, { statusCode: 403, message: 'Anda tidak memiliki akses' })
+
+    it('tells the session listener about a 403 and still rejects with it', async () => {
+      const onForbidden = vi.fn<() => void>()
+      http.bindSessionEvents({ ...QUIET, onForbidden })
+      http.setAccessToken('token-1')
+      respond(forbidden)
+
+      await expect(http.request('/users')).rejects.toMatchObject({ statusCode: 403 })
+
+      expect(onForbidden).toHaveBeenCalledTimes(1)
+      expect(refreshCalls()).toBe(0)
+    })
+
+    it('says nothing for a 403 on an unauthenticated request', async () => {
+      const onForbidden = vi.fn<() => void>()
+      http.bindSessionEvents({ ...QUIET, onForbidden })
+      respond(forbidden)
+
+      await expect(http.request('/auth/login', { method: 'POST', body: {}, auth: false })).rejects.toMatchObject({
+        statusCode: 403,
+      })
+
+      expect(onForbidden).not.toHaveBeenCalled()
+    })
+  })
+
   describe('refreshSession', () => {
     it('returns the session and stores its token', async () => {
       respond((url) => (url.endsWith('/auth/refresh') ? json(200, SESSION) : json(200, {})))
@@ -276,7 +310,7 @@ describe('http client', () => {
 
     it('returns null without reporting an expired session when nobody was logged in', async () => {
       const expired = vi.fn<() => void>()
-      http.bindSessionEvents({ onExpired: expired, onRefreshed: () => undefined })
+      http.bindSessionEvents({ ...QUIET, onExpired: expired })
       respond(() => unauthorized())
 
       expect(await http.refreshSession()).toBeNull()

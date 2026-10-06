@@ -37,3 +37,16 @@ export function updateUser(id: string, input: UpdateUserInput): Promise<User> {
 export function resetUserPassword(id: string, newPassword: string): Promise<User> {
   return request(`/users/${id}/reset-password`, { method: 'POST', body: { newPassword } })
 }
+
+const MAX_PAGE_SIZE = 100
+
+/** Koordinator proyek aktif yang bisa ditugaskan ke proyek. */
+export async function listAssignableManagers(): Promise<User[]> {
+  const page = await listUsers({
+    role: 'PROJECT_MANAGER',
+    isActive: true,
+    page: 1,
+    pageSize: MAX_PAGE_SIZE,
+  })
+  return page.data
+}

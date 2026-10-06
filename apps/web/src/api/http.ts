@@ -9,7 +9,7 @@ const REFRESH_RETRY_DELAY_MS = 250
 export type QueryValue = string | number | boolean | null | undefined
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT'
   body?: unknown
   query?: Record<string, QueryValue>
   /** `false` untuk rute tanpa access token (login, refresh, logout). */

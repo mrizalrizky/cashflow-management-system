@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatDate } from '../format'
-import { roleLabel } from '../roles'
+import { roleLabel } from '../labels'
 
 describe('formatDate', () => {
   it('formats as dd MMM yyyy in Jakarta time', () => {

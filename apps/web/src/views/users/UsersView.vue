@@ -5,31 +5,25 @@ import Column from 'primevue/column'
 import DataTable, { type DataTablePageEvent } from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
-import Tag from 'primevue/tag'
-import { useConfirm } from 'primevue/useconfirm'
-import { useToast } from 'primevue/usetoast'
 import type { User } from '@/api/types'
 import { listUsers, updateUser, type UserFilters } from '@/api/users'
+import ActiveTag from '@/components/ActiveTag.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import TableCard from '@/components/TableCard.vue'
+import ToggleActiveButton from '@/components/ToggleActiveButton.vue'
 import { useDebouncedInput } from '@/composables/useDebouncedInput'
+import { useNotify } from '@/composables/useNotify'
 import { usePagedList } from '@/composables/usePagedList'
-import { errorMessage } from '@/lib/errors'
+import { useToggleActive } from '@/composables/useToggleActive'
 import { formatDate } from '@/lib/format'
-import { ROLE_OPTIONS, roleLabel } from '@/lib/roles'
+import { ACTIVE_OPTIONS, ROLE_OPTIONS, roleLabel } from '@/lib/labels'
 import { useSessionStore } from '@/stores/session'
 import ResetPasswordDialog from './ResetPasswordDialog.vue'
 import UserFormDialog from './UserFormDialog.vue'
 
-const STATUS_OPTIONS = [
-  { label: 'Aktif', value: true },
-  { label: 'Nonaktif', value: false },
-]
-const TOAST_LIFE_MS = 4000
-
 const session = useSessionStore()
-const confirm = useConfirm()
-const toast = useToast()
+const notify = useNotify()
 
 const list = usePagedList<User, UserFilters>(listUsers, {
   search: undefined,
@@ -62,39 +56,16 @@ function openReset(user: User): void {
   resetOpen.value = true
 }
 
-function notifySaved(message: string): void {
-  toast.add({ severity: 'success', summary: message, life: TOAST_LIFE_MS })
+function onSaved(message: string): void {
+  notify.success(message)
   void list.reload()
 }
 
-async function setActive(user: User, isActive: boolean): Promise<void> {
-  try {
-    await updateUser(user.id, { isActive })
-    notifySaved(`${user.name} ${isActive ? 'diaktifkan' : 'dinonaktifkan'}`)
-  } catch (cause) {
-    toast.add({
-      severity: 'error',
-      summary: errorMessage(cause, 'Gagal menyimpan perubahan'),
-      life: TOAST_LIFE_MS,
-    })
-  }
-}
-
-function toggleActive(user: User): void {
-  if (!user.isActive) {
-    void setActive(user, true)
-    return
-  }
-  confirm.require({
-    header: 'Nonaktifkan pengguna',
-    message: `Nonaktifkan ${user.name}? Ia langsung keluar dan tidak bisa login lagi.`,
-    acceptLabel: 'Nonaktifkan',
-    rejectLabel: 'Batal',
-    acceptProps: { severity: 'danger' },
-    rejectProps: { severity: 'secondary', variant: 'text' },
-    accept: () => void setActive(user, false),
-  })
-}
+const toggleActive = useToggleActive<User>({
+  update: (id, isActive) => updateUser(id, { isActive }),
+  onChanged: () => void list.reload(),
+  describe: () => 'Ia langsung keluar dan tidak bisa login lagi.',
+})
 
 function onPage(event: DataTablePageEvent): void {
   list.setPage(event.page + 1, event.rows)
@@ -135,7 +106,7 @@ onMounted(list.reload)
     />
     <Select
       v-model="filters.isActive"
-      :options="STATUS_OPTIONS"
+      :options="ACTIVE_OPTIONS"
       option-label="label"
       option-value="value"
       placeholder="Semua status"
@@ -147,8 +118,7 @@ onMounted(list.reload)
 
   <ErrorState v-if="error" :message="error" @retry="list.reload" />
 
-  <!-- Tabel menggulir di dalam wadahnya sendiri supaya halaman tidak melebar di layar kecil. -->
-  <div v-else class="overflow-x-auto rounded-xl border border-surface-200 bg-surface-0">
+  <TableCard v-else>
     <DataTable
       :value="items"
       data-key="id"
@@ -178,10 +148,7 @@ onMounted(list.reload)
       </Column>
       <Column header="Status">
         <template #body="{ data }: { data: User }">
-          <Tag
-            :severity="data.isActive ? 'success' : 'secondary'"
-            :value="data.isActive ? 'Aktif' : 'Nonaktif'"
-          />
+          <ActiveTag :active="data.isActive" />
         </template>
       </Column>
       <Column header="Dibuat" class="hidden md:table-cell">
@@ -209,30 +176,25 @@ onMounted(list.reload)
               @click="openReset(data)"
             />
             <!-- Akun sendiri tidak bisa dinonaktifkan; API juga menolaknya. -->
-            <Button
+            <ToggleActiveButton
               v-if="data.id !== session.user?.id"
-              :icon="data.isActive ? 'pi pi-ban' : 'pi pi-check-circle'"
-              :severity="data.isActive ? 'danger' : 'success'"
-              variant="text"
-              :aria-label="`${data.isActive ? 'Nonaktifkan' : 'Aktifkan'} ${data.name}`"
-              :title="data.isActive ? 'Nonaktifkan' : 'Aktifkan'"
-              :data-testid="`toggle-${data.id}`"
-              @click="toggleActive(data)"
+              :item="data"
+              @toggle="toggleActive(data)"
             />
           </div>
         </template>
       </Column>
     </DataTable>
-  </div>
+  </TableCard>
 
   <UserFormDialog
     v-model:visible="formOpen"
     :user="selected"
-    @saved="notifySaved(`${$event.name} disimpan`)"
+    @saved="onSaved(`${$event.name} disimpan`)"
   />
   <ResetPasswordDialog
     v-model:visible="resetOpen"
     :user="selected"
-    @saved="notifySaved(`Password ${$event.name} direset`)"
+    @saved="onSaved(`Password ${$event.name} direset`)"
   />
 </template>

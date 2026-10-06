@@ -8,7 +8,7 @@ import FormDialog from '@/components/FormDialog.vue'
 import FormField from '@/components/FormField.vue'
 import PasswordField from '@/components/PasswordField.vue'
 import { useFormSubmit } from '@/composables/useFormSubmit'
-import { ROLE_OPTIONS } from '@/lib/roles'
+import { ROLE_OPTIONS } from '@/lib/labels'
 import { collectErrors, email, newPassword, required } from '@/lib/validation'
 
 const props = defineProps<{

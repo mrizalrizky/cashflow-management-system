@@ -65,6 +65,14 @@ describe('http client', () => {
       expect(fetchMock.mock.calls[0]![1]).toMatchObject({ method: 'GET', credentials: 'same-origin' })
     })
 
+    it('treats a null query value as absent, like undefined', async () => {
+      respond(() => json(200, {}))
+
+      await http.request('/users', { query: { page: 1, role: null, isActive: null } })
+
+      expect(urlOf(fetchMock.mock.calls[0]!)).toBe('/api/v1/users?page=1')
+    })
+
     it('sends a JSON body only when there is one', async () => {
       respond(() => json(200, {}))
 
@@ -147,6 +155,35 @@ describe('http client', () => {
       expect(headersOf(refresh).Authorization).toBeUndefined()
     })
 
+    it('tells the session listener who the refreshed session belongs to', async () => {
+      const onRefreshed = vi.fn<(session: unknown) => void>()
+      http.bindSessionEvents({ onExpired: () => undefined, onRefreshed })
+      http.setAccessToken('token-lama')
+      respond((url, init) => {
+        if (url.endsWith('/auth/refresh')) return json(200, SESSION)
+        const auth = (init.headers as Record<string, string>).Authorization
+        return auth === 'Bearer token-baru' ? json(200, {}) : unauthorized()
+      })
+
+      await http.request('/users')
+
+      expect(onRefreshed).toHaveBeenCalledExactlyOnceWith(SESSION)
+    })
+
+    it('holds a cross-tab lock while refreshing, when the browser offers one', async () => {
+      const lock = vi.fn<(name: string, run: () => Promise<unknown>) => Promise<unknown>>(
+        (_name, run) => run(),
+      )
+      vi.stubGlobal('navigator', { locks: { request: lock } })
+      respond((url) => (url.endsWith('/auth/refresh') ? json(200, SESSION) : json(200, {})))
+
+      await http.refreshSession()
+
+      expect(lock).toHaveBeenCalledExactlyOnceWith('auth-refresh', expect.any(Function))
+      vi.unstubAllGlobals()
+      vi.stubGlobal('fetch', fetchMock)
+    })
+
     it('shares one refresh between requests that fail together', async () => {
       http.setAccessToken('token-lama')
       respond((url, init) => {
@@ -179,7 +216,7 @@ describe('http client', () => {
 
     it('gives up after two failed refreshes and reports the expired session exactly once', async () => {
       const expired = vi.fn<() => void>()
-      http.onSessionExpired(expired)
+      http.bindSessionEvents({ onExpired: expired, onRefreshed: () => undefined })
       http.setAccessToken('token-lama')
       respond(() => unauthorized())
 
@@ -197,7 +234,7 @@ describe('http client', () => {
 
     it('stops refreshing when the server is unreachable, without ending the session', async () => {
       const expired = vi.fn<() => void>()
-      http.onSessionExpired(expired)
+      http.bindSessionEvents({ onExpired: expired, onRefreshed: () => undefined })
       http.setAccessToken('token-lama')
       respond((url) => {
         if (url.endsWith('/auth/refresh')) throw new TypeError('Failed to fetch')
@@ -239,7 +276,7 @@ describe('http client', () => {
 
     it('returns null without reporting an expired session when nobody was logged in', async () => {
       const expired = vi.fn<() => void>()
-      http.onSessionExpired(expired)
+      http.bindSessionEvents({ onExpired: expired, onRefreshed: () => undefined })
       respond(() => unauthorized())
 
       expect(await http.refreshSession()).toBeNull()

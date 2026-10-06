@@ -11,15 +11,15 @@ function deferred<T>() {
 }
 
 describe('useFormSubmit', () => {
-  it('reports success and tracks the submitting state', async () => {
-    const pending = deferred<void>()
+  it('returns the value of the action and tracks the submitting state', async () => {
+    const pending = deferred<string>()
     const form = useFormSubmit(() => pending.promise)
 
     const result = form.submit()
     expect(form.submitting.value).toBe(true)
-    pending.resolve()
+    pending.resolve('tersimpan')
 
-    expect(await result).toBe(true)
+    expect(await result).toEqual({ ok: true, value: 'tersimpan' })
     expect(form.submitting.value).toBe(false)
   })
 
@@ -27,7 +27,7 @@ describe('useFormSubmit', () => {
     const action = vi.fn<() => Promise<void>>()
     const form = useFormSubmit(action)
 
-    expect(await form.submit({ email: 'Email wajib diisi' })).toBe(false)
+    expect(await form.submit({ email: 'Email wajib diisi' })).toEqual({ ok: false })
 
     expect(action).not.toHaveBeenCalled()
     expect(form.fieldErrors.value).toEqual({ email: 'Email wajib diisi' })
@@ -43,7 +43,7 @@ describe('useFormSubmit', () => {
       ),
     )
 
-    expect(await form.submit()).toBe(false)
+    expect(await form.submit()).toEqual({ ok: false })
 
     expect(form.fieldErrors.value).toEqual({ email: 'Format salah', name: 'Wajib' })
     expect(form.formError.value).toBeNull()
@@ -83,7 +83,7 @@ describe('useFormSubmit', () => {
     const form = useFormSubmit(action)
 
     const first = form.submit()
-    expect(await form.submit()).toBe(false)
+    expect(await form.submit()).toEqual({ ok: false })
     pending.resolve()
     await first
 
@@ -100,7 +100,22 @@ describe('useFormSubmit', () => {
     await form.submit()
     expect(form.formError.value).not.toBeNull()
 
-    expect(await form.submit()).toBe(true)
+    expect((await form.submit()).ok).toBe(true)
     expect(form.formError.value).toBeNull()
+  })
+
+  it('forgets every error when reset, for a form that is opened again', async () => {
+    const form = useFormSubmit(() => Promise.reject(new ApiError(409, 'Email sudah dipakai')), {
+      fieldForStatus: { 409: 'email' },
+    })
+    await form.submit()
+    const other = useFormSubmit(() => Promise.reject(new ApiError(500, 'Gagal')))
+    await other.submit()
+
+    form.reset()
+    other.reset()
+
+    expect(form.fieldErrors.value).toEqual({})
+    expect(other.formError.value).toBeNull()
   })
 })

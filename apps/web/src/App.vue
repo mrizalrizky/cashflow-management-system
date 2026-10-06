@@ -11,12 +11,14 @@ import { useSessionStore } from '@/stores/session'
 const route = useRoute()
 const session = useSessionStore()
 
+// Sebelum sesi dipulihkan dan rute pertama selesai dipilih, belum diketahui halaman mana yang
+// boleh tampil; menampilkan kerangka aplikasi di saat itu akan berkedip di depan halaman login.
+const booting = computed(() => !session.ready || route.matched.length === 0)
 const layout = computed(() => (route.meta.layout === 'auth' ? AuthLayout : AppLayout))
 </script>
 
 <template>
-  <!-- Sebelum sesi selesai dipulihkan belum diketahui halaman mana yang boleh tampil. -->
-  <div v-if="!session.ready" class="flex min-h-dvh items-center justify-center">
+  <div v-if="booting" class="flex min-h-dvh items-center justify-center">
     <ProgressSpinner aria-label="Memuat" />
   </div>
   <component :is="layout" v-else>

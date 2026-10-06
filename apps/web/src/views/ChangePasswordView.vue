@@ -3,9 +3,8 @@ import { reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import Password from 'primevue/password'
 import FormAlert from '@/components/FormAlert.vue'
-import FormField from '@/components/FormField.vue'
+import PasswordField from '@/components/PasswordField.vue'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import { useLogout } from '@/composables/useLogout'
 import { collectErrors, matches, newPassword, required } from '@/lib/validation'
@@ -31,14 +30,14 @@ const fields = [
 ] as const
 
 async function onSubmit(): Promise<void> {
-  const changed = await submit(
+  const result = await submit(
     collectErrors(form, {
       currentPassword: [required('Password saat ini')],
       newPassword: newPassword('Password baru'),
       confirmPassword: [matches(() => form.newPassword, 'Konfirmasi password tidak sama')],
     }),
   )
-  if (changed && session.user) {
+  if (result.ok && session.user) {
     await router.replace(postLoginPath(session.user))
   }
 }
@@ -52,24 +51,15 @@ async function onSubmit(): Promise<void> {
     </Message>
     <FormAlert :message="formError" />
 
-    <FormField
+    <PasswordField
       v-for="item in fields"
       :id="item.id"
       :key="item.id"
-      v-slot="field"
+      v-model="form[item.id]"
       :label="item.label"
+      :autocomplete="item.autocomplete"
       :error="fieldErrors[item.id]"
-    >
-      <Password
-        v-model="form[item.id]"
-        :input-id="field.id"
-        :input-props="{ autocomplete: item.autocomplete, 'aria-describedby': field.describedBy }"
-        :invalid="field.invalid"
-        :feedback="false"
-        toggle-mask
-        fluid
-      />
-    </FormField>
+    />
 
     <Button type="submit" label="Simpan password" :loading="submitting" :disabled="submitting" fluid />
     <Button

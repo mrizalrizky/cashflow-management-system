@@ -1,7 +1,5 @@
 export type Role = 'SUPER_ADMIN' | 'PROJECT_MANAGER' | 'STAFF'
 
-export const ROLES: Role[] = ['SUPER_ADMIN', 'PROJECT_MANAGER', 'STAFF']
-
 /** User yang sedang login. */
 export interface AuthUser {
   id: string

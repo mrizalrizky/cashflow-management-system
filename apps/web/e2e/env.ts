@@ -12,12 +12,19 @@ export const ADMIN = {
   password: 'password-admin-1',
 }
 
+const DATABASE_URL =
+  process.env.TEST_DATABASE_URL ?? 'postgresql://cashflow:cashflow_dev@localhost:5432/cashflow_test'
+
+// Dicek di sini, sebelum server dijalankan atau migrasi diterapkan: test browser mengosongkan
+// semua tabel, jadi hanya boleh menyentuh database yang namanya diakhiri `_test`.
+if (!new URL(DATABASE_URL).pathname.endsWith('_test')) {
+  throw new Error('Test browser menolak jalan: nama database harus diakhiri _test')
+}
+
 export const apiEnv: Record<string, string> = {
   NODE_ENV: 'test',
   PORT: String(API_PORT),
-  DATABASE_URL:
-    process.env.TEST_DATABASE_URL ??
-    'postgresql://cashflow:cashflow_dev@localhost:5432/cashflow_test',
+  DATABASE_URL,
   JWT_ACCESS_SECRET: 'browser-test-secret-browser-test-secret-1234',
   LOGIN_RATE_LIMIT: '1000',
   SEED_ADMIN_NAME: ADMIN.name,

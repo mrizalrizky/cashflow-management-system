@@ -1,10 +1,11 @@
 import { request } from './http'
 import type { PageParams, Paginated, Role, User } from './types'
 
+/** `null` diperlakukan sama dengan tidak diisi (nilai dari dropdown yang dikosongkan). */
 export interface UserFilters {
   search?: string
-  role?: Role
-  isActive?: boolean
+  role?: Role | null
+  isActive?: boolean | null
 }
 
 export interface CreateUserInput {

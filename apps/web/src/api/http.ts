@@ -2,8 +2,11 @@ import type { FieldError, SessionResponse } from './types'
 
 const BASE_URL = '/api/v1'
 const REFRESH_PATH = '/auth/refresh'
+const REFRESH_LOCK = 'auth-refresh'
+const REFRESH_RETRY_DELAY_MS = 250
 
-export type QueryValue = string | number | boolean | undefined
+/** `null` dan `undefined` sama-sama berarti "tanpa filter". */
+export type QueryValue = string | number | boolean | null | undefined
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH'
@@ -11,6 +14,13 @@ export interface RequestOptions {
   query?: Record<string, QueryValue>
   /** `false` untuk rute tanpa access token (login, refresh, logout). */
   auth?: boolean
+}
+
+export interface SessionEvents {
+  /** Sesi diperpanjang diam-diam; pemiliknya bisa saja berbeda bila tab lain login ulang. */
+  onRefreshed(session: SessionResponse): void
+  /** Sesi yang tadinya aktif tidak bisa diperpanjang lagi. */
+  onExpired(): void
 }
 
 export class ApiError extends Error {
@@ -27,22 +37,22 @@ export class ApiError extends Error {
 
 // Access token hanya hidup di memori; tidak pernah ditulis ke storage browser.
 let accessToken: string | null = null
-let sessionExpiredHandler: (() => void) | null = null
+let sessionEvents: SessionEvents | null = null
 let refreshing: Promise<SessionResponse | null> | null = null
 
 export function setAccessToken(token: string | null): void {
   accessToken = token
 }
 
-/** Dipanggil sekali saat sesi yang tadinya aktif tidak bisa diperpanjang lagi. */
-export function onSessionExpired(handler: () => void): void {
-  sessionExpiredHandler = handler
+/** Satu pendengar untuk perubahan sesi yang terjadi di balik layar (dipakai store sesi). */
+export function bindSessionEvents(events: SessionEvents): void {
+  sessionEvents = events
 }
 
 function buildUrl(path: string, query: RequestOptions['query']): string {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined) params.set(key, String(value))
+    if (value !== undefined && value !== null) params.set(key, String(value))
   }
   const search = params.toString()
   return `${BASE_URL}${path}${search ? `?${search}` : ''}`
@@ -91,10 +101,15 @@ async function send<T>(path: string, options: RequestOptions): Promise<T> {
 
 type RefreshOutcome = SessionResponse | 'expired' | 'unavailable'
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function callRefresh(): Promise<RefreshOutcome> {
-  // Dicoba dua kali: tab lain mungkin baru saja merotasi token yang sama, dan
-  // percobaan kedua membawa cookie baru yang ditulis tab itu.
+  // Dicoba dua kali dengan jeda: tab lain mungkin baru saja merotasi token yang sama,
+  // dan percobaan kedua membawa cookie baru yang ditulis tab itu.
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt > 0) await wait(REFRESH_RETRY_DELAY_MS)
     try {
       return await send<SessionResponse>(REFRESH_PATH, { method: 'POST', auth: false })
     } catch (error) {
@@ -105,20 +120,30 @@ async function callRefresh(): Promise<RefreshOutcome> {
 }
 
 /**
+ * Menjalankan refresh bergantian antar tab bila browser mendukung Web Locks, sehingga tab
+ * kedua baru mengirim request setelah cookie baru dari tab pertama tersimpan.
+ */
+function acrossTabs<T>(run: () => Promise<T>): Promise<T> {
+  const locks = globalThis.navigator?.locks
+  return locks ? (locks.request(REFRESH_LOCK, run) as Promise<T>) : run()
+}
+
+/**
  * Memperpanjang sesi lewat cookie refresh. Pemanggil yang datang bersamaan menunggu satu
  * request yang sama. Mengembalikan null bila tidak ada sesi yang bisa diperpanjang.
  */
 export function refreshSession(): Promise<SessionResponse | null> {
   refreshing ??= (async () => {
     const hadSession = accessToken !== null
-    const outcome = await callRefresh()
+    const outcome = await acrossTabs(callRefresh)
     if (typeof outcome === 'object') {
       accessToken = outcome.accessToken
+      sessionEvents?.onRefreshed(outcome)
       return outcome
     }
     if (outcome === 'expired') {
       accessToken = null
-      if (hadSession) sessionExpiredHandler?.()
+      if (hadSession) sessionEvents?.onExpired()
     }
     return null
   })().finally(() => {

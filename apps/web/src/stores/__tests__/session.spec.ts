@@ -129,11 +129,25 @@ describe('session store', () => {
     session.onExpired(listener)
     await session.login('admin@example.com', 'rahasia-123')
 
-    const reportExpiry = vi.mocked(http.onSessionExpired).mock.calls[0]![0]
-    reportExpiry()
+    vi.mocked(http.bindSessionEvents).mock.calls[0]![0].onExpired()
 
     expect(session.user).toBeNull()
     expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('follows the user of a silently refreshed session, such as another login in a second tab', async () => {
+    vi.mocked(authApi.login).mockResolvedValue(SESSION)
+    const session = useSessionStore()
+    await session.login('admin@example.com', 'rahasia-123')
+    const other = { ...USER, id: 'u2', name: 'Orang Lain', role: 'STAFF' as const }
+
+    vi.mocked(http.bindSessionEvents).mock.calls[0]![0].onRefreshed({
+      accessToken: 'token-3',
+      user: other,
+    })
+
+    expect(session.user).toEqual(other)
+    expect(session.role).toBe('STAFF')
   })
 
   it('never writes to browser storage', async () => {

@@ -66,8 +66,10 @@ describe('POST /auth/refresh', () => {
     const session = await loginAs(ctx);
     const rotated = refreshCookie(await refresh(ctx, session.cookie).expect(200));
 
-    await refresh(ctx, session.cookie).expect(401);
+    const loser = await refresh(ctx, session.cookie).expect(401);
 
+    // Cookie tidak dihapus: tab pemenang baru saja menerima cookie baru di browser yang sama.
+    expect(loser.headers['set-cookie']).toBeUndefined();
     await refresh(ctx, rotated).expect(200);
     expect(await ctx.prisma.auditLog.count({ where: { action: 'TOKEN_REUSE' } })).toBe(0);
   });
@@ -81,6 +83,8 @@ describe('POST /auth/refresh', () => {
     ]);
 
     expect(results.map((r) => r.status).sort()).toEqual([200, 401]);
+    const loser = results.find((r) => r.status === 401)!;
+    expect(loser.headers['set-cookie']).toBeUndefined();
     expect(await ctx.prisma.refreshToken.count({ where: { revoked_at: null } })).toBe(1);
   });
 

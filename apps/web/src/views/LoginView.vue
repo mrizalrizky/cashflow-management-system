@@ -3,9 +3,9 @@ import { reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
 import FormAlert from '@/components/FormAlert.vue'
 import FormField from '@/components/FormField.vue'
+import PasswordField from '@/components/PasswordField.vue'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import { collectErrors, email, required } from '@/lib/validation'
 import { postLoginPath } from '@/router/guards'
@@ -21,13 +21,13 @@ const { submitting, fieldErrors, formError, submit } = useFormSubmit(() =>
 )
 
 async function onSubmit(): Promise<void> {
-  const loggedIn = await submit(
+  const result = await submit(
     collectErrors(form, {
       email: [required('Email'), email()],
       password: [required('Password')],
     }),
   )
-  if (loggedIn && session.user) {
+  if (result.ok && session.user) {
     await router.replace(postLoginPath(session.user, route.query.redirect))
   }
 }
@@ -50,17 +50,13 @@ async function onSubmit(): Promise<void> {
       />
     </FormField>
 
-    <FormField id="password" v-slot="field" label="Password" :error="fieldErrors.password">
-      <Password
-        v-model="form.password"
-        :input-id="field.id"
-        :input-props="{ autocomplete: 'current-password', 'aria-describedby': field.describedBy }"
-        :invalid="field.invalid"
-        :feedback="false"
-        toggle-mask
-        fluid
-      />
-    </FormField>
+    <PasswordField
+      id="password"
+      v-model="form.password"
+      label="Password"
+      autocomplete="current-password"
+      :error="fieldErrors.password"
+    />
 
     <Button type="submit" label="Masuk" :loading="submitting" :disabled="submitting" fluid />
   </form>

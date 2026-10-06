@@ -8,14 +8,15 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
-import { ApiError } from '@/api/http'
 import type { User } from '@/api/types'
 import { listUsers, updateUser, type UserFilters } from '@/api/users'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useDebouncedInput } from '@/composables/useDebouncedInput'
 import { usePagedList } from '@/composables/usePagedList'
-import { formatDate, ROLE_OPTIONS, roleLabel } from '@/lib/format'
+import { errorMessage } from '@/lib/errors'
+import { formatDate } from '@/lib/format'
+import { ROLE_OPTIONS, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 import ResetPasswordDialog from './ResetPasswordDialog.vue'
 import UserFormDialog from './UserFormDialog.vue'
@@ -42,7 +43,8 @@ const search = useDebouncedInput((value) => {
 })
 
 const hasFilters = computed(
-  () => Boolean(filters.search) || filters.role !== undefined || filters.isActive !== undefined,
+  // Tombol hapus pada Select mengisi model dengan null, jadi null juga berarti tanpa filter.
+  () => Boolean(filters.search) || filters.role != null || filters.isActive != null,
 )
 
 // Dialog: satu untuk tambah/ubah, satu untuk reset password.
@@ -72,7 +74,7 @@ async function setActive(user: User, isActive: boolean): Promise<void> {
   } catch (cause) {
     toast.add({
       severity: 'error',
-      summary: cause instanceof ApiError ? cause.message : 'Gagal menyimpan perubahan',
+      summary: errorMessage(cause, 'Gagal menyimpan perubahan'),
       life: TOAST_LIFE_MS,
     })
   }

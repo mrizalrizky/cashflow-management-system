@@ -17,7 +17,7 @@ declare module 'vue-router' {
 }
 
 // Halaman yang dibangun pada fase berikutnya memakai tampilan sementara yang sama.
-const placeholder = () => import('@/views/HomeView.vue')
+const placeholder = () => import('@/views/PlaceholderView.vue')
 
 export const routes: RouteRecordRaw[] = [
   {

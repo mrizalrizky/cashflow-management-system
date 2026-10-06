@@ -12,8 +12,20 @@ import { TokenService } from './token.service.js';
 /** Jeda saat token yang baru dirotasi masih boleh muncul lagi (tab lain yang refresh bersamaan). */
 const REUSE_GRACE_MS = 10_000;
 
+const SESSION_ENDED = 'Sesi berakhir, silakan login kembali';
+
 function sessionEnded(): UnauthorizedException {
-  return new UnauthorizedException('Sesi berakhir, silakan login kembali');
+  return new UnauthorizedException(SESSION_ENDED);
+}
+
+/**
+ * Refresh kalah cepat dari request lain yang memakai token yang sama (biasanya tab lain).
+ * Sesinya sendiri masih hidup lewat token baru milik pemenang, jadi cookie tidak boleh dihapus.
+ */
+export class ConcurrentRefreshException extends UnauthorizedException {
+  constructor() {
+    super(SESSION_ENDED);
+  }
 }
 
 @Injectable()
@@ -63,7 +75,9 @@ export class AuthService {
     if (!current || current.expires_at <= now) throw sessionEnded();
 
     if (current.revoked_at) {
-      await this.handleRotatedTokenReuse(current.user_id, current.revoked_at, now, ip);
+      const withinGrace = now.getTime() - current.revoked_at.getTime() <= REUSE_GRACE_MS;
+      if (withinGrace) throw new ConcurrentRefreshException();
+      await this.endSessionsAfterTokenReuse(current.user_id, ip);
       throw sessionEnded();
     }
     if (!current.user.is_active) throw sessionEnded();
@@ -71,7 +85,7 @@ export class AuthService {
     const refreshToken = await this.prisma.$transaction((tx) =>
       this.sessions.rotate(tx, current.id, current.user_id, now),
     );
-    if (!refreshToken) throw sessionEnded();
+    if (!refreshToken) throw new ConcurrentRefreshException();
 
     return this.buildSession(current.user, refreshToken);
   }
@@ -122,17 +136,10 @@ export class AuthService {
   }
 
   /**
-   * Token yang sudah dirotasi dipakai lagi. Dalam jeda singkat, itu tab lain yang refresh
-   * bersamaan dan cukup ditolak. Di luar jeda itu dianggap pencurian: semua sesi diakhiri.
+   * Token yang sudah lama dirotasi dipakai lagi: dianggap pencurian, semua sesi diakhiri.
+   * (Dalam jeda singkat setelah rotasi, itu hanya tab lain yang refresh bersamaan.)
    */
-  private async handleRotatedTokenReuse(
-    userId: string,
-    rotatedAt: Date,
-    now: Date,
-    ip: string | null,
-  ): Promise<void> {
-    if (now.getTime() - rotatedAt.getTime() <= REUSE_GRACE_MS) return;
-
+  private async endSessionsAfterTokenReuse(userId: string, ip: string | null): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await this.sessions.endAll(tx, userId);
       await this.logUserEvent(tx, 'TOKEN_REUSE', userId, ip);

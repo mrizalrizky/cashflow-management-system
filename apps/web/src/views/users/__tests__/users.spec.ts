@@ -107,6 +107,19 @@ describe('UsersView', () => {
     expect(lastListParams()).toMatchObject({ role: 'PROJECT_MANAGER', isActive: false })
   })
 
+  it('treats a cleared filter as no filter', async () => {
+    const { wrapper } = await mountUsers([])
+    const role = wrapper.findAllComponents(Select)[0]!
+    role.vm.$emit('update:modelValue', 'STAFF')
+    await flushPromises()
+
+    // Tombol hapus pada Select mengisi model dengan null.
+    role.vm.$emit('update:modelValue', null)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Belum ada pengguna')
+  })
+
   it('asks the API for the page the table requests', async () => {
     const { wrapper } = await mountUsers()
 
@@ -257,6 +270,19 @@ describe('UserFormDialog', () => {
 
     expect(wrapper.get('#user-email-error').text()).toBe('Email sudah dipakai')
     expect(wrapper.emitted('saved')).toBeUndefined()
+  })
+
+  it('starts clean when it is opened again after an error', async () => {
+    const { wrapper } = await mountForm()
+    await submitForm(wrapper)
+    expect(wrapper.text()).toContain('Nama wajib diisi')
+
+    await wrapper.setProps({ visible: false })
+    await wrapper.setProps({ visible: true, user: BUDI })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('wajib diisi')
+    expect((wrapper.get('#user-name').element as HTMLInputElement).value).toBe('Budi Santoso')
   })
 
   it('edits without a password field and sends only what changed', async () => {

@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import * as authApi from '@/api/auth'
-import { onSessionExpired, refreshSession, setAccessToken } from '@/api/http'
+import { bindSessionEvents, refreshSession, setAccessToken } from '@/api/http'
 import type { AuthUser, Role, SessionResponse } from '@/api/types'
 
 /** Siapa yang sedang login. Access token sendiri disimpan klien HTTP, bukan di sini. */
@@ -64,9 +64,16 @@ export const useSessionStore = defineStore('session', () => {
     expiredListener = listener
   }
 
-  onSessionExpired(() => {
-    clear()
-    expiredListener?.()
+  bindSessionEvents({
+    // Cookie dipakai bersama semua tab: bila tab lain login sebagai orang lain,
+    // perpanjangan sesi di tab ini mengembalikan user itu, dan tampilan harus mengikutinya.
+    onRefreshed: (session) => {
+      user.value = session.user
+    },
+    onExpired: () => {
+      clear()
+      expiredListener?.()
+    },
   })
 
   return { user, ready, isAuthenticated, role, restore, login, changePassword, logout, onExpired }

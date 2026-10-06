@@ -12,7 +12,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
-import { AuthService } from './auth.service.js';
+import { AuthService, ConcurrentRefreshException } from './auth.service.js';
 import type { AuthUser, Session } from './auth.types.js';
 import { AllowPendingPasswordChange, CurrentUser, Public } from './decorators.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
@@ -58,8 +58,11 @@ export class AuthController {
     try {
       return this.respondWithSession(res, await this.auth.refresh(readRefreshCookie(req), ip));
     } catch (error) {
-      // Supaya browser berhenti mengirim token yang sudah tidak berlaku.
-      clearRefreshCookie(res, this.secureCookies);
+      // Supaya browser berhenti mengirim token yang sudah tidak berlaku. Kecuali bila hanya
+      // kalah cepat dari tab lain: cookie di browser saat itu sudah milik sesi yang baru.
+      if (!(error instanceof ConcurrentRefreshException)) {
+        clearRefreshCookie(res, this.secureCookies);
+      }
       throw error;
     }
   }

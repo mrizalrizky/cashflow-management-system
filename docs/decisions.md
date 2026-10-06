@@ -22,3 +22,12 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Sesi yang diakhiri dihapus barisnya.** Logout, ganti password, reset oleh admin, ganti peran, dan penonaktifan menghapus baris `refresh_tokens`. `revoked_at` hanya diisi oleh rotasi, sehingga deteksi pencurian hanya terpicu oleh token lama yang sudah ditukar, bukan oleh perangkat lain yang sesinya sengaja diakhiri.
 - **Password saat ini salah dijawab 400** (error field `currentPassword`), bukan 401, supaya klien tidak mengiranya sesi kedaluwarsa.
 - **Perubahan peran dan status aktif diserikan** dengan advisory lock PostgreSQL, supaya dua admin yang saling menurunkan pada saat bersamaan tidak menghilangkan SUPER_ADMIN terakhir.
+
+## Fase 1b
+
+- **Access token hanya di memori.** Tidak ada data sesi yang ditulis JavaScript ke storage atau cookie; saat halaman dimuat ulang, sesi dipulihkan lewat cookie refresh.
+- **Dua tab refresh bersamaan.** Web menyerikan refresh antar tab dengan Web Locks (bila tersedia) dan mencoba sekali lagi setelah jeda singkat. API tidak menghapus cookie bila sebuah refresh hanya kalah cepat dari tab lain, karena cookie di browser saat itu sudah milik sesi yang baru.
+- **Menu mengikuti rute.** Item menu tampil berdasarkan `meta.roles` rutenya, jadi menu dan guard tidak bisa berbeda. Yang benar-benar menjaga data tetap API.
+- **Tipe API ditulis tangan** di `apps/web/src/api/types.ts` untuk fase ini; pembuatan otomatis dari OpenAPI ditunda ke awal Fase 2.
+- **Test browser terisolasi.** Playwright menjalankan API (port 3100, build ke `dist-browser-test`) dan web (port 5174) sendiri terhadap `cashflow_test`, supaya server dan data pengembangan tidak tersentuh.
+- **`primeicons` dikunci di 7.0.0** (MIT).

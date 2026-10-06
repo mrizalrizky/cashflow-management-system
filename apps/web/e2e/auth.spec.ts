@@ -62,7 +62,7 @@ test('login, forced password change, user management and role limits', async ({ 
     const dialog = page.getByRole('dialog')
     await dialog.getByLabel('Nama').fill(STAFF.name)
     await dialog.getByLabel('Email').fill(STAFF.email)
-    await dialog.getByRole('combobox').click()
+    await dialog.getByRole('combobox', { name: 'Peran' }).click()
     await page.getByRole('option', { name: 'Staf' }).click()
     await dialog.getByLabel('Password sementara').fill(STAFF.temporaryPassword)
     await dialog.getByRole('button', { name: 'Simpan' }).click()

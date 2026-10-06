@@ -1,6 +1,6 @@
 import { reactive, ref, watch, type Ref, type UnwrapNestedRefs } from 'vue'
-import { ApiError } from '@/api/http'
 import type { PageParams, Paginated } from '@/api/types'
+import { errorMessage } from '@/lib/errors'
 
 export const DEFAULT_PAGE_SIZE = 20
 
@@ -45,7 +45,7 @@ export function usePagedList<T, F extends object>(
       total.value = result.meta.total
     } catch (cause) {
       if (request !== latestRequest) return
-      error.value = cause instanceof ApiError ? cause.message : 'Gagal memuat data'
+      error.value = errorMessage(cause, 'Gagal memuat data')
     } finally {
       if (request === latestRequest) loading.value = false
     }

@@ -5,12 +5,11 @@ import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import SideNav from '@/components/SideNav.vue'
 import { useLogout } from '@/composables/useLogout'
-import { roleLabel } from '@/lib/format'
+import { APP_NAME } from '@/lib/app'
+import { roleLabel } from '@/lib/roles'
 import { menuFor } from '@/router/navigation'
 import { PATHS } from '@/router/paths'
 import { useSessionStore } from '@/stores/session'
-
-const APP_NAME = 'Arus Kas'
 
 const session = useSessionStore()
 const router = useRouter()

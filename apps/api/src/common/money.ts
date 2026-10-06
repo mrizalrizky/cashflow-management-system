@@ -1,9 +1,9 @@
 import { applyDecorators } from '@nestjs/common';
 import { IsString, Matches } from 'class-validator';
 
-// 15 digit cukup untuk ratusan triliun rupiah dan masih jauh di bawah batas BIGINT.
-const UNSIGNED = /^\d{1,15}$/;
-const SIGNED = /^-?\d{1,15}$/;
+// 18 digit: nilai 18 digit mana pun masih di bawah batas kolom BIGINT (sekitar 9,2 x 10^18).
+const UNSIGNED = /^\d{1,18}$/;
+const SIGNED = /^-?\d{1,18}$/;
 
 /**
  * Nominal rupiah di JSON: string berisi digit saja, tanpa titik, koma, atau desimal.

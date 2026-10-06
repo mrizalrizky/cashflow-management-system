@@ -13,7 +13,7 @@ class SignedAmountDto {
 }
 
 describe('IsMoneyString', () => {
-  it.each(['0', '1250000', '000123', '9007199254740993', '999999999999999'])(
+  it.each(['0', '1250000', '000123', '9007199254740993', '999999999999999999'])(
     'accepts %j',
     async (amount) => {
       expect((await validateBody(AmountDto, { amount })).rejected).toEqual([]);
@@ -31,7 +31,7 @@ describe('IsMoneyString', () => {
     ['a JSON number', 1250000],
     ['null', null],
     ['a missing value', undefined],
-    ['16 digits', '1234567890123456'],
+    ['19 digits, more than the database column holds', '1234567890123456789'],
     ['letters', 'seribu'],
   ])('rejects %s', async (_label, amount) => {
     expect((await validateBody(AmountDto, { amount })).rejected).toEqual(['amount']);

@@ -19,14 +19,14 @@ describe('HomeView', () => {
   })
 
   it('shows connected when the API is healthy', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ status: 'ok' }) }))
     const wrapper = mountHome()
     await flushPromises()
     expect(wrapper.get('[data-testid="health"]').text()).toContain('API terhubung')
   })
 
   it('shows not connected when the API returns 503', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503, json: () => Promise.resolve({ statusCode: 503 }) }))
     const wrapper = mountHome()
     await flushPromises()
     expect(wrapper.get('[data-testid="health"]').text()).toContain('API tidak terhubung')

@@ -153,10 +153,10 @@ model Transaction {
 
   account     Account      @relation(fields: [account_id], references: [id])
   category    Category     @relation(fields: [category_id], references: [id])
-  project     Project?     @relation(fields: [project_id], references: [id])
+  project     Project?     @relation(fields: [project_id], references: [id], onDelete: Restrict)
   created_by  User         @relation("transaction_created_by", fields: [created_by_id], references: [id])
-  reviewed_by User?        @relation("transaction_reviewed_by", fields: [reviewed_by_id], references: [id])
-  voided_by   User?        @relation("transaction_voided_by", fields: [voided_by_id], references: [id])
+  reviewed_by User?        @relation("transaction_reviewed_by", fields: [reviewed_by_id], references: [id], onDelete: Restrict)
+  voided_by   User?        @relation("transaction_voided_by", fields: [voided_by_id], references: [id], onDelete: Restrict)
   attachments Attachment[]
 
   @@index([transaction_date], map: "idx_transactions_transaction_date")

@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
@@ -56,4 +57,36 @@ describe('GET /api/v1/health', () => {
     const res = await request(app.getHttpServer()).get('/api/v1/tidak-ada').expect(404);
     expect(res.body.statusCode).toBe(404);
   });
+
+  it('returns 503 within a few seconds when the database never answers', async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PrismaService)
+      .useValue({ $queryRaw: () => new Promise(() => {}) })
+      .compile();
+    app = moduleRef.createNestApplication();
+    configureApp(app);
+    await app.init();
+
+    const started = Date.now();
+    const res = await request(app.getHttpServer()).get('/api/v1/health').expect(503);
+    expect(res.body.message).toBe('Database tidak tersedia');
+    expect(Date.now() - started).toBeLessThan(4500);
+  }, 8000);
+
+  it('returns 503 promptly when the real database client cannot connect', async () => {
+    const unreachable = new PrismaService({
+      getOrThrow: () => 'postgresql://cashflow:cashflow_dev@127.0.0.1:1/cashflow_test',
+    } as unknown as ConfigService);
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PrismaService)
+      .useValue(unreachable)
+      .compile();
+    app = moduleRef.createNestApplication();
+    configureApp(app);
+    await app.init();
+
+    const started = Date.now();
+    await request(app.getHttpServer()).get('/api/v1/health').expect(503);
+    expect(Date.now() - started).toBeLessThan(4500);
+  }, 8000);
 });

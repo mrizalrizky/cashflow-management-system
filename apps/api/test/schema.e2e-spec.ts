@@ -97,4 +97,33 @@ describe('database schema', () => {
       prisma.category.create({ data: { name: 'Material', type: 'OUT' } }),
     ).rejects.toThrow();
   });
+
+  it('refuses to delete a project that has transactions', async () => {
+    const tx = await createTransactionWithAmount(1000n);
+    const project = await prisma.project.create({
+      data: { code: 'PRJ-2026-001', name: 'Rumah A', client_name: 'Klien A' },
+    });
+    await prisma.transaction.update({ where: { id: tx.id }, data: { project_id: project.id } });
+
+    await expect(prisma.project.delete({ where: { id: project.id } })).rejects.toThrow();
+    const after = await prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
+    expect(after.project_id).toBe(project.id);
+  });
+
+  it('refuses to delete a user who reviewed or voided a transaction', async () => {
+    const tx = await createTransactionWithAmount(1000n);
+    const reviewer = await prisma.user.create({
+      data: { name: 'B', email: 'b@example.com', password_hash: 'x', role: 'SUPER_ADMIN' },
+    });
+    const voider = await prisma.user.create({
+      data: { name: 'C', email: 'c@example.com', password_hash: 'x', role: 'SUPER_ADMIN' },
+    });
+    await prisma.transaction.update({
+      where: { id: tx.id },
+      data: { reviewed_by_id: reviewer.id, voided_by_id: voider.id },
+    });
+
+    await expect(prisma.user.delete({ where: { id: reviewer.id } })).rejects.toThrow();
+    await expect(prisma.user.delete({ where: { id: voider.id } })).rejects.toThrow();
+  });
 });

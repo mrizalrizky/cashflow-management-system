@@ -4,6 +4,7 @@ import { APP_FILTER } from '@nestjs/core';
 import { AccountsModule } from './accounts/accounts.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CategoriesModule } from './categories/categories.module.js';
 import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { validateEnv } from './config/env.validation.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -19,6 +20,7 @@ import { UsersModule } from './users/users.module.js';
     HealthModule,
     UsersModule,
     AccountsModule,
+    CategoriesModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
 })

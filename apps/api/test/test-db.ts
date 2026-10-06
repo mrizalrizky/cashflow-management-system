@@ -4,7 +4,10 @@ import { assertTestDatabaseUrl } from './test-env.js';
 
 export function createTestPrisma(): PrismaClient {
   const connectionString = assertTestDatabaseUrl(process.env.DATABASE_URL);
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  // Gagal cepat bila koneksi ke database macet, daripada menggantung berjam-jam.
+  return new PrismaClient({
+    adapter: new PrismaPg({ connectionString, connectionTimeoutMillis: 5000 }),
+  });
 }
 
 export async function resetDb(prisma: PrismaClient): Promise<void> {

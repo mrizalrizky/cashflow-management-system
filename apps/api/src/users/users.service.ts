@@ -113,13 +113,19 @@ export class UsersService {
         if (accessChanges) {
           await this.sessions.endAll(tx, id);
         }
+        // Hanya koordinator proyek yang boleh ditugaskan ke proyek, jadi penugasannya ikut
+        // dicabut saat perannya berganti. Penonaktifan tidak mencabutnya.
+        const leavesProjects = roleChanges && before.role === 'PROJECT_MANAGER';
+        const removed_project_ids = leavesProjects
+          ? await this.removeProjectAssignments(tx, id)
+          : undefined;
         await this.audit.log(tx, {
           userId: actor.id,
           action: 'UPDATE',
           entityType: ENTITY,
           entityId: id,
           before,
-          after,
+          after: removed_project_ids ? { ...after, removed_project_ids } : after,
           ip,
         });
         return after;
@@ -154,6 +160,20 @@ export class UsersService {
       });
       return user;
     });
+  }
+
+  /** Mencabut semua penugasan proyek seorang user; mengembalikan id proyeknya, terurut. */
+  private async removeProjectAssignments(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<string[]> {
+    const assignments = await tx.projectMember.findMany({
+      where: { user_id: userId },
+      select: { project_id: true },
+      orderBy: { project_id: 'asc' },
+    });
+    await tx.projectMember.deleteMany({ where: { user_id: userId } });
+    return assignments.map((assignment) => assignment.project_id);
   }
 
   /** Mencegah admin mengunci dirinya sendiri atau menghilangkan SUPER_ADMIN aktif terakhir. */

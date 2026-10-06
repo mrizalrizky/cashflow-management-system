@@ -31,3 +31,13 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Tipe API ditulis tangan** di `apps/web/src/api/types.ts` untuk fase ini; pembuatan otomatis dari OpenAPI ditunda ke awal Fase 2.
 - **Test browser terisolasi.** Playwright menjalankan API (port 3100, build ke `dist-browser-test`) dan web (port 5174) sendiri terhadap `cashflow_test`, supaya server dan data pengembangan tidak tersentuh.
 - **`primeicons` dikunci di 7.0.0** (MIT).
+
+## Fase 2a
+
+- **Uang di JSON berupa string digit** (maksimal 18 digit), dua arah. Angka JSON, desimal, dan pemisah ribuan ditolak.
+- **Saldo akun dihitung** dari saldo awal dan transaksi `APPROVED` (`AccountBalanceService`), tidak disimpan. Saldo awal boleh negatif.
+- **Nama akun unik** tanpa membedakan huruf besar/kecil; **nama kategori unik per tipe**. Tipe kategori tidak bisa diubah, dan kategori sistem tidak bisa diubah sama sekali.
+- **Kode proyek** `PRJ-<tahun>-<nomor>`: tahun saat proyek dibuat (waktu Jakarta), nomor berurutan per tahun dan dibuat di bawah advisory lock supaya dua proyek yang dibuat bersamaan tidak bertabrakan.
+- **Akses proyek di satu tempat:** `ProjectAccessService`. Proyek di luar jangkauan dijawab 404, sama seperti proyek yang tidak ada.
+- **Ganti peran dari PROJECT_MANAGER mencabut penugasan proyeknya** (dicatat di audit sebagai `removed_project_ids`). Penonaktifan tidak mencabutnya, jadi akses kembali saat diaktifkan lagi.
+- **Verifikasi tanpa menulis `dist`:** `npm run typecheck -w api` (ikut dijalankan oleh `lint`) memeriksa `src`, `test`, dan `scripts`.

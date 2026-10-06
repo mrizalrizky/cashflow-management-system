@@ -1,4 +1,12 @@
-import { reactive, ref, watch, type Ref, type UnwrapNestedRefs } from 'vue'
+import {
+  computed,
+  reactive,
+  ref,
+  watch,
+  type ComputedRef,
+  type Ref,
+  type UnwrapNestedRefs,
+} from 'vue'
 import type { PageParams, Paginated } from '@/api/types'
 import { errorMessage } from '@/lib/errors'
 
@@ -13,6 +21,8 @@ export interface PagedList<T, F extends object> {
   filters: UnwrapNestedRefs<F>
   loading: Ref<boolean>
   error: Ref<string | null>
+  /** True bila ada filter yang terisi; kosong, null dan undefined berarti tanpa filter. */
+  filtered: ComputedRef<boolean>
   setPage(page: number, pageSize?: number): void
   reload(): Promise<void>
 }
@@ -29,6 +39,9 @@ export function usePagedList<T, F extends object>(
   const filters = reactive({ ...initialFilters }) as UnwrapNestedRefs<F>
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const filtered = computed(() =>
+    Object.values(filters).some((value) => value !== undefined && value !== null && value !== ''),
+  )
 
   // Hanya jawaban dari permintaan terakhir yang dipakai; jawaban lama yang datang terlambat dibuang.
   let latestRequest = 0
@@ -69,5 +82,5 @@ export function usePagedList<T, F extends object>(
     else page.value = 1
   })
 
-  return { items, total, page, pageSize, filters, loading, error, setPage, reload }
+  return { items, total, page, pageSize, filters, loading, error, filtered, setPage, reload }
 }

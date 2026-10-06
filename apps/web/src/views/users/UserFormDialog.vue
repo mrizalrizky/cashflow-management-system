@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import type { Role, User } from '@/api/types'
-import { createUser, updateUser, type UpdateUserInput } from '@/api/users'
+import { createUser, updateUser, type CreateUserInput } from '@/api/users'
 import FormDialog from '@/components/FormDialog.vue'
 import FormField from '@/components/FormField.vue'
 import PasswordField from '@/components/PasswordField.vue'
-import { useFormSubmit } from '@/composables/useFormSubmit'
+import { useEntityDialog } from '@/composables/useEntityDialog'
+import { omit } from '@/lib/changes'
 import { ROLE_OPTIONS } from '@/lib/labels'
 import { collectErrors, email, newPassword, required } from '@/lib/validation'
 
@@ -18,64 +18,43 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [user: User] }>()
 const visible = defineModel<boolean>('visible', { required: true })
 
-const editing = computed(() => props.user !== null)
-const form = reactive({ name: '', email: '', role: null as Role | null, password: '' })
-
-function changedFields(user: User): UpdateUserInput {
-  const changes: UpdateUserInput = {}
-  if (form.name.trim() !== user.name) changes.name = form.name.trim()
-  // API menyimpan email dalam huruf kecil, jadi beda huruf besar saja bukan perubahan.
-  if (form.email.trim().toLowerCase() !== user.email) changes.email = form.email.trim()
-  if (form.role && form.role !== user.role) changes.role = form.role
-  return changes
+interface Form {
+  name: string
+  email: string
+  role: Role | null
+  password: string
 }
 
-/** Mengembalikan user yang tersimpan, atau null bila tidak ada yang berubah. */
-async function save(): Promise<User | null> {
-  if (!props.user) {
-    return createUser({
-      name: form.name.trim(),
-      email: form.email.trim(),
-      role: form.role!,
-      password: form.password,
-    })
-  }
-  const changes = changedFields(props.user)
-  return Object.keys(changes).length > 0 ? updateUser(props.user.id, changes) : null
-}
-
-// API menjawab email kembar dengan 409 tanpa rincian field.
-const { submitting, fieldErrors, formError, submit, reset } = useFormSubmit(save, {
-  fieldForStatus: { 409: 'email' },
-})
-
-// Tiap kali dibuka, formulir diisi ulang dan pesan error dari pembukaan sebelumnya dibuang.
-watch(
+const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntityDialog<
+  User,
+  Form,
+  CreateUserInput
+>({
   visible,
-  (open) => {
-    if (!open) return
-    form.name = props.user?.name ?? ''
-    form.email = props.user?.email ?? ''
-    form.role = props.user?.role ?? null
-    form.password = ''
-    reset()
-  },
-  { immediate: true },
-)
-
-async function onSubmit(): Promise<void> {
-  const result = await submit(
-    collectErrors(form, {
+  entity: () => props.user,
+  blank: () => ({ name: '', email: '', role: null, password: '' }),
+  fromEntity: (user) => ({ name: user.name, email: user.email, role: user.role, password: '' }),
+  toInput: (values) => ({
+    name: values.name.trim(),
+    // API menyimpan email dalam huruf kecil, jadi beda huruf besar saja bukan perubahan.
+    email: values.email.trim().toLowerCase(),
+    role: values.role!,
+    password: values.password,
+  }),
+  validate: (values, isEditing) =>
+    collectErrors(values, {
       name: [required('Nama')],
       email: [required('Email'), email()],
       role: [(value) => (value ? null : 'Peran wajib diisi')],
-      password: editing.value ? [] : newPassword('Password sementara'),
+      // Password hanya diisi saat membuat; mengubahnya lewat "Reset password".
+      password: isEditing ? [] : newPassword('Password sementara'),
     }),
-  )
-  if (!result.ok) return
-  if (result.value) emit('saved', result.value)
-  visible.value = false
-}
+  create: createUser,
+  update: (user, changes) => updateUser(user.id, omit(changes, 'password')),
+  onSaved: (user) => emit('saved', user),
+  // API menjawab email kembar dengan 409 tanpa rincian field.
+  fieldForStatus: { 409: 'email' },
+})
 </script>
 
 <template>

@@ -29,7 +29,7 @@ beforeEach(() => {
 
 describe('AppLayout', () => {
   it.each<[Role, string, string[]]>([
-    ['SUPER_ADMIN', '/dashboard', ['Dashboard', 'Transaksi', 'Proyek', 'Pengguna']],
+    ['SUPER_ADMIN', '/dashboard', ['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna']],
     ['PROJECT_MANAGER', '/proyek', ['Proyek Saya', 'Transaksi']],
     ['STAFF', '/transaksi', ['Transaksi']],
   ])('shows %s exactly their menu', async (role, path, labels) => {
@@ -89,9 +89,10 @@ describe('AppLayout', () => {
       'Dashboard',
       'Transaksi',
       'Proyek',
+      'Master data',
       'Pengguna',
     ])
-    drawerLinks[3]!.click()
+    drawerLinks[4]!.click()
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/pengguna')

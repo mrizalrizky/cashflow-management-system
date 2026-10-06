@@ -43,14 +43,14 @@ test('login, forced password change, user management and role limits', async ({ 
   await test.step('after the change the admin lands on the dashboard with the full menu', async () => {
     await changePassword(page, ADMIN.temporaryPassword, ADMIN.password)
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(sidebarLinks(page)).toHaveText(['Dashboard', 'Transaksi', 'Proyek', 'Pengguna'])
+    await expect(sidebarLinks(page)).toHaveText(['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna'])
     await expect(page.getByRole('banner')).toContainText(ADMIN.name)
   })
 
   await test.step('a reload keeps the session and the page', async () => {
     await page.reload()
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(sidebarLinks(page)).toHaveCount(4)
+    await expect(sidebarLinks(page)).toHaveCount(5)
     await expect(page.getByRole('button', { name: 'Masuk' })).toHaveCount(0)
   })
 

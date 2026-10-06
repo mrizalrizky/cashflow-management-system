@@ -75,9 +75,19 @@ describe('resolveNavigation', () => {
   )
 })
 
+describe('master data page', () => {
+  it.each<[Role, true | { path: string }]>([
+    ['STAFF', { path: '/transaksi' }],
+    ['PROJECT_MANAGER', { path: '/proyek' }],
+    ['SUPER_ADMIN', true],
+  ])('handles %s opening it', (role, expected) => {
+    expect(navigate(user(role), '/master-data')).toEqual(expected)
+  })
+})
+
 describe('menuFor', () => {
   it.each<[Role, string[]]>([
-    ['SUPER_ADMIN', ['Dashboard', 'Transaksi', 'Proyek', 'Pengguna']],
+    ['SUPER_ADMIN', ['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna']],
     ['PROJECT_MANAGER', ['Proyek Saya', 'Transaksi']],
     ['STAFF', ['Transaksi']],
   ])('lists the pages for %s', (role, labels) => {

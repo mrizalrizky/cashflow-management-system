@@ -25,6 +25,7 @@ const MENU: MenuDefinition[] = [
     to: PATHS.projects,
     labelFor: { PROJECT_MANAGER: 'Proyek Saya' },
   },
+  { label: 'Master data', icon: 'pi pi-database', to: PATHS.masterData },
   { label: 'Pengguna', icon: 'pi pi-users', to: PATHS.users },
 ]
 

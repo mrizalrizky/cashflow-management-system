@@ -7,6 +7,7 @@ export const PATHS = {
   dashboard: '/dashboard',
   transactions: '/transaksi',
   projects: '/proyek',
+  masterData: '/master-data',
   users: '/pengguna',
 } as const
 

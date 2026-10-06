@@ -44,6 +44,11 @@ export const routes: RouteRecordRaw[] = [
     meta: { roles: ['SUPER_ADMIN', 'PROJECT_MANAGER'], title: 'Proyek' },
   },
   {
+    path: PATHS.masterData,
+    component: () => import('@/views/master-data/MasterDataView.vue'),
+    meta: { roles: ['SUPER_ADMIN'], title: 'Master data' },
+  },
+  {
     path: PATHS.users,
     component: () => import('@/views/users/UsersView.vue'),
     meta: { roles: ['SUPER_ADMIN'], title: 'Pengguna' },

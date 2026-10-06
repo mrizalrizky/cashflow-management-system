@@ -25,6 +25,10 @@ npm run dev:web     # http://localhost:5173
 
 Seed aman dijalankan berulang. Admin pertama hanya dibuat bila belum ada SUPER_ADMIN, dan wajib ganti password saat login pertama.
 
+## Dokumentasi API
+
+Saat API berjalan di luar produksi, daftar rute bisa dibuka di http://localhost:3000/api/docs.
+
 ## Test
 
 ```bash

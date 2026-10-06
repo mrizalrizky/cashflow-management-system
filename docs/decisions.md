@@ -41,3 +41,5 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Akses proyek di satu tempat:** `ProjectAccessService`. Proyek di luar jangkauan dijawab 404, sama seperti proyek yang tidak ada.
 - **Ganti peran dari PROJECT_MANAGER mencabut penugasan proyeknya** (dicatat di audit sebagai `removed_project_ids`). Penonaktifan tidak mencabutnya, jadi akses kembali saat diaktifkan lagi.
 - **Verifikasi tanpa menulis `dist`:** `npm run typecheck -w api` (ikut dijalankan oleh `lint`) memeriksa `src`, `test`, dan `scripts`.
+- **Dokumentasi API** disajikan Swagger di `/api/docs` hanya di luar produksi. **Tipe API di web tetap ditulis tangan** (`apps/web/src/api/types.ts`); pembuatan otomatis dari OpenAPI tidak dikerjakan karena menuntut setiap respons dijadikan kelas DTO terdokumentasi.
+- **Install script `@scarf/scarf` ditolak** (telemetri milik dependensi Swagger UI).

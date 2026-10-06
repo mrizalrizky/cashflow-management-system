@@ -1,0 +1,217 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  PROJECT_MANAGER
+  STAFF
+
+  @@map("role")
+}
+
+enum TxType {
+  IN
+  OUT
+
+  @@map("tx_type")
+}
+
+enum TxStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  VOID
+
+  @@map("tx_status")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+
+  @@map("project_status")
+}
+
+enum AccountType {
+  CASH
+  BANK
+
+  @@map("account_type")
+}
+
+model User {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique(map: "uq_users_email")
+  password_hash        String
+  role                 Role
+  is_active            Boolean  @default(true)
+  must_change_password Boolean  @default(true)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  project_memberships   ProjectMember[] @relation("project_member_user")
+  project_assignments   ProjectMember[] @relation("project_member_assigner")
+  transactions_created  Transaction[]   @relation("transaction_created_by")
+  transactions_reviewed Transaction[]   @relation("transaction_reviewed_by")
+  transactions_voided   Transaction[]   @relation("transaction_voided_by")
+  attachments           Attachment[]
+  audit_logs            AuditLog[]
+  refresh_tokens        RefreshToken[]
+
+  @@map("users")
+}
+
+model Account {
+  id              String      @id @default(uuid())
+  name            String
+  type            AccountType
+  opening_balance BigInt      @default(0)
+  is_active       Boolean     @default(true)
+  created_at      DateTime    @default(now())
+
+  transactions Transaction[]
+
+  @@map("accounts")
+}
+
+model Category {
+  id        String  @id @default(uuid())
+  name      String
+  type      TxType
+  is_system Boolean @default(false) // mis. Transfer Masuk/Keluar; tidak bisa diubah atau dinonaktifkan
+  is_active Boolean @default(true)
+
+  transactions Transaction[]
+
+  @@unique([name, type], map: "uq_categories_name_type")
+  @@map("categories")
+}
+
+model Project {
+  id             String        @id @default(uuid())
+  code           String        @unique(map: "uq_projects_code") // mis. PRJ-2026-001
+  name           String
+  client_name    String
+  contract_value BigInt        @default(0)
+  status         ProjectStatus @default(ACTIVE)
+  start_date     DateTime?     @db.Date
+  end_date       DateTime?     @db.Date
+  notes          String?
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+
+  members      ProjectMember[]
+  transactions Transaction[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  project_id  String
+  user_id     String // wajib user dengan role PROJECT_MANAGER (validasi di service)
+  assigned_at DateTime @default(now())
+  assigned_by String?
+
+  project  Project @relation(fields: [project_id], references: [id])
+  user     User    @relation("project_member_user", fields: [user_id], references: [id])
+  assigner User?   @relation("project_member_assigner", fields: [assigned_by], references: [id])
+
+  @@id([project_id, user_id])
+  @@index([user_id], map: "idx_project_members_user_id")
+  @@map("project_members")
+}
+
+model Transaction {
+  id                String    @id @default(uuid())
+  type              TxType
+  amount            BigInt // > 0, rupiah; CHECK constraint di migrasi
+  transaction_date  DateTime  @db.Date
+  description       String
+  status            TxStatus  @default(PENDING)
+  account_id        String
+  category_id       String
+  project_id        String? // null = overhead perusahaan
+  transfer_group_id String? // terisi = sisi transfer
+  created_by_id     String
+  reviewed_by_id    String? // approve atau reject
+  reviewed_at       DateTime?
+  reject_reason     String?
+  voided_by_id      String?
+  voided_at         DateTime?
+  void_reason       String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  account     Account      @relation(fields: [account_id], references: [id])
+  category    Category     @relation(fields: [category_id], references: [id])
+  project     Project?     @relation(fields: [project_id], references: [id])
+  created_by  User         @relation("transaction_created_by", fields: [created_by_id], references: [id])
+  reviewed_by User?        @relation("transaction_reviewed_by", fields: [reviewed_by_id], references: [id])
+  voided_by   User?        @relation("transaction_voided_by", fields: [voided_by_id], references: [id])
+  attachments Attachment[]
+
+  @@index([transaction_date], map: "idx_transactions_transaction_date")
+  @@index([project_id, status], map: "idx_transactions_project_id_status")
+  @@index([account_id, status], map: "idx_transactions_account_id_status")
+  @@index([created_by_id], map: "idx_transactions_created_by_id")
+  @@index([transfer_group_id], map: "idx_transactions_transfer_group_id")
+  @@map("transactions")
+}
+
+model Attachment {
+  id             String   @id @default(uuid())
+  transaction_id String
+  storage_key    String
+  file_name      String
+  mime_type      String
+  size_bytes     Int
+  uploaded_by_id String
+  created_at     DateTime @default(now())
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id])
+  uploaded_by User        @relation(fields: [uploaded_by_id], references: [id])
+
+  @@index([transaction_id], map: "idx_attachments_transaction_id")
+  @@map("attachments")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  user_id     String?
+  action      String // CREATE | UPDATE | APPROVE | REJECT | VOID | LOGIN | ...
+  entity_type String
+  entity_id   String
+  before      Json?
+  after       Json?
+  ip          String?
+  created_at  DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([entity_type, entity_id], map: "idx_audit_logs_entity")
+  @@index([created_at], map: "idx_audit_logs_created_at")
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  user_id    String
+  token_hash String    @unique(map: "uq_refresh_tokens_token_hash")
+  expires_at DateTime
+  revoked_at DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id], map: "idx_refresh_tokens_user_id")
+  @@map("refresh_tokens")
+}

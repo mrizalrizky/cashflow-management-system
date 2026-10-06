@@ -10,7 +10,8 @@ export type AuditAction =
   | 'CHANGE_PASSWORD'
   | 'RESET_PASSWORD'
   | 'CREATE'
-  | 'UPDATE';
+  | 'UPDATE'
+  | 'SET_MEMBERS';
 
 export interface AuditEntry {
   userId: string | null;

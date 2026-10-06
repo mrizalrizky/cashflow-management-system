@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
+import { LOCKS, withLock } from '../common/advisory-lock.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { PasswordService } from '../auth/password.service.js';
 import { SessionService } from '../auth/session.service.js';
@@ -17,8 +18,6 @@ import type { CreateUserDto, ListUsersQueryDto, UpdateUserDto } from './dto/user
 
 const ENTITY = 'user';
 
-/** Kunci advisory PostgreSQL yang menyerikan semua perubahan peran dan status aktif. */
-const ACCESS_CHANGE_LOCK = 7301;
 
 function notFound(): NotFoundException {
   return new NotFoundException('Pengguna tidak ditemukan');
@@ -92,7 +91,9 @@ export class UsersService {
     return this.withUniqueEmail(() =>
       this.prisma.$transaction(async (tx) => {
         if (dto.role !== undefined || dto.isActive !== undefined) {
-          await this.lockAccessChanges(tx);
+          // Tanpa kunci ini dua admin yang saling menurunkan pada saat bersamaan sama-sama
+          // lolos pengecekan dan tidak ada SUPER_ADMIN yang tersisa.
+          await withLock(tx, LOCKS.userAccess);
         }
         const before = await tx.user.findUnique({ where: { id } });
         if (!before) throw notFound();
@@ -153,14 +154,6 @@ export class UsersService {
       });
       return user;
     });
-  }
-
-  /**
-   * Tanpa kunci ini dua admin yang saling menurunkan pada saat bersamaan sama-sama lolos
-   * pengecekan dan tidak ada SUPER_ADMIN yang tersisa. Kunci dilepas saat transaksi selesai.
-   */
-  private async lockAccessChanges(tx: Prisma.TransactionClient): Promise<void> {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ACCESS_CHANGE_LOCK})`;
   }
 
   /** Mencegah admin mengunci dirinya sendiri atau menghilangkan SUPER_ADMIN aktif terakhir. */

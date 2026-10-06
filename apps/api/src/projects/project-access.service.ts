@@ -33,8 +33,15 @@ export class ProjectAccessService {
    * proyek aktif mana pun (ia hanya melihat kode dan namanya); koordinator hanya proyeknya.
    */
   optionsScope(user: AuthUser): Prisma.ProjectWhereInput {
-    const assigned = user.role === 'PROJECT_MANAGER' ? this.assignedTo(user) : {};
-    return { ...assigned, status: 'ACTIVE' };
+    switch (user.role) {
+      case 'SUPER_ADMIN':
+      case 'STAFF':
+        return { status: 'ACTIVE' };
+      case 'PROJECT_MANAGER':
+        return { ...this.assignedTo(user), status: 'ACTIVE' };
+      default:
+        return NOTHING;
+    }
   }
 
   /** Proyek di luar jangkauan dijawab sama seperti proyek yang tidak ada. */

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
-import { LOCKS, withLock } from '../common/advisory-lock.js';
+import { lockForTransaction, LOCKS } from '../common/advisory-lock.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { PasswordService } from '../auth/password.service.js';
 import { SessionService } from '../auth/session.service.js';
@@ -17,7 +17,6 @@ import type { Prisma, User } from '../generated/prisma/client.js';
 import type { CreateUserDto, ListUsersQueryDto, UpdateUserDto } from './dto/user.dto.js';
 
 const ENTITY = 'user';
-
 
 function notFound(): NotFoundException {
   return new NotFoundException('Pengguna tidak ditemukan');
@@ -93,7 +92,7 @@ export class UsersService {
         if (dto.role !== undefined || dto.isActive !== undefined) {
           // Tanpa kunci ini dua admin yang saling menurunkan pada saat bersamaan sama-sama
           // lolos pengecekan dan tidak ada SUPER_ADMIN yang tersisa.
-          await withLock(tx, LOCKS.userAccess);
+          await lockForTransaction(tx, LOCKS.userAccess);
         }
         const before = await tx.user.findUnique({ where: { id } });
         if (!before) throw notFound();

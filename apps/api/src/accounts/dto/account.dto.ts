@@ -1,5 +1,6 @@
-import { IsBoolean, IsIn, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsString, MaxLength } from 'class-validator';
 import { IsMoneyString } from '../../common/money.js';
+import { IsName } from '../../common/name.js';
 import { PaginationQueryDto } from '../../common/pagination.js';
 import { ToBoolean, Trim } from '../../common/transforms.js';
 import { IsOptionalNotNull } from '../../common/validation.js';
@@ -8,10 +9,7 @@ import { AccountType } from '../../generated/prisma/client.js';
 const ACCOUNT_TYPES = Object.values(AccountType);
 
 export class CreateAccountDto {
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @IsName()
   name: string;
 
   @IsIn(ACCOUNT_TYPES)
@@ -25,10 +23,7 @@ export class CreateAccountDto {
 
 export class UpdateAccountDto {
   @IsOptionalNotNull()
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @IsName()
   name?: string;
 
   @IsOptionalNotNull()

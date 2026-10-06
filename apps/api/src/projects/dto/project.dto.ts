@@ -7,10 +7,10 @@ import {
   IsString,
   IsUUID,
   MaxLength,
-  MinLength,
 } from 'class-validator';
 import { IsCalendarDate } from '../../common/calendar-date.js';
 import { IsMoneyString } from '../../common/money.js';
+import { IsName } from '../../common/name.js';
 import { PaginationQueryDto } from '../../common/pagination.js';
 import { Trim } from '../../common/transforms.js';
 import { IsOptionalNotNull } from '../../common/validation.js';
@@ -25,16 +25,10 @@ export const MAX_PROJECT_MEMBERS = 50;
 // sedangkan `@IsOptionalNotNull()` hanya menerima "tidak dikirim".
 
 export class CreateProjectDto {
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(NAME_MAX)
+  @IsName(NAME_MAX)
   name: string;
 
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(NAME_MAX)
+  @IsName(NAME_MAX)
   clientName: string;
 
   @IsOptionalNotNull()
@@ -58,17 +52,11 @@ export class CreateProjectDto {
 
 export class UpdateProjectDto {
   @IsOptionalNotNull()
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(NAME_MAX)
+  @IsName(NAME_MAX)
   name?: string;
 
   @IsOptionalNotNull()
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(NAME_MAX)
+  @IsName(NAME_MAX)
   clientName?: string;
 
   @IsOptionalNotNull()

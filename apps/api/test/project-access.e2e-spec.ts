@@ -109,6 +109,17 @@ describe('project access', () => {
   });
 });
 
+describe('ProjectAccessService scopes', () => {
+  it('match nothing for a role the service does not know', () => {
+    const access = new ProjectAccessService();
+    const stranger = { id: 'x', name: 'X', email: 'x@example.com', role: 'AUDITOR', mustChangePassword: false };
+    const nothing = { id: { in: [] } };
+
+    expect(access.scope(stranger as never)).toEqual(nothing);
+    expect(access.optionsScope(stranger as never)).toEqual(nothing);
+  });
+});
+
 describe('ProjectAccessService.assertCanView', () => {
   const ctx = setupE2e();
 

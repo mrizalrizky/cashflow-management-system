@@ -130,6 +130,33 @@ describe('PUT /projects/:id/members', () => {
     expect(await ctx.prisma.auditLog.count({ where: { action: 'SET_MEMBERS' } })).toBe(0);
   });
 
+  it('keeps a deactivated manager who is already assigned while others are added', async () => {
+    const admin = await asAdmin(ctx);
+    const project = await createProject(ctx.prisma);
+    const away = await createUser(ctx.prisma, { role: 'PROJECT_MANAGER', isActive: false });
+    const joins = await createUser(ctx.prisma, { role: 'PROJECT_MANAGER' });
+    await assign(ctx.prisma, project.id, away.id);
+
+    await setMembers(ctx, admin, project.id, [away.id, joins.id]).expect(200);
+
+    expect(await memberIds(ctx, project.id)).toEqual([away.id, joins.id].sort());
+  });
+
+  it('handles two edits of the same project arriving together', async () => {
+    const admin = await asAdmin(ctx);
+    const project = await createProject(ctx.prisma);
+    const manager = await createUser(ctx.prisma, { role: 'PROJECT_MANAGER' });
+
+    const results = await Promise.all([
+      setMembers(ctx, admin, project.id, [manager.id]),
+      setMembers(ctx, admin, project.id, [manager.id]),
+    ]);
+
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    expect(await memberIds(ctx, project.id)).toEqual([manager.id]);
+    expect(await ctx.prisma.auditLog.count({ where: { action: 'SET_MEMBERS' } })).toBe(1);
+  });
+
   it('answers 404 for an unknown project', async () => {
     const admin = await asAdmin(ctx);
     const res = await setMembers(ctx, admin, randomUUID(), []).expect(404);

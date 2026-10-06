@@ -1,10 +1,13 @@
-import { toDateString } from '../common/calendar-date.js';
+import { formatCalendarDate } from '../common/calendar-date.js';
 import { fromMoney } from '../common/money.js';
 import type { Prisma, Project, ProjectStatus } from '../generated/prisma/client.js';
 
-/** Proyek selalu dimuat bersama koordinatornya, terurut nama. */
+/** Proyek selalu dimuat bersama koordinatornya, terurut nama; hanya kolom yang ditampilkan. */
 export const PROJECT_INCLUDE = {
-  members: { include: { user: true }, orderBy: { user: { name: 'asc' } } },
+  members: {
+    include: { user: { select: { id: true, name: true, email: true } } },
+    orderBy: { user: { name: 'asc' } },
+  },
 } satisfies Prisma.ProjectInclude;
 
 export type ProjectWithMembers = Prisma.ProjectGetPayload<{ include: typeof PROJECT_INCLUDE }>;
@@ -45,10 +48,10 @@ export function toProjectResponse(project: ProjectWithMembers): ProjectResponse 
     clientName: project.client_name,
     contractValue: fromMoney(project.contract_value),
     status: project.status,
-    startDate: project.start_date ? toDateString(project.start_date) : null,
-    endDate: project.end_date ? toDateString(project.end_date) : null,
+    startDate: project.start_date ? formatCalendarDate(project.start_date) : null,
+    endDate: project.end_date ? formatCalendarDate(project.end_date) : null,
     notes: project.notes,
-    members: project.members.map(({ user }) => ({ id: user.id, name: user.name, email: user.email })),
+    members: project.members.map(({ user }) => user),
     createdAt: project.created_at.toISOString(),
     updatedAt: project.updated_at.toISOString(),
   };

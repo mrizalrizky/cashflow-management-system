@@ -1,22 +1,27 @@
 import { registerDecorator, ValidationOptions } from 'class-validator';
 
 const PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MIN_YEAR = 1900;
+const MAX_YEAR = 2999;
 
 /** Tanggal kalender (kolom DATE) sebagai objek Date pada tengah malam UTC. */
-export function toDate(value: string): Date {
+export function parseCalendarDate(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
-/** Kebalikan `toDate`: `YYYY-MM-DD` tanpa konversi zona waktu. */
-export function toDateString(value: Date): string {
+/** Kebalikan `parseCalendarDate`: `YYYY-MM-DD` tanpa konversi zona waktu. */
+export function formatCalendarDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
 /** Benar hanya untuk tanggal yang sungguh ada, mis. menolak 30 Februari. */
 export function isCalendarDate(value: unknown): value is string {
   if (typeof value !== 'string' || !PATTERN.test(value)) return false;
-  const date = toDate(value);
-  return !Number.isNaN(date.getTime()) && toDateString(date) === value;
+  const date = parseCalendarDate(value);
+  if (Number.isNaN(date.getTime()) || formatCalendarDate(date) !== value) return false;
+  // Tahun di luar rentang ini hampir pasti salah ketik.
+  const year = date.getUTCFullYear();
+  return year >= MIN_YEAR && year <= MAX_YEAR;
 }
 
 /** Tanggal kalender di JSON: `YYYY-MM-DD`. */

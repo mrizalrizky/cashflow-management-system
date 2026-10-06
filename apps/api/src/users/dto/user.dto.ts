@@ -4,9 +4,9 @@ import {
   IsIn,
   IsString,
   MaxLength,
-  MinLength,
 } from 'class-validator';
 import { NormalizeEmail } from '../../common/email.js';
+import { IsName } from '../../common/name.js';
 import { PaginationQueryDto } from '../../common/pagination.js';
 import { IsNewPassword } from '../../common/password-policy.js';
 import { ToBoolean, Trim } from '../../common/transforms.js';
@@ -16,10 +16,7 @@ import { Role } from '../../generated/prisma/client.js';
 const ROLES = Object.values(Role);
 
 export class CreateUserDto {
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @IsName()
   name: string;
 
   @NormalizeEmail()
@@ -36,10 +33,7 @@ export class CreateUserDto {
 
 export class UpdateUserDto {
   @IsOptionalNotNull()
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @IsName()
   name?: string;
 
   @IsOptionalNotNull()

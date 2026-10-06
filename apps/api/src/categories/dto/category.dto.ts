@@ -1,15 +1,13 @@
-import { IsBoolean, IsIn, IsString, MaxLength, MinLength } from 'class-validator';
-import { ToBoolean, Trim } from '../../common/transforms.js';
+import { IsBoolean, IsIn } from 'class-validator';
+import { IsName } from '../../common/name.js';
+import { ToBoolean } from '../../common/transforms.js';
 import { IsOptionalNotNull } from '../../common/validation.js';
 import { TxType } from '../../generated/prisma/client.js';
 
 const TX_TYPES = Object.values(TxType);
 
 export class CreateCategoryDto {
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @IsName()
   name: string;
 
   @IsIn(TX_TYPES)
@@ -19,10 +17,7 @@ export class CreateCategoryDto {
 /** Tipe sengaja tidak bisa diubah: transaksi yang sudah memakai kategori ini bergantung padanya. */
 export class UpdateCategoryDto {
   @IsOptionalNotNull()
-  @Trim()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @IsName()
   name?: string;
 
   @IsOptionalNotNull()

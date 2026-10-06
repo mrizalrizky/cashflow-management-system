@@ -2,8 +2,8 @@ import 'reflect-metadata';
 import {
   currentYearInJakarta,
   IsCalendarDate,
-  toDate,
-  toDateString,
+  formatCalendarDate,
+  parseCalendarDate,
 } from './calendar-date.js';
 import { validateBody } from './testing/validate.js';
 
@@ -23,6 +23,9 @@ describe('IsCalendarDate', () => {
     ['a month that does not exist', '2026-13-01'],
     ['day-first order', '06-10-2026'],
     ['a timestamp', '2026-10-06T00:00:00Z'],
+    ['year zero', '0000-01-01'],
+    ['a year far in the past', '1899-12-31'],
+    ['a year far in the future', '3000-01-01'],
     ['a number', 20261006],
     ['an empty string', ''],
     ['null', null],
@@ -34,9 +37,9 @@ describe('IsCalendarDate', () => {
 describe('calendar date conversion', () => {
   it('round-trips without shifting the day', () => {
     for (const value of ['2026-10-06', '2026-01-01', '2026-12-31']) {
-      expect(toDateString(toDate(value))).toBe(value);
+      expect(formatCalendarDate(parseCalendarDate(value))).toBe(value);
     }
-    expect(toDate('2026-10-06').toISOString()).toBe('2026-10-06T00:00:00.000Z');
+    expect(parseCalendarDate('2026-10-06').toISOString()).toBe('2026-10-06T00:00:00.000Z');
   });
 });
 

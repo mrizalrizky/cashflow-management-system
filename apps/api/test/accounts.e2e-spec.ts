@@ -112,6 +112,21 @@ describe('POST /accounts', () => {
     expect(await ctx.prisma.auditLog.count({ where: { entity_type: 'account' } })).toBe(1);
   });
 
+  it.each([
+    ['the same name', 'Kas Proyek'],
+    ['the same name in another case', 'KAS PROYEK'],
+  ])('creates only one account when two requests with %s arrive together', async (_label, other) => {
+    const admin = await asAdmin(ctx);
+
+    const results = await Promise.all([
+      call(ctx, admin, 'post', ACCOUNTS).send(NEW_ACCOUNT),
+      call(ctx, admin, 'post', ACCOUNTS).send({ ...NEW_ACCOUNT, name: other }),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await ctx.prisma.account.count()).toBe(1);
+  });
+
   it('does not treat _ and % in a name as wildcards when checking for duplicates', async () => {
     const admin = await asAdmin(ctx);
     await call(ctx, admin, 'post', ACCOUNTS).send({ ...NEW_ACCOUNT, name: 'Kas A1' }).expect(201);

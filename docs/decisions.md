@@ -43,3 +43,8 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Verifikasi tanpa menulis `dist`:** `npm run typecheck -w api` (ikut dijalankan oleh `lint`) memeriksa `src`, `test`, dan `scripts`.
 - **Dokumentasi API** disajikan Swagger di `/api/docs` hanya di luar produksi. **Tipe API di web tetap ditulis tangan** (`apps/web/src/api/types.ts`); pembuatan otomatis dari OpenAPI tidak dikerjakan karena menuntut setiap respons dijadikan kelas DTO terdokumentasi.
 - **Install script `@scarf/scarf` ditolak** (telemetri milik dependensi Swagger UI).
+- **Nama kembar dicegah dengan advisory lock**, bukan constraint database: pengecekan nama akun dan kategori berjalan bergantian, jadi dua request bersamaan (mis. tombol Simpan terklik dua kali) tidak sama-sama lolos. Nama kategori sistem tidak boleh dipakai di tipe mana pun.
+- **Mengubah anggota proyek hanya memeriksa yang baru ditugaskan.** Koordinator nonaktif yang sudah ditugaskan tetap dipertahankan. Perubahan anggota memakai kunci yang sama dengan perubahan peran user.
+- **Kode proyek memakai advisory lock**, bukan "retry bila melanggar `uq_projects_code`" seperti catatan di spec; hasilnya sama dan tidak ada request yang gagal.
+- **Tanggal kalender** hanya menerima tahun 1900 sampai 2999.
+- **Untuk Fase 6:** `NODE_ENV=production` wajib diset di compose produksi; tanpa itu dokumentasi API terbuka dan cookie tidak `Secure`.

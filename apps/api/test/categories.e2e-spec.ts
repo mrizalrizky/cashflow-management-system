@@ -121,6 +121,32 @@ describe('POST /categories', () => {
   });
 
   it.each([
+    ['the same name', 'Material'],
+    ['the same name in another case', 'MATERIAL'],
+  ])('creates only one category when two requests with %s arrive together', async (_label, other) => {
+    const admin = await asAdmin(ctx);
+
+    const results = await Promise.all([
+      call(ctx, admin, 'post', CATEGORIES).send(NEW_CATEGORY),
+      call(ctx, admin, 'post', CATEGORIES).send({ ...NEW_CATEGORY, name: other }),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await ctx.prisma.category.count()).toBe(1);
+  });
+
+  it('reserves the names of system categories in both types', async () => {
+    const admin = await asAdmin(ctx);
+    await createCategory(ctx.prisma, { name: 'Transfer Masuk', type: 'IN', isSystem: true });
+    const ordinary = await createCategory(ctx.prisma, { name: 'Lain', type: 'OUT' });
+
+    await call(ctx, admin, 'post', CATEGORIES).send({ name: 'transfer masuk', type: 'OUT' }).expect(409);
+    await call(ctx, admin, 'patch', `${CATEGORIES}/${ordinary.id}`)
+      .send({ name: 'Transfer Masuk' })
+      .expect(409);
+  });
+
+  it.each([
     ['an unknown type', { type: 'TRANSFER' }, 'type'],
     ['a blank name', { name: ' ' }, 'name'],
     ['an attempt to create a system category', { isSystem: true }, 'isSystem'],

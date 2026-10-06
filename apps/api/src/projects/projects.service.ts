@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
-import { LOCKS, withLock } from '../common/advisory-lock.js';
-import { currentYearInJakarta, toDate } from '../common/calendar-date.js';
+import { lockForTransaction, LOCKS } from '../common/advisory-lock.js';
+import { currentYearInJakarta, parseCalendarDate } from '../common/calendar-date.js';
 import { toMoney } from '../common/money.js';
 import { Paginated, paginated, toSkipTake } from '../common/pagination.js';
 import { containsText } from '../common/search.js';
@@ -28,7 +28,7 @@ function toWhere(query: ListProjectsQueryDto): Prisma.ProjectWhereInput {
 
 /** `undefined` berarti tidak diubah, `null` berarti dikosongkan. */
 function toNullableDate(value: string | null | undefined): Date | null | undefined {
-  return value === undefined || value === null ? value : toDate(value);
+  return value === undefined || value === null ? value : parseCalendarDate(value);
 }
 
 function assertDateRange(start: Date | null, end: Date | null): void {
@@ -155,10 +155,11 @@ export class ProjectsService {
   /** Kode berikutnya untuk tahun berjalan, mis. PRJ-2026-001. */
   private async nextCode(tx: Prisma.TransactionClient): Promise<string> {
     // Tanpa kunci, dua proyek yang dibuat bersamaan membaca nomor terakhir yang sama.
-    await withLock(tx, LOCKS.projectCode);
+    await lockForTransaction(tx, LOCKS.projectCode);
 
     const prefix = `PRJ-${currentYearInJakarta()}-`;
     // Dibaca sebagai angka, bukan teks: sebagai teks "…-1000" terurut sebelum "…-999".
+    // Pola dibatasi 9 digit supaya CAST ke INTEGER tidak pernah meluap.
     const rows = await tx.$queryRaw<{ last: number | null }[]>`
       SELECT MAX(CAST(split_part(code, '-', 3) AS INTEGER)) AS last
       FROM projects

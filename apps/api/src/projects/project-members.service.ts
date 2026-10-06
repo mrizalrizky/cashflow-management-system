@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
+import { lockForTransaction, LOCKS } from '../common/advisory-lock.js';
 import { validationFailed } from '../common/validation.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -14,7 +15,7 @@ export class ProjectMembersService {
     private readonly audit: AuditService,
   ) {}
 
-  /** Mengganti daftar koordinator sebuah proyek. Yang tetap ada tidak disentuh. */
+  /** Mengganti daftar koordinator sebuah proyek. Yang tetap ada tidak disentuh atau diperiksa ulang. */
   async setMembers(
     actor: AuthUser,
     projectId: string,
@@ -22,16 +23,22 @@ export class ProjectMembersService {
     ip: string | null,
   ): Promise<ProjectWithMembers> {
     return this.prisma.$transaction(async (tx) => {
+      // Kunci yang sama dengan perubahan peran user: tanpa ini seorang user bisa ditugaskan
+      // tepat saat perannya diganti, dan dua perubahan anggota bersamaan saling bertabrakan.
+      await lockForTransaction(tx, LOCKS.userAccess);
+
       const project = await tx.project.findUnique({
         where: { id: projectId },
         include: { members: true },
       });
       if (!project) throw projectNotFound();
-      await this.assertAllAssignable(tx, userIds);
 
       const current = project.members.map((member) => member.user_id);
       const added = userIds.filter((id) => !current.includes(id));
       const removed = current.filter((id) => !userIds.includes(id));
+      // Hanya yang baru ditugaskan yang diperiksa: koordinator nonaktif yang sudah ada tetap
+      // dipertahankan, supaya aksesnya kembali saat ia diaktifkan lagi.
+      await this.assertAllAssignable(tx, added);
 
       if (added.length > 0 || removed.length > 0) {
         await tx.projectMember.deleteMany({
@@ -68,7 +75,7 @@ export class ProjectMembersService {
       throw validationFailed([
         {
           field: 'userIds',
-          messages: ['Semua pengguna yang ditugaskan harus koordinator proyek yang aktif'],
+          messages: ['Pengguna yang baru ditugaskan harus koordinator proyek yang aktif'],
         },
       ]);
     }

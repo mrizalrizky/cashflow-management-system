@@ -6,10 +6,10 @@ import {
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
+import { lockForTransaction, LOCKS } from '../common/advisory-lock.js';
 import { equalsText } from '../common/search.js';
-import type { Db } from '../database/db.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Category, TxType } from '../generated/prisma/client.js';
+import type { Category, Prisma, TxType } from '../generated/prisma/client.js';
 import type {
   CreateCategoryDto,
   ListCategoriesQueryDto,
@@ -81,15 +81,24 @@ export class CategoriesService {
     });
   }
 
-  /** Nama unik per tipe, tanpa membedakan huruf besar/kecil. */
+  /**
+   * Nama unik per tipe, tanpa membedakan huruf besar/kecil. Nama kategori sistem tidak boleh
+   * dipakai di tipe mana pun, supaya tidak tertukar dengan kategori transfer yang asli.
+   * Kunci mencegah dua request dengan nama yang sama lolos pengecekan bersamaan.
+   */
   private async assertNameAvailable(
-    db: Db,
+    tx: Prisma.TransactionClient,
     name: string,
     type: TxType,
     exceptId?: string,
   ): Promise<void> {
-    const taken = await db.category.findFirst({
-      where: { name: equalsText(name), type, id: exceptId ? { not: exceptId } : undefined },
+    await lockForTransaction(tx, LOCKS.categoryName);
+    const taken = await tx.category.findFirst({
+      where: {
+        name: equalsText(name),
+        OR: [{ type }, { is_system: true }],
+        id: exceptId ? { not: exceptId } : undefined,
+      },
     });
     if (taken) throw new ConflictException('Kategori sudah ada');
   }

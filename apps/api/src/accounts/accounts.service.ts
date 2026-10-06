@@ -1,10 +1,10 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
+import { lockForTransaction, LOCKS } from '../common/advisory-lock.js';
 import { toMoney } from '../common/money.js';
 import { Paginated, paginated, toSkipTake } from '../common/pagination.js';
 import { containsText, equalsText } from '../common/search.js';
-import type { Db } from '../database/db.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Account, Prisma } from '../generated/prisma/client.js';
 import { AccountBalanceService } from './account-balance.service.js';
@@ -108,9 +108,18 @@ export class AccountsService {
     });
   }
 
-  /** Nama akun unik tanpa membedakan huruf besar/kecil. `exceptId` adalah akun yang sedang diubah. */
-  private async assertNameAvailable(db: Db, name: string, exceptId?: string): Promise<void> {
-    const taken = await db.account.findFirst({
+  /**
+   * Nama akun unik tanpa membedakan huruf besar/kecil. `exceptId` adalah akun yang sedang
+   * diubah. Kunci membuat pengecekan dan penyimpanan berikutnya tidak bisa disela request
+   * lain dengan nama yang sama (mis. tombol Simpan terklik dua kali).
+   */
+  private async assertNameAvailable(
+    tx: Prisma.TransactionClient,
+    name: string,
+    exceptId?: string,
+  ): Promise<void> {
+    await lockForTransaction(tx, LOCKS.accountName);
+    const taken = await tx.account.findFirst({
       where: { name: equalsText(name), id: exceptId ? { not: exceptId } : undefined },
     });
     if (taken) throw new ConflictException('Nama akun sudah dipakai');

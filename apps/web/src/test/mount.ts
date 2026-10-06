@@ -5,7 +5,7 @@ import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { installPrimeVue } from '@/plugins/primevue'
-import { PATHS } from '@/router/paths'
+import { PATHS, PROJECT_DETAIL_ROUTE } from '@/router/paths'
 
 export interface MountedView {
   wrapper: VueWrapper
@@ -37,7 +37,10 @@ export function createTestRouter(): Router {
   const blank = { template: '<div />' }
   return createRouter({
     history: createMemoryHistory(),
-    routes: Object.values(PATHS).map((path) => ({ path, component: blank })),
+    routes: [...Object.values(PATHS), PROJECT_DETAIL_ROUTE].map((path) => ({
+      path,
+      component: blank,
+    })),
   })
 }
 

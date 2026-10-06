@@ -11,6 +11,13 @@ export const PATHS = {
   users: '/pengguna',
 } as const
 
+/** Pola rute halaman detail proyek. */
+export const PROJECT_DETAIL_ROUTE = `${PATHS.projects}/:id`
+
+export function projectPath(id: string): string {
+  return `${PATHS.projects}/${id}`
+}
+
 const LANDING: Record<Role, string> = {
   SUPER_ADMIN: PATHS.dashboard,
   PROJECT_MANAGER: PATHS.projects,

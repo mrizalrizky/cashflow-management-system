@@ -75,6 +75,21 @@ describe('resolveNavigation', () => {
   )
 })
 
+describe('project detail page', () => {
+  it.each<[Role, true | { path: string }]>([
+    ['STAFF', { path: '/transaksi' }],
+    ['PROJECT_MANAGER', true],
+    ['SUPER_ADMIN', true],
+  ])('handles %s opening one', (role, expected) => {
+    const route = routes.find((r) => r.path === '/proyek/:id')!
+    const result = resolveNavigation({
+      user: user(role),
+      to: { path: '/proyek/abc', fullPath: '/proyek/abc', meta: route.meta ?? {} },
+    })
+    expect(result).toEqual(expected)
+  })
+})
+
 describe('master data page', () => {
   it.each<[Role, true | { path: string }]>([
     ['STAFF', { path: '/transaksi' }],

@@ -49,7 +49,11 @@ Mengganti konvensi di bagian 7 dokumen dasar.
 | Hal | Dokumen dasar | Keputusan |
 |---|---|---|
 | Storage bukti | MinIO (S3-compatible) | Disk lokal pada Docker volume di balik antarmuka `StorageService`. Driver S3 **tidak** dibangun di MVP. Service `minio` dihapus dari Compose. |
-| State frontend | NgRx | Angular signals + service. Tanpa NgRx. |
+| Framework frontend | Angular + PrimeNG | Vue 3 (Composition API, `<script setup>`, TypeScript) + Vite + Vue Router + PrimeVue 4 (lisensi MIT; PrimeVue 5 memakai lisensi non-MIT dengan license manager, jadi tidak dipakai). Tailwind CSS tetap. Semua penyebutan "Angular" dan "PrimeNG" di dokumen dasar dibaca sebagai Vue dan PrimeVue. |
+| State frontend | NgRx | Pinia, hanya untuk state yang dibagi antar halaman (sesi user); selebihnya composable dan state lokal komponen. |
+| Chart | PrimeNG Chart | PrimeVue Chart (Chart.js). |
+| Test dan lint | Jest | Vitest untuk API dan web, oxlint untuk API (bawaan scaffold NestJS 12). Playwright tetap untuk alur kritis. |
+| Versi Prisma | tidak ditentukan | Prisma 7 stabil (tag `latest` di npm saat ini masih release candidate 8.0). |
 | Monorepo | tidak ditentukan | npm workspaces (`apps/api`, `apps/web`), tanpa Nx. |
 | Tipe API di frontend | tidak ditentukan | Di-generate dari spesifikasi OpenAPI (`@nestjs/swagger`). |
 | Backup | `pg_dump` | `pg_dump` **dan** arsip volume lampiran dalam satu skrip; restore keduanya didokumentasikan dan diuji. |
@@ -275,4 +279,4 @@ Urutan dan kriteria selesai mengikuti bagian 11 dokumen dasar, dengan penyesuaia
 
 ## 8. Di luar lingkup
 
-Sama dengan dokumen dasar (BOQ, payroll, termin klien, hutang/piutang, laba rugi, multi-currency, multi-company), ditambah: driver storage S3, reset password lewat email, NgRx.
+Sama dengan dokumen dasar (BOQ, payroll, termin klien, hutang/piutang, laba rugi, multi-currency, multi-company), ditambah: driver storage S3, reset password lewat email.

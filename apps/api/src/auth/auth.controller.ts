@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import type { AuthUser, Session } from './auth.types.js';
 import { AllowPendingPasswordChange, CurrentUser, Public } from './decorators.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './refresh-cookie.js';
 
@@ -56,6 +57,24 @@ export class AuthController {
   ): Promise<void> {
     await this.auth.logout(readRefreshCookie(req), ip);
     clearRefreshCookie(res, this.secureCookies);
+  }
+
+  @AllowPendingPasswordChange()
+  @Post('change-password')
+  @HttpCode(200)
+  async changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ChangePasswordDto,
+    @Ip() ip: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SessionResponse> {
+    const session = await this.auth.changePassword(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
+      ip,
+    );
+    return this.respondWithSession(res, session);
   }
 
   @AllowPendingPasswordChange()

@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
+import { validationFailed } from '../common/validation.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
 import { Session, toAuthUser } from './auth.types.js';
@@ -101,6 +102,42 @@ export class AuthService {
         ip,
       });
     });
+  }
+
+  /** Mengganti password, mengakhiri semua sesi lain, dan membuka sesi baru untuk pemanggil. */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    ip: string | null,
+  ): Promise<Session> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!(await this.passwords.verify(user.password_hash, currentPassword))) {
+      throw new UnauthorizedException('Password saat ini salah');
+    }
+    if (newPassword === currentPassword) {
+      throw validationFailed([
+        { field: 'newPassword', messages: ['Password baru harus berbeda dari password saat ini'] },
+      ]);
+    }
+
+    const password_hash = await this.passwords.hash(newPassword);
+    const { updated, refreshToken } = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { password_hash, must_change_password: false },
+      });
+      await this.sessions.revokeAll(tx, userId);
+      await this.audit.log(tx, {
+        userId,
+        action: 'CHANGE_PASSWORD',
+        entityType: 'user',
+        entityId: userId,
+        ip,
+      });
+      return { updated, refreshToken: await this.sessions.create(tx, userId) };
+    });
+    return this.buildSession(updated, refreshToken);
   }
 
   /**

@@ -7,6 +7,7 @@ import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { validateEnv } from './config/env.validation.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { HealthModule } from './health/health.module.js';
     AuditModule,
     AuthModule,
     HealthModule,
+    UsersModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
 })

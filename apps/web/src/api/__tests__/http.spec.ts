@@ -16,6 +16,16 @@ function unauthorized(): Response {
   return json(401, { statusCode: 401, message: 'Sesi tidak valid' })
 }
 
+/** Error yang dilempar sebuah request; test gagal bila request itu ternyata berhasil. */
+async function failureOf(promise: Promise<unknown>): Promise<import('../http').ApiError> {
+  try {
+    await promise
+  } catch (error) {
+    return error as import('../http').ApiError
+  }
+  throw new Error('Request diharapkan gagal')
+}
+
 function urlOf(call: Parameters<typeof fetch>): string {
   return String(call[0])
 }
@@ -92,7 +102,7 @@ describe('http client', () => {
       const errors = [{ field: 'email', messages: ['email must be an email'] }]
       respond(() => json(400, { statusCode: 400, message: 'Validasi gagal', errors }))
 
-      const error = await http.request('/users', { method: 'POST', body: {} }).catch((e) => e)
+      const error = await failureOf(http.request('/users', { method: 'POST', body: {} }))
 
       expect(error).toBeInstanceOf(http.ApiError)
       expect(error).toMatchObject({ statusCode: 400, message: 'Validasi gagal', fieldErrors: errors })
@@ -101,7 +111,7 @@ describe('http client', () => {
     it('reports a network failure as status 0 with a connection message', async () => {
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
 
-      const error = await http.request('/users').catch((e) => e)
+      const error = await failureOf(http.request('/users'))
 
       expect(error).toMatchObject({ statusCode: 0, message: 'Tidak dapat terhubung ke server', fieldErrors: [] })
     })
@@ -112,7 +122,7 @@ describe('http client', () => {
     ])('reports %s as a readable error, not a parse error', async (_label, status, body) => {
       respond(() => new Response(body, { status, headers: { 'Content-Type': 'text/html' } }))
 
-      const error = await http.request('/users').catch((e) => e)
+      const error = await failureOf(http.request('/users'))
 
       expect(error).toBeInstanceOf(http.ApiError)
       expect(error.statusCode).toBe(status)
@@ -224,7 +234,7 @@ describe('http client', () => {
       expect(await http.refreshSession()).toEqual(SESSION)
 
       await http.request('/users')
-      expect(headersOf(fetchMock.mock.calls.at(-1)!).Authorization).toBe('Bearer token-baru')
+      expect(headersOf(fetchMock.mock.calls[fetchMock.mock.calls.length - 1]!).Authorization).toBe('Bearer token-baru')
     })
 
     it('returns null without reporting an expired session when nobody was logged in', async () => {

@@ -1,10 +1,9 @@
-import { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
-import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 
-export type TestApp = INestApplication<App>;
+export type TestApp = NestExpressApplication;
 
 /** Aplikasi utuh dengan konfigurasi yang sama seperti main.ts. */
 export async function createTestApp(): Promise<TestApp> {

@@ -1,6 +1,18 @@
 import type { Response } from 'supertest';
 import { PasswordService } from '../src/auth/password.service.js';
-import type { PrismaClient, Role, User } from '../src/generated/prisma/client.js';
+import type {
+  Account,
+  AccountType,
+  Category,
+  PrismaClient,
+  Project,
+  ProjectStatus,
+  Role,
+  Transaction,
+  TxStatus,
+  TxType,
+  User,
+} from '../src/generated/prisma/client.js';
 import { api, E2eContext } from './e2e-context.js';
 import { LOGIN } from './routes.js';
 
@@ -83,4 +95,129 @@ export function bearer(accessToken: string): [string, string] {
 /** Nama field yang ditolak dalam respons `Validasi gagal`. */
 export function errorFields(body: { errors: { field: string }[] }): string[] {
   return body.errors.map((e) => e.field);
+}
+
+export type Method = 'get' | 'post' | 'patch' | 'put';
+
+/** Request atas nama sebuah sesi. */
+export function call(ctx: E2eContext, session: TestSession, method: Method, path: string) {
+  return api(ctx)[method](path).set(...bearer(session.accessToken));
+}
+
+/**
+ * Memastikan sebuah rute menolak request tanpa token (401) dan menjawab tiap peran
+ * dengan status yang diharapkan. Tiap peran memakai user baru.
+ */
+export async function expectAccess(
+  ctx: E2eContext,
+  request: { method: Method; path: string; body?: object },
+  expected: Record<Role, number>,
+): Promise<void> {
+  const send = (session?: TestSession) => {
+    const req = session
+      ? call(ctx, session, request.method, request.path)
+      : api(ctx)[request.method](request.path);
+    return request.body ? req.send(request.body) : req;
+  };
+
+  await send().expect(401);
+  for (const [role, status] of Object.entries(expected) as [Role, number][]) {
+    const res = await send(await loginAs(ctx, { role }));
+    if (res.status !== status) {
+      throw new Error(
+        `${request.method.toUpperCase()} ${request.path} sebagai ${role}: ` +
+          `diharapkan ${status}, didapat ${res.status} ${JSON.stringify(res.body)}`,
+      );
+    }
+  }
+}
+
+const ADMIN_ONLY = { SUPER_ADMIN: 200, PROJECT_MANAGER: 403, STAFF: 403 } as const;
+
+/** Status yang diharapkan untuk rute khusus SUPER_ADMIN; `ok` adalah status saat berhasil. */
+export function adminOnly(ok = 200): Record<Role, number> {
+  return { ...ADMIN_ONLY, SUPER_ADMIN: ok };
+}
+
+export function asAdmin(ctx: E2eContext) {
+  return loginAs(ctx, { role: 'SUPER_ADMIN', email: 'admin@example.com', name: 'Admin' });
+}
+
+export function createAccount(
+  prisma: PrismaClient,
+  overrides: Partial<{ name: string; type: AccountType; openingBalance: bigint; isActive: boolean }> = {},
+): Promise<Account> {
+  sequence += 1;
+  return prisma.account.create({
+    data: {
+      name: overrides.name ?? `Akun ${sequence}`,
+      type: overrides.type ?? 'BANK',
+      opening_balance: overrides.openingBalance ?? 0n,
+      is_active: overrides.isActive ?? true,
+    },
+  });
+}
+
+export function createCategory(
+  prisma: PrismaClient,
+  overrides: Partial<{ name: string; type: TxType; isSystem: boolean; isActive: boolean }> = {},
+): Promise<Category> {
+  sequence += 1;
+  return prisma.category.create({
+    data: {
+      name: overrides.name ?? `Kategori ${sequence}`,
+      type: overrides.type ?? 'OUT',
+      is_system: overrides.isSystem ?? false,
+      is_active: overrides.isActive ?? true,
+    },
+  });
+}
+
+export function createProject(
+  prisma: PrismaClient,
+  overrides: Partial<{ code: string; name: string; clientName: string; status: ProjectStatus; contractValue: bigint }> = {},
+): Promise<Project> {
+  sequence += 1;
+  return prisma.project.create({
+    data: {
+      code: overrides.code ?? `PRJ-TEST-${String(sequence).padStart(4, '0')}`,
+      name: overrides.name ?? `Proyek ${sequence}`,
+      client_name: overrides.clientName ?? `Klien ${sequence}`,
+      status: overrides.status ?? 'ACTIVE',
+      contract_value: overrides.contractValue ?? 0n,
+    },
+  });
+}
+
+/** Menugaskan seorang koordinator ke sebuah proyek, langsung di database. */
+export async function assign(prisma: PrismaClient, projectId: string, userId: string): Promise<void> {
+  await prisma.projectMember.create({ data: { project_id: projectId, user_id: userId } });
+}
+
+/** Transaksi yang ditulis langsung ke database, untuk menguji perhitungan saldo dan ringkasan. */
+export function createTransaction(
+  prisma: PrismaClient,
+  input: {
+    accountId: string;
+    categoryId: string;
+    createdById: string;
+    type: TxType;
+    amount: bigint;
+    status?: TxStatus;
+    projectId?: string;
+  },
+): Promise<Transaction> {
+  return prisma.transaction.create({
+    data: {
+      type: input.type,
+      amount: input.amount,
+      status: input.status ?? 'APPROVED',
+      transaction_date: new Date('2026-10-06T00:00:00.000Z'),
+      description: 'uji',
+      account_id: input.accountId,
+      category_id: input.categoryId,
+      created_by_id: input.createdById,
+      project_id: input.projectId,
+    },
+  });
 }

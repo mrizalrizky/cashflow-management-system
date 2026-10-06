@@ -1,8 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { toAuthUser } from '../src/auth/auth.types.js';
 import { UsersService } from '../src/users/users.service.js';
-import { api, E2eContext, setupE2e } from './e2e-context.js';
-import { bearer, createUser, DEFAULT_PASSWORD, errorFields, login, loginAs, TestSession } from './fixtures.js';
+import { api, setupE2e } from './e2e-context.js';
+import {
+  asAdmin,
+  call,
+  createUser,
+  DEFAULT_PASSWORD,
+  errorFields,
+  login,
+  loginAs,
+} from './fixtures.js';
 import { LOGIN, REFRESH, USERS } from './routes.js';
 
 const NEW_USER = {
@@ -11,16 +19,6 @@ const NEW_USER = {
   role: 'PROJECT_MANAGER',
   password: 'password-awal-1',
 };
-
-type Method = 'get' | 'post' | 'patch';
-
-function asAdmin(ctx: E2eContext) {
-  return loginAs(ctx, { role: 'SUPER_ADMIN', email: 'admin@example.com', name: 'Admin' });
-}
-
-function call(ctx: E2eContext, session: TestSession, method: Method, path: string) {
-  return api(ctx)[method](path).set(...bearer(session.accessToken));
-}
 
 describe('POST /users', () => {
   const ctx = setupE2e();

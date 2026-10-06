@@ -1,14 +1,13 @@
-import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
+import type { TestApp } from './app-factory.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 
 describe('GET /api/v1/health', () => {
-  let app: INestApplication<App>;
+  let app: TestApp;
 
   afterEach(async () => {
     await app.close();
@@ -16,7 +15,7 @@ describe('GET /api/v1/health', () => {
 
   it('returns 200 when the database answers', async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<TestApp>();
     configureApp(app);
     await app.init();
 
@@ -29,7 +28,7 @@ describe('GET /api/v1/health', () => {
       .overrideProvider(PrismaService)
       .useValue({ $queryRaw: () => Promise.reject(new Error('connection refused')) })
       .compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<TestApp>();
     configureApp(app);
     await app.init();
 
@@ -41,7 +40,7 @@ describe('GET /api/v1/health', () => {
 
   it('is not served outside the /api/v1 prefix', async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<TestApp>();
     configureApp(app);
     await app.init();
 
@@ -50,7 +49,7 @@ describe('GET /api/v1/health', () => {
 
   it('answers unknown API routes with a JSON 404', async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<TestApp>();
     configureApp(app);
     await app.init();
 
@@ -63,7 +62,7 @@ describe('GET /api/v1/health', () => {
       .overrideProvider(PrismaService)
       .useValue({ $queryRaw: () => new Promise(() => {}) })
       .compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<TestApp>();
     configureApp(app);
     await app.init();
 
@@ -81,7 +80,7 @@ describe('GET /api/v1/health', () => {
       .overrideProvider(PrismaService)
       .useValue(unreachable)
       .compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<TestApp>();
     configureApp(app);
     await app.init();
 

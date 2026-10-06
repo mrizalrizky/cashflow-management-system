@@ -1,4 +1,5 @@
 import { BadRequestException, ValidationError, ValidationPipe } from '@nestjs/common';
+import { ValidateIf } from 'class-validator';
 
 export interface FieldError {
   field: string;
@@ -9,6 +10,12 @@ export interface FieldError {
 export function validationFailed(errors: FieldError[]): BadRequestException {
   return new BadRequestException({ message: 'Validasi gagal', errors });
 }
+
+/**
+ * Field boleh tidak dikirim, tetapi bila dikirim harus lolos validator lain.
+ * Berbeda dari `@IsOptional()`, `null` tidak dilewatkan, jadi tidak sampai ke kolom non-null.
+ */
+export const IsOptionalNotNull = () => ValidateIf((_object, value) => value !== undefined);
 
 function toFieldErrors(errors: ValidationError[]): FieldError[] {
   return errors.map((error) => ({

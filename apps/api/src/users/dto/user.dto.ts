@@ -2,7 +2,6 @@ import {
   IsBoolean,
   IsEmail,
   IsIn,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -11,6 +10,7 @@ import { NormalizeEmail } from '../../common/email.js';
 import { PaginationQueryDto } from '../../common/pagination.js';
 import { IsNewPassword } from '../../common/password-policy.js';
 import { ToBoolean, Trim } from '../../common/transforms.js';
+import { IsOptionalNotNull } from '../../common/validation.js';
 import { Role } from '../../generated/prisma/client.js';
 
 const ROLES = Object.values(Role);
@@ -35,24 +35,24 @@ export class CreateUserDto {
 }
 
 export class UpdateUserDto {
-  @IsOptional()
+  @IsOptionalNotNull()
   @Trim()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   name?: string;
 
-  @IsOptional()
+  @IsOptionalNotNull()
   @NormalizeEmail()
   @IsEmail()
   @MaxLength(254)
   email?: string;
 
-  @IsOptional()
+  @IsOptionalNotNull()
   @IsIn(ROLES)
   role?: Role;
 
-  @IsOptional()
+  @IsOptionalNotNull()
   @IsBoolean()
   isActive?: boolean;
 }
@@ -63,17 +63,17 @@ export class ResetPasswordDto {
 }
 
 export class ListUsersQueryDto extends PaginationQueryDto {
-  @IsOptional()
+  @IsOptionalNotNull()
   @Trim()
   @IsString()
   @MaxLength(100)
   search?: string;
 
-  @IsOptional()
+  @IsOptionalNotNull()
   @IsIn(ROLES)
   role?: Role;
 
-  @IsOptional()
+  @IsOptionalNotNull()
   @ToBoolean()
   @IsBoolean()
   isActive?: boolean;

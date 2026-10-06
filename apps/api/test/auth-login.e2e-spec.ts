@@ -1,8 +1,7 @@
 import { api, setupE2e } from './e2e-context.js';
-import { bearer, createUser, DEFAULT_PASSWORD, login, loginAs } from './fixtures.js';
+import { bearer, createUser, DEFAULT_PASSWORD, errorFields, login, loginAs } from './fixtures.js';
+import { HEALTH, LOGIN, ME } from './routes.js';
 
-const LOGIN = '/api/v1/auth/login';
-const ME = '/api/v1/auth/me';
 
 describe('POST /auth/login', () => {
   const ctx = setupE2e();
@@ -87,7 +86,7 @@ describe('POST /auth/login', () => {
   ])('rejects %s with a field error', async (_label, body, field) => {
     const res = await api(ctx).post(LOGIN).send(body).expect(400);
     expect(res.body.message).toBe('Validasi gagal');
-    expect(res.body.errors.map((e: { field: string }) => e.field)).toContain(field);
+    expect(errorFields(res.body)).toContain(field);
   });
 
   it('records successful and failed logins in the audit log without the password', async () => {
@@ -142,6 +141,6 @@ describe('authentication guard', () => {
   });
 
   it('leaves the health check open', async () => {
-    await api(ctx).get('/api/v1/health').expect(200);
+    await api(ctx).get(HEALTH).expect(200);
   });
 });

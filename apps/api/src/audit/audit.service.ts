@@ -1,12 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, PrismaClient } from '../generated/prisma/client.js';
+import type { Db } from '../database/db.js';
+import type { Prisma } from '../generated/prisma/client.js';
 
-/** Klien biasa atau klien transaksi, supaya audit ikut transaksi pemanggilnya. */
-export type Db = PrismaClient | Prisma.TransactionClient;
+export type AuditAction =
+  | 'LOGIN'
+  | 'LOGIN_FAILED'
+  | 'LOGOUT'
+  | 'TOKEN_REUSE'
+  | 'CHANGE_PASSWORD'
+  | 'RESET_PASSWORD'
+  | 'CREATE'
+  | 'UPDATE';
 
 export interface AuditEntry {
   userId: string | null;
-  action: string;
+  action: AuditAction;
   entityType: string;
   entityId: string;
   before?: unknown;
@@ -14,7 +22,14 @@ export interface AuditEntry {
   ip?: string | null;
 }
 
-const SECRET_FIELDS = new Set(['password_hash', 'token_hash']);
+const SECRET_FIELDS = new Set([
+  'password_hash',
+  'token_hash',
+  'password',
+  'currentPassword',
+  'newPassword',
+  'refreshToken',
+]);
 
 /** Salinan yang aman disimpan sebagai JSON: tanpa field rahasia, bigint dan tanggal jadi string. */
 export function sanitizeForAudit(value: unknown): unknown {

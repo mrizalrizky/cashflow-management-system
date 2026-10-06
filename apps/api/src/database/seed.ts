@@ -1,4 +1,4 @@
-import argon2 from 'argon2';
+import { PasswordService } from '../auth/password.service.js';
 import { normalizeEmail } from '../common/email.js';
 import { PASSWORD_MIN_LENGTH } from '../common/password-policy.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
@@ -60,7 +60,7 @@ async function ensureAdmin(prisma: PrismaClient, options: SeedOptions): Promise<
     data: {
       name: options.adminName?.trim() || 'Administrator',
       email,
-      password_hash: await argon2.hash(password),
+      password_hash: await new PasswordService().hash(password),
       role: 'SUPER_ADMIN',
       must_change_password: true,
     },

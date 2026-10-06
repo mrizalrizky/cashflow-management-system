@@ -2,10 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { toAuthUser } from '../src/auth/auth.types.js';
 import { UsersService } from '../src/users/users.service.js';
 import { api, E2eContext, setupE2e } from './e2e-context.js';
-import { bearer, createUser, DEFAULT_PASSWORD, login, loginAs, Session } from './fixtures.js';
+import { bearer, createUser, DEFAULT_PASSWORD, errorFields, login, loginAs, TestSession } from './fixtures.js';
+import { LOGIN, REFRESH, USERS } from './routes.js';
 
-const USERS = '/api/v1/users';
-const REFRESH = '/api/v1/auth/refresh';
 const NEW_USER = {
   name: 'Budi Santoso',
   email: 'Budi@Example.com',
@@ -19,12 +18,8 @@ function asAdmin(ctx: E2eContext) {
   return loginAs(ctx, { role: 'SUPER_ADMIN', email: 'admin@example.com', name: 'Admin' });
 }
 
-function call(ctx: E2eContext, session: Session, method: Method, path: string) {
+function call(ctx: E2eContext, session: TestSession, method: Method, path: string) {
   return api(ctx)[method](path).set(...bearer(session.accessToken));
-}
-
-function fieldsOf(body: { errors: { field: string }[] }): string[] {
-  return body.errors.map((e) => e.field);
 }
 
 describe('POST /users', () => {
@@ -75,7 +70,7 @@ describe('POST /users', () => {
       .send({ ...NEW_USER, ...override })
       .expect(400);
 
-    expect(fieldsOf(res.body)).toContain(field);
+    expect(errorFields(res.body)).toContain(field);
     expect(await ctx.prisma.user.count()).toBe(1);
   });
 
@@ -236,6 +231,32 @@ describe('PATCH /users/:id', () => {
     }
   });
 
+  it.each([{ name: null }, { email: null }, { role: null }, { isActive: null }])(
+    'rejects the explicit null in %j with a field error',
+    async (body) => {
+      const admin = await asAdmin(ctx);
+      const user = await createUser(ctx.prisma);
+
+      const res = await call(ctx, admin, 'patch', `${USERS}/${user.id}`).send(body).expect(400);
+
+      expect(errorFields(res.body)).toEqual(Object.keys(body));
+    },
+  );
+
+  it('keeps one active SUPER_ADMIN when two admins remove each other at the same moment', async () => {
+    const first = await createUser(ctx.prisma, { role: 'SUPER_ADMIN' });
+    const second = await createUser(ctx.prisma, { role: 'SUPER_ADMIN' });
+    const users = ctx.app.get(UsersService);
+
+    const results = await Promise.allSettled([
+      users.update(toAuthUser(first), second.id, { role: 'STAFF' }, null),
+      users.update(toAuthUser(second), first.id, { isActive: false }, null),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(await ctx.prisma.user.count({ where: { role: 'SUPER_ADMIN', is_active: true } })).toBe(1);
+  });
+
   it('rejects a duplicate email, an empty body value and an unknown user', async () => {
     const admin = await asAdmin(ctx);
     const user = await createUser(ctx.prisma, { email: 'a@example.com' });
@@ -262,7 +283,7 @@ describe('POST /users/:id/reset-password', () => {
     expect(res.body).toMatchObject({ id: target.user.id, mustChangePassword: true });
     await api(ctx).post(REFRESH).set('Cookie', target.cookie).expect(401);
     await api(ctx)
-      .post('/api/v1/auth/login')
+      .post(LOGIN)
       .send({ email: target.user.email, password: DEFAULT_PASSWORD })
       .expect(401);
     await login(ctx, target.user.email, 'sementara-789');

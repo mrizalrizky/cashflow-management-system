@@ -17,6 +17,9 @@ import type { CreateUserDto, ListUsersQueryDto, UpdateUserDto } from './dto/user
 
 const ENTITY = 'user';
 
+/** Kunci advisory PostgreSQL yang menyerikan semua perubahan peran dan status aktif. */
+const ACCESS_CHANGE_LOCK = 7301;
+
 function notFound(): NotFoundException {
   return new NotFoundException('Pengguna tidak ditemukan');
 }
@@ -88,6 +91,9 @@ export class UsersService {
   async update(actor: AuthUser, id: string, dto: UpdateUserDto, ip: string | null): Promise<User> {
     return this.withUniqueEmail(() =>
       this.prisma.$transaction(async (tx) => {
+        if (dto.role !== undefined || dto.isActive !== undefined) {
+          await this.lockAccessChanges(tx);
+        }
         const before = await tx.user.findUnique({ where: { id } });
         if (!before) throw notFound();
 
@@ -104,7 +110,7 @@ export class UsersService {
           data: { name: dto.name, email: dto.email, role: dto.role, is_active: dto.isActive },
         });
         if (accessChanges) {
-          await this.sessions.revokeAll(tx, id);
+          await this.sessions.endAll(tx, id);
         }
         await this.audit.log(tx, {
           userId: actor.id,
@@ -137,7 +143,7 @@ export class UsersService {
         where: { id },
         data: { password_hash, must_change_password: true },
       });
-      await this.sessions.revokeAll(tx, id);
+      await this.sessions.endAll(tx, id);
       await this.audit.log(tx, {
         userId: actor.id,
         action: 'RESET_PASSWORD',
@@ -147,6 +153,14 @@ export class UsersService {
       });
       return user;
     });
+  }
+
+  /**
+   * Tanpa kunci ini dua admin yang saling menurunkan pada saat bersamaan sama-sama lolos
+   * pengecekan dan tidak ada SUPER_ADMIN yang tersisa. Kunci dilepas saat transaksi selesai.
+   */
+  private async lockAccessChanges(tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ACCESS_CHANGE_LOCK})`;
   }
 
   /** Mencegah admin mengunci dirinya sendiri atau menghilangkan SUPER_ADMIN aktif terakhir. */

@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service.js';
+import { AuditAction, AuditService } from '../audit/audit.service.js';
 import { validationFailed } from '../common/validation.js';
+import type { Db } from '../database/db.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
 import { Session, toAuthUser } from './auth.types.js';
@@ -8,6 +9,7 @@ import { PasswordService } from './password.service.js';
 import { SessionService } from './session.service.js';
 import { TokenService } from './token.service.js';
 
+/** Jeda saat token yang baru dirotasi masih boleh muncul lagi (tab lain yang refresh bersamaan). */
 const REUSE_GRACE_MS = 10_000;
 
 function sessionEnded(): UnauthorizedException {
@@ -43,13 +45,7 @@ export class AuthService {
     }
 
     const refreshToken = await this.prisma.$transaction(async (tx) => {
-      await this.audit.log(tx, {
-        userId: user.id,
-        action: 'LOGIN',
-        entityType: 'user',
-        entityId: user.id,
-        ip,
-      });
+      await this.logUserEvent(tx, 'LOGIN', user.id, ip);
       return this.sessions.create(tx, user.id);
     });
     return this.buildSession(user, refreshToken);
@@ -63,23 +59,18 @@ export class AuthService {
       where: { token_hash: this.tokens.hashRefreshToken(rawToken) },
       include: { user: true },
     });
-    if (!current) throw sessionEnded();
-
     const now = new Date();
+    if (!current || current.expires_at <= now) throw sessionEnded();
+
     if (current.revoked_at) {
-      await this.handleRevokedTokenUse(current.user_id, current.revoked_at, now, ip);
+      await this.handleRotatedTokenReuse(current.user_id, current.revoked_at, now, ip);
       throw sessionEnded();
     }
-    if (current.expires_at <= now || !current.user.is_active) throw sessionEnded();
+    if (!current.user.is_active) throw sessionEnded();
 
-    const refreshToken = await this.prisma.$transaction(async (tx) => {
-      // Bersyarat: bila dua request berpacu, hanya satu yang berhasil merotasi.
-      const { count } = await tx.refreshToken.updateMany({
-        where: { id: current.id, revoked_at: null },
-        data: { revoked_at: now },
-      });
-      return count === 1 ? this.sessions.create(tx, current.user_id, now) : null;
-    });
+    const refreshToken = await this.prisma.$transaction((tx) =>
+      this.sessions.rotate(tx, current.id, current.user_id, now),
+    );
     if (!refreshToken) throw sessionEnded();
 
     return this.buildSession(current.user, refreshToken);
@@ -91,16 +82,11 @@ export class AuthService {
 
     await this.prisma.$transaction(async (tx) => {
       const token = await tx.refreshToken.findUnique({ where: { token_hash: hash } });
+      // Token yang sudah dirotasi bukan sesi aktif; tidak ada yang perlu diakhiri.
       if (!token || token.revoked_at) return;
 
-      await tx.refreshToken.update({ where: { id: token.id }, data: { revoked_at: new Date() } });
-      await this.audit.log(tx, {
-        userId: token.user_id,
-        action: 'LOGOUT',
-        entityType: 'user',
-        entityId: token.user_id,
-        ip,
-      });
+      await this.sessions.end(tx, token.id);
+      await this.logUserEvent(tx, 'LOGOUT', token.user_id, ip);
     });
   }
 
@@ -113,7 +99,8 @@ export class AuthService {
   ): Promise<Session> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (!(await this.passwords.verify(user.password_hash, currentPassword))) {
-      throw new UnauthorizedException('Password saat ini salah');
+      // Sengaja 400, bukan 401: sesi pemanggil masih sah, hanya isian formulirnya yang salah.
+      throw validationFailed([{ field: 'currentPassword', messages: ['Password saat ini salah'] }]);
     }
     if (newPassword === currentPassword) {
       throw validationFailed([
@@ -127,14 +114,8 @@ export class AuthService {
         where: { id: userId },
         data: { password_hash, must_change_password: false },
       });
-      await this.sessions.revokeAll(tx, userId);
-      await this.audit.log(tx, {
-        userId,
-        action: 'CHANGE_PASSWORD',
-        entityType: 'user',
-        entityId: userId,
-        ip,
-      });
+      await this.sessions.endAll(tx, userId);
+      await this.logUserEvent(tx, 'CHANGE_PASSWORD', userId, ip);
       return { updated, refreshToken: await this.sessions.create(tx, userId) };
     });
     return this.buildSession(updated, refreshToken);
@@ -142,26 +123,30 @@ export class AuthService {
 
   /**
    * Token yang sudah dirotasi dipakai lagi. Dalam jeda singkat, itu tab lain yang refresh
-   * bersamaan dan cukup ditolak. Di luar jeda itu dianggap pencurian: semua sesi dicabut.
+   * bersamaan dan cukup ditolak. Di luar jeda itu dianggap pencurian: semua sesi diakhiri.
    */
-  private async handleRevokedTokenUse(
+  private async handleRotatedTokenReuse(
     userId: string,
-    revokedAt: Date,
+    rotatedAt: Date,
     now: Date,
     ip: string | null,
   ): Promise<void> {
-    if (now.getTime() - revokedAt.getTime() <= REUSE_GRACE_MS) return;
+    if (now.getTime() - rotatedAt.getTime() <= REUSE_GRACE_MS) return;
 
     await this.prisma.$transaction(async (tx) => {
-      await this.sessions.revokeAll(tx, userId, now);
-      await this.audit.log(tx, {
-        userId,
-        action: 'TOKEN_REUSE',
-        entityType: 'user',
-        entityId: userId,
-        ip,
-      });
+      await this.sessions.endAll(tx, userId);
+      await this.logUserEvent(tx, 'TOKEN_REUSE', userId, ip);
     });
+  }
+
+  /** Catatan audit untuk kejadian yang dilakukan user terhadap akunnya sendiri. */
+  private logUserEvent(
+    db: Db,
+    action: AuditAction,
+    userId: string,
+    ip: string | null,
+  ): Promise<void> {
+    return this.audit.log(db, { userId, action, entityType: 'user', entityId: userId, ip });
   }
 
   private async buildSession(user: User, refreshToken: string): Promise<Session> {

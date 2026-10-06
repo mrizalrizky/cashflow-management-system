@@ -19,3 +19,6 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Admin tidak bisa mengunci diri.** Admin tidak bisa menonaktifkan atau mengubah peran akunnya sendiri, dan SUPER_ADMIN aktif terakhir tidak bisa dihilangkan.
 - **Pencarian teks** memakai `containsText()` (`common/search.ts`) karena Prisma tidak meng-escape wildcard `%` dan `_`.
 - **Belum diputuskan (Fase 2):** nasib baris `project_members` bila seorang PROJECT_MANAGER diubah perannya.
+- **Sesi yang diakhiri dihapus barisnya.** Logout, ganti password, reset oleh admin, ganti peran, dan penonaktifan menghapus baris `refresh_tokens`. `revoked_at` hanya diisi oleh rotasi, sehingga deteksi pencurian hanya terpicu oleh token lama yang sudah ditukar, bukan oleh perangkat lain yang sesinya sengaja diakhiri.
+- **Password saat ini salah dijawab 400** (error field `currentPassword`), bukan 401, supaya klien tidak mengiranya sesi kedaluwarsa.
+- **Perubahan peran dan status aktif diserikan** dengan advisory lock PostgreSQL, supaya dua admin yang saling menurunkan pada saat bersamaan tidak menghilangkan SUPER_ADMIN terakhir.

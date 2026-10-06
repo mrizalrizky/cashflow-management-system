@@ -55,7 +55,13 @@ export class AuthController {
     @Ip() ip: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionResponse> {
-    return this.respondWithSession(res, await this.auth.refresh(readRefreshCookie(req), ip));
+    try {
+      return this.respondWithSession(res, await this.auth.refresh(readRefreshCookie(req), ip));
+    } catch (error) {
+      // Supaya browser berhenti mengirim token yang sudah tidak berlaku.
+      clearRefreshCookie(res, this.secureCookies);
+      throw error;
+    }
   }
 
   /** Publik karena access token boleh saja sudah kedaluwarsa saat user logout. */

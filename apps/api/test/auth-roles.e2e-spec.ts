@@ -1,9 +1,8 @@
 import type { Role } from '../src/generated/prisma/client.js';
 import { api, setupE2e } from './e2e-context.js';
 import { bearer, DEFAULT_PASSWORD, loginAs } from './fixtures.js';
+import { CHANGE_PASSWORD, ME, USERS } from './routes.js';
 
-const USERS = '/api/v1/users';
-const ME = '/api/v1/auth/me';
 const NEW_USER = { name: 'Baru', email: 'baru@example.com', role: 'STAFF', password: 'password-123' };
 
 describe('role enforcement', () => {
@@ -73,7 +72,7 @@ describe('forced password change', () => {
     const session = await loginAs(ctx, { role: 'SUPER_ADMIN', mustChangePassword: true });
 
     const res = await api(ctx)
-      .post('/api/v1/auth/change-password')
+      .post(CHANGE_PASSWORD)
       .set(...bearer(session.accessToken))
       .send({ currentPassword: DEFAULT_PASSWORD, newPassword: 'password-baru-456' })
       .expect(200);

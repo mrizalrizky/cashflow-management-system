@@ -1,13 +1,11 @@
 import { api, E2eContext, setupE2e } from './e2e-context.js';
-import { bearer, DEFAULT_PASSWORD, login, loginAs, refreshCookie, Session } from './fixtures.js';
+import { bearer, DEFAULT_PASSWORD, errorFields, login, loginAs, refreshCookie, TestSession } from './fixtures.js';
+import { CHANGE_PASSWORD, LOGIN, REFRESH } from './routes.js';
 
-const CHANGE = '/api/v1/auth/change-password';
-const REFRESH = '/api/v1/auth/refresh';
-const LOGIN = '/api/v1/auth/login';
 const NEW_PASSWORD = 'password-baru-456';
 
-function changePassword(ctx: E2eContext, session: Session, body: Record<string, unknown>) {
-  return api(ctx).post(CHANGE).set(...bearer(session.accessToken)).send(body);
+function changePassword(ctx: E2eContext, session: TestSession, body: Record<string, unknown>) {
+  return api(ctx).post(CHANGE_PASSWORD).set(...bearer(session.accessToken)).send(body);
 }
 
 describe('POST /auth/change-password', () => {
@@ -48,9 +46,13 @@ describe('POST /auth/change-password', () => {
     const res = await changePassword(ctx, session, {
       currentPassword: 'bukan-password-saya',
       newPassword: NEW_PASSWORD,
-    }).expect(401);
+    }).expect(400);
 
-    expect(res.body).toEqual({ statusCode: 401, message: 'Password saat ini salah' });
+    expect(res.body).toEqual({
+      statusCode: 400,
+      message: 'Validasi gagal',
+      errors: [{ field: 'currentPassword', messages: ['Password saat ini salah'] }],
+    });
     await login(ctx, session.user.email, DEFAULT_PASSWORD);
     await api(ctx).post(REFRESH).set('Cookie', session.cookie).expect(200);
   });
@@ -69,13 +71,13 @@ describe('POST /auth/change-password', () => {
     }).expect(400);
 
     expect(res.body.message).toBe('Validasi gagal');
-    expect(res.body.errors.map((e: { field: string }) => e.field)).toEqual(['newPassword']);
+    expect(errorFields(res.body)).toEqual(['newPassword']);
     await login(ctx, session.user.email, DEFAULT_PASSWORD);
   });
 
   it('requires authentication', async () => {
     await api(ctx)
-      .post(CHANGE)
+      .post(CHANGE_PASSWORD)
       .send({ currentPassword: DEFAULT_PASSWORD, newPassword: NEW_PASSWORD })
       .expect(401);
   });

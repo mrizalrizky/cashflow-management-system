@@ -1,19 +1,10 @@
-import request from 'supertest';
-import { createTestApp, TestApp } from './app-factory.js';
+import { api, setupE2e } from './e2e-context.js';
 
 describe('error format', () => {
-  let app: TestApp;
-
-  beforeAll(async () => {
-    app = await createTestApp();
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
+  const ctx = setupE2e();
 
   it('answers an unknown API route with exactly statusCode and message', async () => {
-    const res = await request(app.getHttpServer()).get('/api/v1/tidak-ada').expect(404);
+    const res = await api(ctx).get('/api/v1/tidak-ada').expect(404);
     expect(Object.keys(res.body).sort()).toEqual(['message', 'statusCode']);
     expect(res.body.statusCode).toBe(404);
     expect(typeof res.body.message).toBe('string');

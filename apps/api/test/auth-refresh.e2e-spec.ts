@@ -1,9 +1,7 @@
 import { api, E2eContext, setupE2e } from './e2e-context.js';
-import { bearer, createUser, login, loginAs, refreshCookie } from './fixtures.js';
+import { bearer, createUser, DEFAULT_PASSWORD, login, loginAs, refreshCookie } from './fixtures.js';
+import { CHANGE_PASSWORD, LOGOUT, ME, REFRESH } from './routes.js';
 
-const REFRESH = '/api/v1/auth/refresh';
-const LOGOUT = '/api/v1/auth/logout';
-const ME = '/api/v1/auth/me';
 const SESSION_ENDED = { statusCode: 401, message: 'Sesi berakhir, silakan login kembali' };
 
 function refresh(ctx: E2eContext, cookie?: string) {
@@ -84,6 +82,42 @@ describe('POST /auth/refresh', () => {
 
     expect(results.map((r) => r.status).sort()).toEqual([200, 401]);
     expect(await ctx.prisma.refreshToken.count({ where: { revoked_at: null } })).toBe(1);
+  });
+
+  it('treats a session ended by a password change as ended, not as stolen', async () => {
+    const laptop = await loginAs(ctx);
+    const phone = await login(ctx, laptop.user.email);
+    const changed = await api(ctx)
+      .post(CHANGE_PASSWORD)
+      .set(...bearer(laptop.accessToken))
+      .send({ currentPassword: DEFAULT_PASSWORD, newPassword: 'password-baru-456' })
+      .expect(200);
+    await ageRevocations(ctx, 11);
+
+    await refresh(ctx, phone.cookie).expect(401);
+
+    await refresh(ctx, refreshCookie(changed)).expect(200);
+    expect(await ctx.prisma.auditLog.count({ where: { action: 'TOKEN_REUSE' } })).toBe(0);
+  });
+
+  it('ignores a rotated token that has since expired', async () => {
+    const session = await loginAs(ctx);
+    const rotated = refreshCookie(await refresh(ctx, session.cookie).expect(200));
+    await ageRevocations(ctx, 11);
+    await ctx.prisma.refreshToken.updateMany({
+      where: { revoked_at: { not: null } },
+      data: { expires_at: new Date(Date.now() - 1000) },
+    });
+
+    await refresh(ctx, session.cookie).expect(401);
+
+    await refresh(ctx, rotated).expect(200);
+  });
+
+  it('clears the cookie when the refresh fails', async () => {
+    const res = await refresh(ctx, 'refresh_token=tidak-dikenal').expect(401);
+    const cleared = (res.headers['set-cookie'] as unknown as string[])[0];
+    expect(cleared).toMatch(/^refresh_token=;/);
   });
 
   it('rejects an expired refresh token', async () => {

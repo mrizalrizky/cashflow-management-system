@@ -1,12 +1,12 @@
 import { api, setupE2e } from './e2e-context.js';
 import { createUser, DEFAULT_PASSWORD } from './fixtures.js';
+import { HEALTH, LOGIN, REFRESH } from './routes.js';
 
 // Batas e2e bawaan sengaja tinggi; file ini menurunkannya sebelum modul aplikasi dimuat.
 vi.hoisted(() => {
   process.env.LOGIN_RATE_LIMIT = '3';
 });
 
-const LOGIN = '/api/v1/auth/login';
 const TOO_MANY = {
   statusCode: 429,
   message: 'Terlalu banyak percobaan login. Coba lagi nanti.',
@@ -30,8 +30,8 @@ describe('login rate limit', () => {
 
     // Rute lain tidak ikut dibatasi.
     for (let call = 1; call <= 10; call += 1) {
-      await api(ctx).get('/api/v1/health').expect(200);
+      await api(ctx).get(HEALTH).expect(200);
     }
-    await api(ctx).post('/api/v1/auth/refresh').expect(401);
+    await api(ctx).post(REFRESH).expect(401);
   });
 });

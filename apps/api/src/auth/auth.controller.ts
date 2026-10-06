@@ -1,11 +1,11 @@
-import { Body, Controller, Get, HttpCode, Ip, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Ip, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import type { AuthUser, Session } from './auth.types.js';
 import { AllowPendingPasswordChange, CurrentUser, Public } from './decorators.js';
 import { LoginDto } from './dto/login.dto.js';
-import { setRefreshCookie } from './refresh-cookie.js';
+import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './refresh-cookie.js';
 
 interface SessionResponse {
   accessToken: string;
@@ -32,6 +32,30 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionResponse> {
     return this.respondWithSession(res, await this.auth.login(dto.email, dto.password, ip));
+  }
+
+  @Public()
+  @Post('refresh')
+  @HttpCode(200)
+  async refresh(
+    @Req() req: Request,
+    @Ip() ip: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SessionResponse> {
+    return this.respondWithSession(res, await this.auth.refresh(readRefreshCookie(req), ip));
+  }
+
+  /** Publik karena access token boleh saja sudah kedaluwarsa saat user logout. */
+  @Public()
+  @Post('logout')
+  @HttpCode(204)
+  async logout(
+    @Req() req: Request,
+    @Ip() ip: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    await this.auth.logout(readRefreshCookie(req), ip);
+    clearRefreshCookie(res, this.secureCookies);
   }
 
   @AllowPendingPasswordChange()

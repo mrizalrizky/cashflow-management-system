@@ -1,6 +1,15 @@
 import 'reflect-metadata';
 import { plainToInstance, Type } from 'class-transformer';
-import { IsIn, IsInt, IsNotEmpty, IsString, Max, Min, validateSync } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Max,
+  Min,
+  MinLength,
+  validateSync,
+} from 'class-validator';
 
 export class EnvVars {
   @IsIn(['development', 'test', 'production'])
@@ -15,10 +24,27 @@ export class EnvVars {
   @IsString()
   @IsNotEmpty()
   DATABASE_URL: string;
+
+  /** Kunci penanda tangan access token. */
+  @IsString()
+  @MinLength(32)
+  JWT_ACCESS_SECRET: string;
+
+  /** Jumlah percobaan login per IP per menit. */
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  LOGIN_RATE_LIMIT: number = 5;
+
+  /** Jumlah reverse proxy di depan API; 0 berarti diakses langsung. */
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  TRUST_PROXY_HOPS: number = 0;
 }
 
 export function validateEnv(raw: Record<string, unknown>): EnvVars {
-  const env = plainToInstance(EnvVars, raw);
+  const env = plainToInstance(EnvVars, raw, { exposeDefaultValues: true });
   const errors = validateSync(env);
   if (errors.length > 0) {
     const detail = errors

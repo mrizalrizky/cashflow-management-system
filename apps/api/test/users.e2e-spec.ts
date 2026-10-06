@@ -130,7 +130,22 @@ describe('GET /users', () => {
     expect(res.body.meta).toEqual({ page: 2, pageSize: 2, total: 4 });
   });
 
-  it.each(['pageSize=1000', 'pageSize=0', 'page=0', 'page=abc', 'role=OWNER', 'isActive=maybe'])(
+  it('keeps a stable order across pages for users with the same name', async () => {
+    const admin = await asAdmin(ctx);
+    for (let i = 0; i < 4; i += 1) await createUser(ctx.prisma, { name: 'Kembar' });
+
+    const ids: string[] = [];
+    for (const page of [1, 2, 3, 4, 5]) {
+      const res = await call(ctx, admin, 'get', `${USERS}?page=${page}&pageSize=1`).expect(200);
+      ids.push(res.body.data[0].id);
+    }
+    const again = await call(ctx, admin, 'get', `${USERS}?pageSize=5`).expect(200);
+
+    expect(new Set(ids).size).toBe(5);
+    expect(again.body.data.map((u: { id: string }) => u.id)).toEqual(ids);
+  });
+
+  it.each(['pageSize=1000', 'pageSize=0', 'page=0', 'page=abc', 'page=100000000000', 'role=OWNER', 'isActive=maybe'])(
     'rejects the query %s',
     async (query) => {
       const admin = await asAdmin(ctx);

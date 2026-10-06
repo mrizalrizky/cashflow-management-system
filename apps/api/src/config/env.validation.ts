@@ -40,6 +40,7 @@ export class EnvVars {
   @Type(() => Number)
   @IsInt()
   @Min(0)
+  @Max(10)
   TRUST_PROXY_HOPS: number = 0;
 }
 

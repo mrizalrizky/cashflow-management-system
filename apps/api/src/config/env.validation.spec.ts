@@ -31,6 +31,7 @@ describe('validateEnv', () => {
     ['a JWT_ACCESS_SECRET shorter than 32 characters', { JWT_ACCESS_SECRET: 'short' }, /JWT_ACCESS_SECRET/],
     ['a LOGIN_RATE_LIMIT of zero', { LOGIN_RATE_LIMIT: '0' }, /LOGIN_RATE_LIMIT/],
     ['a negative TRUST_PROXY_HOPS', { TRUST_PROXY_HOPS: '-1' }, /TRUST_PROXY_HOPS/],
+    ['an implausibly large TRUST_PROXY_HOPS', { TRUST_PROXY_HOPS: '11' }, /TRUST_PROXY_HOPS/],
   ])('rejects %s and names the variable', (_label, override, pattern) => {
     expect(() => validateEnv({ ...valid, ...override })).toThrow(pattern);
   });

@@ -43,3 +43,12 @@ Set `POSTGRES_PORT` sebelum `npm run db:up`, lalu sesuaikan port di `DATABASE_UR
 export POSTGRES_PORT=5433
 export TEST_DATABASE_URL=postgresql://cashflow:cashflow_dev@localhost:5433/cashflow_test
 ```
+
+## Di belakang reverse proxy
+
+`TRUST_PROXY_HOPS` (di `apps/api/.env`) adalah jumlah reverse proxy di depan API:
+
+- `0` bila API diakses langsung (pengembangan lokal).
+- `1` bila ada satu reverse proxy (Caddy/nginx) di depannya.
+
+Bila terlalu kecil, semua orang terbaca dari IP proxy yang sama dan berbagi satu batas percobaan login. Bila terlalu besar, klien bisa memalsukan IP-nya lewat header `X-Forwarded-For`.

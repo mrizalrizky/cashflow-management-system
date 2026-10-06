@@ -49,7 +49,7 @@ export class UsersService {
   async list(query: ListUsersQueryDto): Promise<Paginated<User>> {
     const where = toWhere(query);
     const [users, total] = await Promise.all([
-      this.prisma.user.findMany({ where, orderBy: { name: 'asc' }, ...toSkipTake(query) }),
+      this.prisma.user.findMany({ where, orderBy: [{ name: 'asc' }, { id: 'asc' }], ...toSkipTake(query) }),
       this.prisma.user.count({ where }),
     ]);
     return paginated(users, total, query);

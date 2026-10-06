@@ -3,12 +3,15 @@ import { IsInt, Max, Min } from 'class-validator';
 
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
+/** Batas atas supaya `skip` tidak melampaui rentang integer database. */
+export const MAX_PAGE = 100_000;
 
 /** Dasar untuk semua DTO query daftar. Turunkan dan tambahkan filter khusus modul. */
 export class PaginationQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE)
   page: number = 1;
 
   @Type(() => Number)

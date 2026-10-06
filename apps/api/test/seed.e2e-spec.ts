@@ -77,4 +77,23 @@ describe('seedDatabase', () => {
     );
     expect(await prisma.user.count()).toBe(0);
   });
+
+  it('refuses the placeholder password from .env.example', async () => {
+    await expect(
+      seedDatabase(prisma, { ...options, adminPassword: 'ganti-password-ini' }),
+    ).rejects.toThrow(/SEED_ADMIN_PASSWORD/);
+    expect(await prisma.user.count()).toBe(0);
+  });
+
+  it('does not create a second admin when a SUPER_ADMIN exists under another email', async () => {
+    await seedDatabase(prisma, options);
+    await seedDatabase(prisma, { ...options, adminEmail: 'other@example.com' });
+    expect(await prisma.user.count()).toBe(1);
+  });
+
+  it('does not need admin credentials when an admin already exists', async () => {
+    await seedDatabase(prisma, options);
+    await expect(seedDatabase(prisma, {})).resolves.toBeUndefined();
+    expect(await prisma.category.count()).toBe(17);
+  });
 });

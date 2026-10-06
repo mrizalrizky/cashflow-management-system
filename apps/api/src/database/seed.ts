@@ -1,4 +1,6 @@
 import argon2 from 'argon2';
+import { normalizeEmail } from '../common/email.js';
+import { PASSWORD_MIN_LENGTH } from '../common/password-policy.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 
 export interface SeedOptions {
@@ -6,6 +8,9 @@ export interface SeedOptions {
   adminEmail?: string;
   adminPassword?: string;
 }
+
+/** Nilai contoh di .env.example; tidak boleh dipakai sebagai password sungguhan. */
+const PLACEHOLDER_PASSWORD = 'ganti-password-ini';
 
 const ACCOUNTS = [
   { name: 'Kas Kecil', type: 'CASH' },
@@ -35,37 +40,43 @@ const CATEGORIES = [
   { name: 'Transfer Keluar', type: 'OUT', is_system: true } as const,
 ];
 
-/** Aman dijalankan berulang: tidak menggandakan data dan tidak menimpa password admin. */
-export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): Promise<void> {
-  const email = options.adminEmail?.trim().toLowerCase();
+/** Membuat admin pertama. Bila sudah ada SUPER_ADMIN, tidak melakukan apa pun. */
+async function ensureAdmin(prisma: PrismaClient, options: SeedOptions): Promise<void> {
+  const existing = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
+  if (existing) return;
+
+  const email = options.adminEmail ? normalizeEmail(options.adminEmail) : '';
   if (!email) {
     throw new Error('SEED_ADMIN_EMAIL wajib diisi');
   }
   const password = options.adminPassword ?? '';
-  if (password.length < 8) {
-    throw new Error('SEED_ADMIN_PASSWORD wajib diisi, minimal 8 karakter');
+  if (password.length < PASSWORD_MIN_LENGTH || password === PLACEHOLDER_PASSWORD) {
+    throw new Error(
+      `SEED_ADMIN_PASSWORD wajib diisi, minimal ${PASSWORD_MIN_LENGTH} karakter, dan bukan nilai contoh`,
+    );
   }
 
-  const existingAdmin = await prisma.user.findUnique({ where: { email } });
-  if (!existingAdmin) {
-    await prisma.user.create({
-      data: {
-        name: options.adminName?.trim() || 'Administrator',
-        email,
-        password_hash: await argon2.hash(password),
-        role: 'SUPER_ADMIN',
-        must_change_password: true,
-      },
-    });
-  }
+  await prisma.user.create({
+    data: {
+      name: options.adminName?.trim() || 'Administrator',
+      email,
+      password_hash: await argon2.hash(password),
+      role: 'SUPER_ADMIN',
+      must_change_password: true,
+    },
+  });
+}
 
+async function ensureAccounts(prisma: PrismaClient): Promise<void> {
   for (const account of ACCOUNTS) {
     const existing = await prisma.account.findFirst({ where: { name: account.name } });
     if (!existing) {
       await prisma.account.create({ data: account });
     }
   }
+}
 
+async function ensureCategories(prisma: PrismaClient): Promise<void> {
   for (const category of CATEGORIES) {
     await prisma.category.upsert({
       where: { name_type: { name: category.name, type: category.type } },
@@ -73,4 +84,11 @@ export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): 
       create: category,
     });
   }
+}
+
+/** Aman dijalankan berulang: tidak menggandakan data dan tidak menimpa password admin. */
+export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): Promise<void> {
+  await ensureAdmin(prisma, options);
+  await ensureAccounts(prisma);
+  await ensureCategories(prisma);
 }

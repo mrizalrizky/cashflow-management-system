@@ -30,8 +30,11 @@ Seed aman dijalankan berulang. Admin pertama hanya dibuat bila belum ada SUPER_A
 ```bash
 npm run lint
 npm test
-npm run test:e2e    # butuh database berjalan
+npm run test:e2e       # e2e API; butuh database berjalan
+npm run test:browser   # alur login di browser sungguhan; butuh database berjalan
 ```
+
+Test browser menjalankan API dan web sendiri di port 3100 dan 5174 terhadap `cashflow_test`, jadi server dan data pengembangan tidak tersentuh. Sekali saja, pasang browsernya: `npx playwright install chromium` di `apps/web`.
 
 e2e memakai database `cashflow_test`, yang dibuat otomatis saat volume PostgreSQL pertama kali dibuat.
 

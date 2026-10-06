@@ -1,0 +1,8 @@
+{
+  // Build terpisah untuk test browser, supaya `dist` milik server pengembangan tidak tersentuh.
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "outDir": "./dist-browser-test",
+    "incremental": false
+  }
+}

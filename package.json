@@ -16,6 +16,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e -w api",
+    "test:browser": "npm run test:browser -w web",
     "build": "npm run build --workspaces --if-present"
   },
   "allowScripts": {

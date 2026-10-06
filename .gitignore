@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-browser-test/
 coverage/
 .env
 .env.*
@@ -12,3 +13,5 @@ apps/api/storage/
 .superpowers/
 .DS_Store
 Thumbs.db
+test-results/
+playwright-report/

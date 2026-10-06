@@ -1,22 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import Tag from 'primevue/tag'
-import { fetchHealth, type HealthState } from '@/api/health'
+import { useRoute } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
 
-const state = ref<HealthState | 'loading'>('loading')
-
-onMounted(async () => {
-  state.value = await fetchHealth()
-})
+// Tampilan sementara untuk halaman yang dibangun pada fase berikutnya.
+const route = useRoute()
 </script>
 
 <template>
-  <main class="mx-auto max-w-md p-6">
-    <h1 class="text-2xl font-semibold">Arus Kas</h1>
-    <p class="mt-4" data-testid="health">
-      <Tag v-if="state === 'loading'" severity="secondary" value="Memeriksa API…" />
-      <Tag v-else-if="state === 'up'" severity="success" value="API terhubung" />
-      <Tag v-else severity="danger" value="API tidak terhubung" />
-    </p>
-  </main>
+  <PageHeader :title="route.meta.title ?? 'Arus Kas'" />
+  <p class="text-surface-600">Halaman ini dibangun pada fase berikutnya.</p>
 </template>

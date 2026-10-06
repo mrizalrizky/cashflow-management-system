@@ -4,13 +4,14 @@ import { RouterView, useRoute } from 'vue-router'
 import ConfirmDialog from 'primevue/confirmdialog'
 import ProgressSpinner from 'primevue/progressspinner'
 import Toast from 'primevue/toast'
+import AppLayout from '@/layouts/AppLayout.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import { useSessionStore } from '@/stores/session'
 
 const route = useRoute()
 const session = useSessionStore()
 
-const layout = computed(() => (route.meta.layout === 'auth' ? AuthLayout : 'div'))
+const layout = computed(() => (route.meta.layout === 'auth' ? AuthLayout : AppLayout))
 </script>
 
 <template>

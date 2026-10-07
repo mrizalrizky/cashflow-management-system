@@ -1,4 +1,4 @@
-import { request } from './http'
+import { request, requestFile, type DownloadedFile } from './http'
 import type { PageParams, Paginated, Transaction, TxStatus, TxType } from './types'
 
 /** `null` diperlakukan sama dengan tidak diisi (nilai dari dropdown yang dikosongkan). */
@@ -95,4 +95,12 @@ export function voidTransaction(id: string, reason: string): Promise<Transaction
 /** Mengembalikan kedua sisi transfer: keluar dulu, lalu masuk. */
 export function createTransfer(input: TransferInput): Promise<Transaction[]> {
   return request('/transactions/transfer', { method: 'POST', body: input })
+}
+
+/**
+ * Daftar transaksi sebagai berkas CSV, dengan filter yang sama seperti daftar (tanpa halaman).
+ * Isinya dibatasi API sesuai apa yang boleh dilihat pengguna.
+ */
+export function exportTransactions(filters: TransactionFilters): Promise<DownloadedFile> {
+  return requestFile('/transactions/export', { ...filters })
 }

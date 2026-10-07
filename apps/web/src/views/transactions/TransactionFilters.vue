@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch, type WritableComputedRef } from 'vue'
+import { computed, ref, type WritableComputedRef } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
 import type { TransactionFilters } from '@/api/transactions'
-import DateField from '@/components/DateField.vue'
+import DateRangeFilter, { type DateRange } from '@/components/DateRangeFilter.vue'
 import FilterBar from '@/components/FilterBar.vue'
 import FilterSelect from '@/components/FilterSelect.vue'
 import { useDebouncedInput } from '@/composables/useDebouncedInput'
@@ -66,17 +66,10 @@ const showTransfers = computed({
 
 const search = useDebouncedInput((value) => patch({ search: value || undefined }))
 
-const dateFrom = ref<string | null>(null)
-const dateTo = ref<string | null>(null)
-const rangeBackwards = computed(
-  () => dateFrom.value !== null && dateTo.value !== null && dateFrom.value > dateTo.value,
-)
-watch([dateFrom, dateTo], () => {
-  // Rentang yang terbalik tidak dikirim; pengguna diberi tahu di bawah kolomnya.
-  patch({
-    dateFrom: rangeBackwards.value ? undefined : (dateFrom.value ?? undefined),
-    dateTo: rangeBackwards.value ? undefined : (dateTo.value ?? undefined),
-  })
+const dates = ref<InstanceType<typeof DateRangeFilter> | null>(null)
+const range = computed<DateRange>({
+  get: () => ({ from: model.value.dateFrom ?? undefined, to: model.value.dateTo ?? undefined }),
+  set: (next) => patch({ dateFrom: next.from, dateTo: next.to }),
 })
 
 function named(items: { id: string; name: string }[]): Option<string>[] {
@@ -92,8 +85,7 @@ const projectOptions = computed<Option<string>[]>(() => [
 
 function reset(): void {
   search.value = ''
-  dateFrom.value = null
-  dateTo.value = null
+  dates.value?.clear()
   model.value = {}
 }
 </script>
@@ -107,27 +99,7 @@ function reset(): void {
       aria-label="Cari keterangan"
       fluid
     />
-    <div>
-      <div class="grid grid-cols-2 gap-2">
-        <DateField
-          id="filter-date-from"
-          v-model="dateFrom"
-          :invalid="rangeBackwards"
-          placeholder="Dari tanggal"
-          aria-label="Dari tanggal"
-        />
-        <DateField
-          id="filter-date-to"
-          v-model="dateTo"
-          :invalid="rangeBackwards"
-          placeholder="Sampai tanggal"
-          aria-label="Sampai tanggal"
-        />
-      </div>
-      <small v-if="rangeBackwards" role="alert" class="text-red-600">
-        Tanggal awal tidak boleh setelah tanggal akhir
-      </small>
-    </div>
+    <DateRangeFilter ref="dates" v-model="range" id-prefix="filter-date" />
     <FilterSelect v-model="type" :options="TX_TYPE_OPTIONS" placeholder="Semua tipe" label="Tipe" />
     <FilterSelect
       v-model="status"

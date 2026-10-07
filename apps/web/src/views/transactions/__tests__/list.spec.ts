@@ -6,12 +6,13 @@ import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import * as accountsApi from '@/api/accounts'
 import * as categoriesApi from '@/api/categories'
-import { ApiError } from '@/api/http'
+import { ApiError, type DownloadedFile } from '@/api/http'
 import * as projectsApi from '@/api/projects'
 import * as transactionsApi from '@/api/transactions'
 import type { Role, Transaction } from '@/api/types'
 import DateField from '@/components/DateField.vue'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
+import * as download from '@/lib/download'
 import { fill, freshPinia, mountView } from '@/test/mount'
 import { signInAs } from '@/test/session'
 import {
@@ -34,6 +35,7 @@ vi.mock('@/api/transactions')
 vi.mock('@/api/accounts')
 vi.mock('@/api/projects')
 vi.mock('@/api/categories')
+vi.mock('@/lib/download')
 
 const SEMEN = makeTransaction()
 const TERMIN_MASUK = makeTransaction({
@@ -365,6 +367,127 @@ describe('TransactionsView', () => {
 
     expect(optionLabels(wrapper, 'Akun')).toEqual(['Kas Kecil', 'Bank Utama'])
     expect(wrapper.find('[data-testid="reload-options"]').exists()).toBe(false)
+  })
+})
+
+describe('TransactionsView: export', () => {
+  const FILE: DownloadedFile = { blob: new Blob(['isi']), fileName: 'transaksi-20261007-1005.csv' }
+  const exportFile = vi.mocked(transactionsApi.exportTransactions)
+
+  async function mountList(role: Role, path = '/transaksi') {
+    signInAs(role)
+    vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf([SEMEN]))
+    exportFile.mockResolvedValue(FILE)
+    return mountView(TransactionsView, { path, withOverlays: true })
+  }
+
+  async function clickExport(wrapper: VueWrapper): Promise<void> {
+    await wrapper.get('[data-testid="export-transactions"]').trigger('click')
+    await flushPromises()
+  }
+
+  it.each(['SUPER_ADMIN', 'PROJECT_MANAGER', 'STAFF'] as const)('is offered to a %s', async (role) => {
+    const { wrapper } = await mountList(role)
+
+    expect(wrapper.get('[data-testid="export-transactions"]').text()).toBe('Ekspor CSV')
+  })
+
+  it('saves the file under the name the API chose and says so', async () => {
+    const { wrapper } = await mountList('STAFF')
+
+    await clickExport(wrapper)
+
+    expect(exportFile).toHaveBeenCalledExactlyOnceWith({})
+    expect(download.saveBlob).toHaveBeenCalledExactlyOnceWith(FILE.blob, 'transaksi-20261007-1005.csv')
+    expect(document.body.textContent).toContain('Berkas ekspor diunduh')
+  })
+
+  it('falls back to a plain name when the API sent none', async () => {
+    const { wrapper } = await mountList('STAFF')
+    exportFile.mockResolvedValue({ blob: FILE.blob, fileName: null })
+
+    await clickExport(wrapper)
+
+    expect(download.saveBlob).toHaveBeenCalledExactlyOnceWith(FILE.blob, 'transaksi.csv')
+  })
+
+  it('exports with exactly the filters of the list on screen', async () => {
+    const { wrapper } = await mountList('SUPER_ADMIN')
+    await choose(wrapper, 'Status', 'PENDING')
+    await choose(wrapper, 'Proyek', RUMAH.id)
+    wrapper.findComponent(ToggleSwitch).vm.$emit('update:modelValue', false)
+    await flushPromises()
+
+    await clickExport(wrapper)
+
+    const { page: _page, pageSize: _pageSize, ...listed } = lastListParams()
+    const sent = exportFile.mock.calls[0]![0]
+    expect(sent).toMatchObject({ status: 'PENDING', projectId: RUMAH.id, includeTransfers: false })
+    expect(sent).not.toHaveProperty('page')
+    expect(sent).not.toHaveProperty('pageSize')
+    // Yang terisi di permintaan daftar sama dengan yang terisi di permintaan ekspor.
+    const filled = (filters: object) => Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined))
+    expect(filled(sent)).toEqual(filled(listed))
+  })
+
+  it('uses a search only once the list has applied it', async () => {
+    const { wrapper } = await mountList('SUPER_ADMIN')
+    vi.useFakeTimers()
+    await fill(wrapper, '#transaction-search', 'semen')
+
+    // Masih diketik: daftar belum disaring, jadi ekspor pun belum.
+    await wrapper.get('[data-testid="export-transactions"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(exportFile.mock.calls[0]![0].search).toBeUndefined()
+
+    await vi.advanceTimersByTimeAsync(300)
+    expect(lastListParams()).toMatchObject({ search: 'semen' })
+    await wrapper.get('[data-testid="export-transactions"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(exportFile.mock.calls[1]![0]).toMatchObject({ search: 'semen' })
+  })
+
+  it('carries a status that came from the address, and leaves out a backwards date range', async () => {
+    const { wrapper } = await mountList('SUPER_ADMIN', '/transaksi?status=PENDING')
+    await pickDates(wrapper, '2026-11-05', '2026-10-31')
+
+    await clickExport(wrapper)
+
+    const sent = exportFile.mock.calls[0]![0]
+    expect(sent.status).toBe('PENDING')
+    expect(sent.dateFrom).toBeUndefined()
+    expect(sent.dateTo).toBeUndefined()
+  })
+
+  it('runs one export at a time, showing that it is busy', async () => {
+    const { wrapper } = await mountList('STAFF')
+    let finish!: (file: DownloadedFile) => void
+    exportFile.mockReturnValue(new Promise((resolve) => (finish = resolve)))
+
+    await clickExport(wrapper)
+    expect(wrapper.get('[data-testid="export-transactions"]').attributes('disabled')).toBeDefined()
+    await clickExport(wrapper)
+    finish(FILE)
+    await flushPromises()
+
+    expect(exportFile).toHaveBeenCalledTimes(1)
+    expect(download.saveBlob).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-testid="export-transactions"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it.each([
+    ['the API refuses', new ApiError(400, 'Validasi gagal')],
+    ['the network drops', new ApiError(0, 'Tidak dapat terhubung ke server')],
+  ])('saves nothing and frees the button when %s', async (_label, failure) => {
+    const { wrapper } = await mountList('STAFF')
+    exportFile.mockRejectedValue(failure)
+
+    await clickExport(wrapper)
+
+    expect(download.saveBlob).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain(failure.message)
+    expect(document.body.textContent).not.toContain('Berkas ekspor diunduh')
+    expect(wrapper.get('[data-testid="export-transactions"]').attributes('disabled')).toBeUndefined()
   })
 })
 

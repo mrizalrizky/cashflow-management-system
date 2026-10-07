@@ -3,9 +3,11 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
-import type { TransactionFilters as Filters } from '@/api/transactions'
+import { exportTransactions, type TransactionFilters as Filters } from '@/api/transactions'
 import type { TxStatus } from '@/api/types'
 import PageHeader from '@/components/PageHeader.vue'
+import { useFileDownload } from '@/composables/useFileDownload'
+import { useNotify } from '@/composables/useNotify'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { TX_STATUS_OPTIONS } from '@/lib/labels'
 import { useSessionStore } from '@/stores/session'
@@ -37,6 +39,18 @@ const table = ref<InstanceType<typeof TransactionTable> | null>(null)
 const formOpen = ref(false)
 const transferOpen = ref(false)
 
+const notify = useNotify()
+const files = useFileDownload()
+
+/**
+ * Mengekspor persis yang sedang tampil: `filters` adalah filter yang dipakai daftar (pencarian
+ * yang masih diketik dan rentang tanggal yang terbalik belum atau tidak masuk ke sana).
+ */
+async function exportList(): Promise<void> {
+  const saved = await files.download(() => exportTransactions({ ...filters.value }), 'transaksi.csv')
+  if (saved) notify.success('Berkas ekspor diunduh')
+}
+
 // Pemberitahuan dan perpindahan halaman diurus dialognya; halaman ini cukup memuat ulang.
 function reloadTable(): void {
   void table.value?.reload()
@@ -46,6 +60,15 @@ function reloadTable(): void {
 <template>
   <PageHeader :title="isStaff ? 'Transaksi Saya' : 'Transaksi'">
     <template #actions>
+      <Button
+        label="Ekspor CSV"
+        icon="pi pi-download"
+        severity="secondary"
+        :loading="files.downloading.value"
+        :disabled="files.downloading.value"
+        data-testid="export-transactions"
+        @click="exportList"
+      />
       <Button
         v-if="isAdmin"
         label="Transfer antar akun"

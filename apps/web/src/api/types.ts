@@ -204,3 +204,19 @@ export interface ProjectSummary {
   costByCategory: CategoryAmount[]
   pendingCount: number
 }
+
+/** Satu catatan log audit. `before` dan `after` adalah keadaan data seperti disimpan API. */
+export interface AuditLog {
+  id: string
+  /** Mis. `LOGIN`, `APPROVE`. */
+  action: string
+  /** Mis. `transaction`, `account`. */
+  entityType: string
+  entityId: string
+  /** null bila pelakunya tidak dikenal, mis. login gagal dengan email tak terdaftar. */
+  user: NamedRef | null
+  before: unknown
+  after: unknown
+  ip: string | null
+  createdAt: string
+}

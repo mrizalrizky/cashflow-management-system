@@ -199,7 +199,37 @@ export function request<T>(path: string, options: RequestOptions = {}): Promise<
   return withSession(options, () => sendJson<T>(path, options))
 }
 
-/** Mengambil berkas dari API, dengan aturan sesi yang sama seperti `request`. */
-export function requestBlob(path: string): Promise<Blob> {
-  return withSession({}, () => send(path, {}, (response) => response.blob()))
+export interface DownloadedFile {
+  blob: Blob
+  /** Nama yang diberikan API (`Content-Disposition`); null bila tidak ada. */
+  fileName: string | null
+}
+
+/**
+ * Nama berkas dari `Content-Disposition`. Hanya bagian terakhirnya yang dipakai, supaya nama
+ * dari server tidak pernah bisa menunjuk ke folder lain di komputer pengguna.
+ */
+function fileNameFrom(response: Response): string | null {
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const match = /filename="?([^";]*)"?/i.exec(disposition)
+  const name = match?.[1]?.split(/[\\/]/).pop()?.trim()
+  return name && name !== '.' && name !== '..' ? name : null
+}
+
+/** Mengambil berkas dari API beserta namanya, dengan aturan sesi yang sama seperti `request`. */
+export function requestFile(
+  path: string,
+  query?: RequestOptions['query'],
+): Promise<DownloadedFile> {
+  return withSession({}, () =>
+    send(path, { query }, async (response) => ({
+      blob: await response.blob(),
+      fileName: fileNameFrom(response),
+    })),
+  )
+}
+
+/** Mengambil isi sebuah berkas saja, mis. untuk pratinjau. */
+export async function requestBlob(path: string): Promise<Blob> {
+  return (await requestFile(path)).blob
 }

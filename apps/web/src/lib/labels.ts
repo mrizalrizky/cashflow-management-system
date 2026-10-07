@@ -1,4 +1,5 @@
 import type { AccountType, ProjectStatus, Role, TxStatus, TxType } from '@/api/types'
+import { hasOwn } from './changes'
 
 export interface Option<T> {
   value: T
@@ -65,3 +66,47 @@ export const ACTIVE_OPTIONS: Option<boolean>[] = [
   { label: 'Aktif', value: true },
   { label: 'Nonaktif', value: false },
 ]
+
+/**
+ * Nama tampilan untuk nilai yang daftarnya bisa bertambah di API (tindakan dan jenis data di
+ * log audit). Nilai yang belum dikenal ditampilkan apa adanya, bukan disembunyikan.
+ */
+function openLabelSet(labels: Record<string, string>) {
+  return {
+    label: (value: string): string => (hasOwn(labels, value) ? labels[value]! : value),
+    options: Object.entries(labels).map(([value, label]) => ({ value, label })),
+  }
+}
+
+const auditActions = openLabelSet({
+  LOGIN: 'Masuk',
+  LOGIN_FAILED: 'Gagal masuk',
+  LOGOUT: 'Keluar',
+  TOKEN_REUSE: 'Sesi dipakai ulang',
+  CHANGE_PASSWORD: 'Mengganti password',
+  RESET_PASSWORD: 'Mereset password',
+  CREATE: 'Membuat',
+  UPDATE: 'Mengubah',
+  SET_MEMBERS: 'Mengatur koordinator',
+  RESUBMIT: 'Mengajukan lagi',
+  CANCEL: 'Membatalkan',
+  APPROVE: 'Menyetujui',
+  REJECT: 'Menolak',
+  VOID: 'Void',
+  TRANSFER: 'Transfer antar akun',
+  ATTACH: 'Menambah bukti',
+  DETACH: 'Menghapus bukti',
+  EXPORT: 'Mengekspor',
+})
+export const auditActionLabel = auditActions.label
+export const AUDIT_ACTION_OPTIONS: Option<string>[] = auditActions.options
+
+const auditEntities = openLabelSet({
+  transaction: 'Transaksi',
+  account: 'Akun',
+  category: 'Kategori',
+  project: 'Proyek',
+  user: 'Pengguna',
+})
+export const auditEntityLabel = auditEntities.label
+export const AUDIT_ENTITY_OPTIONS: Option<string>[] = auditEntities.options

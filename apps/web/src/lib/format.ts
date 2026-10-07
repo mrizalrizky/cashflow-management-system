@@ -1,6 +1,13 @@
 const DATE_OPTIONS = { day: '2-digit', month: 'short', year: 'numeric' } as const
 const JAKARTA = new Intl.DateTimeFormat('id-ID', { ...DATE_OPTIONS, timeZone: 'Asia/Jakarta' })
 const UTC = new Intl.DateTimeFormat('id-ID', { ...DATE_OPTIONS, timeZone: 'UTC' })
+const JAKARTA_TIME = new Intl.DateTimeFormat('id-ID', {
+  ...DATE_OPTIONS,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'Asia/Jakarta',
+})
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
 const CALENDAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 const MONTH = new Intl.DateTimeFormat('id-ID', { month: 'short', year: 'numeric', timeZone: 'UTC' })
@@ -46,4 +53,13 @@ export function formatMonth(value: string | null | undefined): string {
     MONTH.formatToParts(new Date(`${value}-01T00:00:00.000Z`)).map((p) => [p.type, p.value]),
   )
   return `${parts.month} ${parts.year}`
+}
+
+/** Waktu kejadian sebagai `dd MMM yyyy HH.mm` menurut waktu Jakarta. */
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  const parts = Object.fromEntries(JAKARTA_TIME.formatToParts(date).map((p) => [p.type, p.value]))
+  return `${parts.day} ${parts.month} ${parts.year} ${parts.hour}.${parts.minute}`
 }

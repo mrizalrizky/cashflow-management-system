@@ -9,6 +9,7 @@ export const PATHS = {
   projects: '/proyek',
   masterData: '/master-data',
   users: '/pengguna',
+  auditLog: '/audit-log',
 } as const
 
 /** Pola rute halaman detail proyek. */

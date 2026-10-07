@@ -27,6 +27,7 @@ const MENU: MenuDefinition[] = [
   },
   { label: 'Master data', icon: 'pi pi-database', to: PATHS.masterData },
   { label: 'Pengguna', icon: 'pi pi-users', to: PATHS.users },
+  { label: 'Audit log', icon: 'pi pi-history', to: PATHS.auditLog },
 ]
 
 function isVisible(item: MenuDefinition, role: Role): boolean {

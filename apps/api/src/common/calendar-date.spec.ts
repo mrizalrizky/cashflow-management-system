@@ -3,7 +3,9 @@ import {
   currentYearInJakarta,
   IsCalendarDate,
   formatCalendarDate,
+  endOfJakartaDay,
   parseCalendarDate,
+  startOfJakartaDay,
   todayInJakarta,
 } from './calendar-date.js';
 import { validateBody } from './testing/validate.js';
@@ -55,5 +57,13 @@ describe('todayInJakarta', () => {
   it('follows the Jakarta calendar, seven hours ahead of UTC', () => {
     expect(todayInJakarta(new Date('2026-10-06T16:59:59Z'))).toBe('2026-10-06');
     expect(todayInJakarta(new Date('2026-10-06T17:00:00Z'))).toBe('2026-10-07');
+  });
+});
+
+describe('Jakarta day boundaries', () => {
+  it('start seven hours before the same date in UTC and end a day later', () => {
+    expect(startOfJakartaDay('2026-10-06').toISOString()).toBe('2026-10-05T17:00:00.000Z');
+    expect(endOfJakartaDay('2026-10-06').toISOString()).toBe('2026-10-06T17:00:00.000Z');
+    expect(endOfJakartaDay('2026-12-31').toISOString()).toBe('2026-12-31T17:00:00.000Z');
   });
 });

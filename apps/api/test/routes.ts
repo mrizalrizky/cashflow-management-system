@@ -17,3 +17,4 @@ export const TRANSACTIONS = `${API}/transactions`;
 export const TRANSFERS = `${API}/transactions/transfer`;
 export const ATTACHMENTS = `${API}/attachments`;
 export const DASHBOARD = `${API}/dashboard/company`;
+export const AUDIT_LOGS = `${API}/audit-logs`;

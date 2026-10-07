@@ -1,6 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 import type { Role } from '@/api/types'
-import { PATHS, PROJECT_DETAIL_ROUTE } from './paths'
+import { PATHS, PROJECT_DETAIL_ROUTE, TRANSACTION_DETAIL_ROUTE } from './paths'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -42,6 +42,11 @@ export const routes: RouteRecordRaw[] = [
   {
     path: PATHS.transactions,
     component: () => import('@/views/transactions/TransactionsView.vue'),
+    meta: { title: 'Transaksi' },
+  },
+  {
+    path: TRANSACTION_DETAIL_ROUTE,
+    component: () => import('@/views/transactions/TransactionDetailView.vue'),
     meta: { title: 'Transaksi' },
   },
   {

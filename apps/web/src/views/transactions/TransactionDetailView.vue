@@ -195,6 +195,21 @@ function openForm(): void {
       </template>
     </PageHeader>
 
+    <!-- Yang tampil mungkin bukan keadaan terbaru: muat ulang setelah sebuah perubahan gagal. -->
+    <Message v-if="error" severity="warn" :closable="false" class="mb-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <span>Data terbaru gagal dimuat: {{ error }}</span>
+        <Button
+          label="Coba lagi"
+          size="small"
+          severity="secondary"
+          :loading="loading"
+          data-testid="retry-reload"
+          @click="reload"
+        />
+      </div>
+    </Message>
+
     <Message v-if="transaction.isTransfer" severity="info" :closable="false" class="mb-4">
       {{ TRANSFER_VOID_NOTE }}
     </Message>

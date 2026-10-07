@@ -42,6 +42,7 @@ import { negativeBalanceWarning, OVERHEAD } from '@/lib/transactions'
 import { collectErrors } from '@/lib/validation'
 import { transactionPath } from '@/router/paths'
 import { useSessionStore } from '@/stores/session'
+import TransactionOptionsError from './TransactionOptionsError.vue'
 
 const props = defineProps<{
   /** Transaksi yang diubah; null berarti mencatat transaksi baru. */
@@ -105,10 +106,14 @@ let aftermath: Aftermath = { failedUploads: [], approved: null, approveError: nu
  * tetap tertutup dan transaksi yang sama tidak bisa tersimpan dua kali.
  */
 async function createWithProof(input: TransactionInput): Promise<Transaction> {
+  // Dicatat sebelum permintaan pertama: isi form tidak boleh mengubah apa yang sedang disimpan.
+  const proofFiles = [...files.value]
+  const approveNow = form.approveNow
+
   const created = await createTransaction(input)
-  const { failed } = await proof.upload(created.id, files.value)
+  const { failed } = await proof.upload(created.id, proofFiles)
   aftermath = { failedUploads: failed, approved: null, approveError: null }
-  if (!form.approveNow || failed.length > 0) return created
+  if (!approveNow || failed.length > 0) return created
 
   try {
     aftermath.approved = await approveTransaction(created.id)
@@ -266,6 +271,7 @@ const title = computed(() => {
     :submit-label="isResubmit ? 'Ajukan lagi' : undefined"
     @submit="save"
   >
+    <TransactionOptionsError :options="options" />
     <Message v-if="isResubmit" severity="warn" :closable="false">
       Ditolak: {{ transaction?.rejectReason }}
     </Message>
@@ -295,6 +301,7 @@ const title = computed(() => {
 
     <SelectField
       id="tx-account"
+      :loading="options.loading.value"
       v-model="form.accountId"
       label="Akun"
       placeholder="Pilih akun"
@@ -303,6 +310,7 @@ const title = computed(() => {
     />
     <SelectField
       id="tx-category"
+      :loading="options.loading.value"
       v-model="form.categoryId"
       label="Kategori"
       placeholder="Pilih kategori"
@@ -311,6 +319,7 @@ const title = computed(() => {
     />
     <SelectField
       id="tx-project"
+      :loading="options.loading.value"
       v-model="form.projectId"
       label="Proyek"
       placeholder="Pilih proyek"

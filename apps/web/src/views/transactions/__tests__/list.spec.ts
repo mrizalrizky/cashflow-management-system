@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import DataTable from 'primevue/datatable'
+import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import * as accountsApi from '@/api/accounts'
@@ -225,6 +226,14 @@ describe('TransactionsView', () => {
     expect(lastListParams().dateFrom).toBeUndefined()
     expect(lastListParams().dateTo).toBeUndefined()
     expect(wrapper.text()).toContain('Tanggal awal tidak boleh setelah tanggal akhir')
+  })
+
+  it('names the two date filters, for the eye and for a screen reader', async () => {
+    const { wrapper } = await mountList('SUPER_ADMIN')
+
+    const pickers = wrapper.findAllComponents(DatePicker)
+    expect(pickers.map((p) => p.props('ariaLabel'))).toEqual(['Dari tanggal', 'Sampai tanggal'])
+    expect(pickers.map((p) => p.props('placeholder'))).toEqual(['Dari tanggal', 'Sampai tanggal'])
   })
 
   it('clears every filter with Reset', async () => {

@@ -2,13 +2,13 @@
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
 import type { TransactionFilters as Filters } from '@/api/transactions'
 import PageHeader from '@/components/PageHeader.vue'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { useSessionStore } from '@/stores/session'
 import TransactionFilters from './TransactionFilters.vue'
 import TransactionFormDialog from './TransactionFormDialog.vue'
+import TransactionOptionsError from './TransactionOptionsError.vue'
 import TransactionTable from './TransactionTable.vue'
 import TransferDialog from './TransferDialog.vue'
 
@@ -50,18 +50,7 @@ function reloadTable(): void {
     </template>
   </PageHeader>
 
-  <Message v-if="options.error.value" severity="warn" :closable="false" class="mb-4">
-    <div class="flex flex-wrap items-center gap-3">
-      <span>Pilihan filter gagal dimuat: {{ options.error.value }}</span>
-      <Button
-        label="Muat ulang pilihan"
-        size="small"
-        severity="secondary"
-        data-testid="reload-options"
-        @click="options.reload"
-      />
-    </div>
-  </Message>
+  <TransactionOptionsError :options="options" class="mb-4" />
 
   <TransactionFilters
     v-model="filters"

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import Checkbox from 'primevue/checkbox'
+import Dialog from 'primevue/dialog'
 import Select from 'primevue/select'
 import * as accountsApi from '@/api/accounts'
 import * as attachmentsApi from '@/api/attachments'
@@ -212,6 +213,49 @@ describe('TransactionFormDialog: recording', () => {
 
     expect(transactionsApi.createTransaction).toHaveBeenCalledTimes(1)
     expect(attachmentsApi.uploadAttachment).toHaveBeenCalledTimes(1)
+  })
+
+  it('cannot be closed while a save is in flight', async () => {
+    vi.mocked(transactionsApi.createTransaction).mockReturnValue(new Promise(() => undefined))
+    const { wrapper } = await mountForm('STAFF')
+    const cancel = () => wrapper.findAll('button').find((b) => b.text() === 'Batal')!
+    expect(wrapper.findComponent(Dialog).props()).toMatchObject({ closable: true, closeOnEscape: true })
+    expect(cancel().attributes('disabled')).toBeUndefined()
+    await fillExpense(wrapper)
+    await pickProof(wrapper, [NOTA])
+
+    await submitForm(wrapper)
+
+    expect(wrapper.findComponent(Dialog).props()).toMatchObject({ closable: false, closeOnEscape: false })
+    expect(cancel().attributes('disabled')).toBeDefined()
+  })
+
+  it('uploads the proof that was chosen when Simpan was pressed, whatever happens to the form meanwhile', async () => {
+    let finish!: (tx: Transaction) => void
+    vi.mocked(transactionsApi.createTransaction).mockReturnValue(new Promise((resolve) => (finish = resolve)))
+    const { wrapper } = await mountForm('STAFF')
+    await fillExpense(wrapper)
+    await pickProof(wrapper, [NOTA])
+
+    await submitForm(wrapper)
+    await pickProof(wrapper, [])
+    finish(CREATED)
+    await flushPromises()
+
+    expect(attachmentsApi.uploadAttachment).toHaveBeenCalledExactlyOnceWith('t-baru', NOTA)
+  })
+
+  it('says so when its choices cannot be loaded, and can load them again', async () => {
+    vi.mocked(accountsApi.listAccountOptions).mockRejectedValueOnce(new ApiError(0, 'Tidak dapat terhubung ke server'))
+    const { wrapper } = await mountForm('STAFF')
+    expect(wrapper.get('form').text()).toContain('Pilihan gagal dimuat: Tidak dapat terhubung ke server')
+    expect(optionLabels(wrapper, 'tx-account')).toEqual([])
+
+    await wrapper.get('form [data-testid="reload-options"]').trigger('click')
+    await flushPromises()
+
+    expect(optionLabels(wrapper, 'tx-account')).toEqual(['Kas Kecil', 'Bank Utama'])
+    expect(wrapper.find('form [data-testid="reload-options"]').exists()).toBe(false)
   })
 
   it('keeps the save button busy until the proof is uploaded too', async () => {

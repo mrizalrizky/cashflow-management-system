@@ -109,8 +109,20 @@ function reset(): void {
     />
     <div>
       <div class="grid grid-cols-2 gap-2">
-        <DateField id="filter-date-from" v-model="dateFrom" :invalid="rangeBackwards" />
-        <DateField id="filter-date-to" v-model="dateTo" :invalid="rangeBackwards" />
+        <DateField
+          id="filter-date-from"
+          v-model="dateFrom"
+          :invalid="rangeBackwards"
+          placeholder="Dari tanggal"
+          aria-label="Dari tanggal"
+        />
+        <DateField
+          id="filter-date-to"
+          v-model="dateTo"
+          :invalid="rangeBackwards"
+          placeholder="Sampai tanggal"
+          aria-label="Sampai tanggal"
+        />
       </div>
       <small v-if="rangeBackwards" role="alert" class="text-red-600">
         Tanggal awal tidak boleh setelah tanggal akhir

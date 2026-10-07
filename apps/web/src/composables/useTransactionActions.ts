@@ -66,13 +66,15 @@ export function useTransactionActions(options: TransactionActionsOptions): Trans
 
   /**
    * Menjalankan satu tindakan. Mengembalikan hasilnya, atau null bila transaksi ternyata
-   * sudah berubah (sudah ditangani). Kegagalan lain dilempar ke pemanggil.
+   * sudah berubah (sudah ditangani) atau tindakan lain masih berjalan (mis. tombol terklik
+   * dua kali). Kegagalan lain dilempar ke pemanggil.
    */
   async function run<T extends Transaction>(
     seen: Transaction,
     call: () => Promise<T>,
     done: string,
   ): Promise<T | null> {
+    if (busy.value) return null
     busy.value = true
     try {
       const result = await call()

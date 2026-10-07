@@ -215,6 +215,28 @@ describe('TransactionDetailView: proof', () => {
     expect(wrapper.findComponent(ProofPicker).props('modelValue')).toEqual([NOTA])
   })
 
+  it('says so when the latest version cannot be loaded after a change, and can try again', async () => {
+    const mine = makeTransaction({ permissions: { canAttach: true } })
+    const { wrapper } = await mountDetail('STAFF', mine)
+    vi.mocked(attachmentsApi.uploadAttachment).mockResolvedValue(makeAttachment())
+    vi.mocked(transactionsApi.getTransaction).mockRejectedValueOnce(new ApiError(0, 'Tidak dapat terhubung ke server'))
+
+    wrapper.findComponent(ProofPicker).vm.$emit('update:modelValue', [NOTA])
+    await flushPromises()
+    await wrapper.get('[data-testid="upload-proof"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe('Beli semen')
+    expect(wrapper.text()).toContain('Data terbaru gagal dimuat: Tidak dapat terhubung ke server')
+
+    vi.mocked(transactionsApi.getTransaction).mockResolvedValue({ ...mine, attachments: [makeAttachment()] })
+    await wrapper.get('[data-testid="retry-reload"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Data terbaru gagal dimuat')
+    expect(wrapper.findComponent(ProofList).props('attachments')).toHaveLength(1)
+  })
+
   it('reloads after a proof is removed', async () => {
     const mine = makeTransaction({ attachments: [makeAttachment()], permissions: { canAttach: true } })
     const { wrapper } = await mountDetail('STAFF', mine)
@@ -282,6 +304,19 @@ describe('TransactionDetailView: actions', () => {
     expect(button(wrapper, 'approve').exists()).toBe(false)
     expect(document.body.textContent).toContain('Transaksi disetujui')
     expect(document.body.textContent).not.toContain('minus')
+  })
+
+  it('sends one approval even when the confirmation is pressed twice', async () => {
+    vi.mocked(transactionsApi.approveTransaction).mockReturnValue(new Promise(() => undefined))
+    const { wrapper } = await mountDetail('PROJECT_MANAGER', REVIEWABLE)
+
+    await click(wrapper, 'approve')
+    const accept = document.querySelector<HTMLButtonElement>('.p-confirmdialog-accept-button')!
+    accept.click()
+    accept.click()
+    await flushPromises()
+
+    expect(transactionsApi.approveTransaction).toHaveBeenCalledTimes(1)
   })
 
   it('warns an admin when the approval leaves the account below zero', async () => {

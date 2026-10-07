@@ -15,6 +15,7 @@ import ProjectDetailView from '../ProjectDetailView.vue'
 
 vi.mock('@/api/projects')
 vi.mock('@/api/users')
+vi.mock('@/api/reports')
 vi.mock('@/api/transactions')
 vi.mock('@/api/accounts')
 vi.mock('@/api/categories')

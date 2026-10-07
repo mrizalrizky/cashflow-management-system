@@ -26,6 +26,7 @@ import { storeToRefs } from 'pinia'
 import { useSessionStore } from '@/stores/session'
 import ProjectFormDialog from './ProjectFormDialog.vue'
 import ProjectMembersPanel from './ProjectMembersPanel.vue'
+import ProjectSummaryPanel from './ProjectSummaryPanel.vue'
 import TransactionFormDialog from '@/views/transactions/TransactionFormDialog.vue'
 import TransactionTable from '@/views/transactions/TransactionTable.vue'
 
@@ -131,14 +132,16 @@ function openTransactionForm(): void {
       </div>
     </dl>
 
-    <Tabs value="members" lazy>
+    <!-- Panel yang tidak aktif tidak dipasang, jadi ringkasan dimuat ulang tiap kali dibuka. -->
+    <Tabs value="summary" lazy>
       <TabList>
-        <Tab value="members">Anggota</Tab>
+        <Tab value="summary">Ringkasan</Tab>
         <Tab value="transactions">Transaksi</Tab>
+        <Tab value="members">Anggota</Tab>
       </TabList>
       <TabPanels>
-        <TabPanel value="members">
-          <ProjectMembersPanel :project="project" @updated="project = $event" />
+        <TabPanel value="summary">
+          <ProjectSummaryPanel :project-id="project.id" />
         </TabPanel>
         <TabPanel value="transactions">
           <div v-if="canRecord" class="mb-4 flex justify-end">
@@ -154,6 +157,9 @@ function openTransactionForm(): void {
             :scope="{ projectId: project.id }"
             :show-project="false"
           />
+        </TabPanel>
+        <TabPanel value="members">
+          <ProjectMembersPanel :project="project" @updated="project = $event" />
         </TabPanel>
       </TabPanels>
     </Tabs>

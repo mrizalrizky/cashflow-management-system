@@ -51,19 +51,20 @@ describe('MonthlyCashflowChart', () => {
     expect(columns[3]!.get('[data-testid="month-label"]').text()).toBe('Nov 2026')
   })
 
-  it('states each month in words, and shows the net with its sign', async () => {
+  it('writes each month’s three figures under its column, readable without hovering', async () => {
     const columns = (await render()).findAll('li')
 
-    expect(columns[0]!.attributes('aria-label')).toBe(
-      'Agu 2026: masuk Rp 30.000.000, keluar Rp 17.000.000, selisih Rp 13.000.000',
-    )
-    expect(columns[0]!.attributes('title')).toBe(columns[0]!.attributes('aria-label'))
-    expect(columns[1]!.attributes('aria-label')).toContain('selisih -Rp 31.000.000')
+    expect(columns[0]!.get('[data-testid="month-income"]').text()).toBe('masuk Rp 30.000.000')
+    expect(columns[0]!.get('[data-testid="month-expense"]').text()).toBe('keluar Rp 17.000.000')
+    expect(columns[0]!.get('[data-testid="month-net"]').text()).toBe('selisih +Rp 13.000.000')
+    // Tidak bergantung pada title atau aria-label, yang tidak muncul di layar sentuh.
+    expect(columns[0]!.attributes('title')).toBeUndefined()
+    expect(columns[0]!.attributes('aria-label')).toBeUndefined()
 
     const net = columns[1]!.get('[data-testid="month-net"]')
-    expect(net.text()).toBe('-Rp 31.000.000')
-    expect(net.get('span').classes()).toContain('text-red-600')
-    expect(columns[0]!.get('[data-testid="month-net"]').text()).toBe('+Rp 13.000.000')
+    expect(net.text()).toBe('selisih -Rp 31.000.000')
+    expect(net.find('.text-red-600').exists()).toBe(true)
+    expect(columns[3]!.get('[data-testid="month-income"]').text()).toBe('masuk Rp 0')
   })
 
   it('explains the two bars in words', async () => {
@@ -96,7 +97,8 @@ describe('MonthlyCashflowChart', () => {
 
     expect(wrapper.findAll('li')).toHaveLength(24)
     expect(wrapper.get('[data-testid="chart-scroll"]').classes()).toContain('overflow-x-auto')
-    expect(wrapper.get('li').classes()).toContain('min-w-20')
+    // Cukup lebar untuk nominal miliaran tanpa menabrak kolom sebelahnya.
+    expect(wrapper.get('li').classes()).toContain('min-w-32')
   })
 
   it('stays exact for amounts beyond 2^53', async () => {
@@ -109,6 +111,6 @@ describe('MonthlyCashflowChart', () => {
 
     expect(height(columns[0]!, 'income')).toBe('100%')
     expect(height(columns[1]!, 'income')).toBe('50%')
-    expect(columns[1]!.attributes('aria-label')).toContain('masuk Rp 9.007.199.254.740.993')
+    expect(columns[1]!.get('[data-testid="month-income"]').text()).toBe('masuk Rp 9.007.199.254.740.993')
   })
 })

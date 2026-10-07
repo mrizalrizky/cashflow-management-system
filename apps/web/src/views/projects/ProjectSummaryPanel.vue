@@ -27,13 +27,18 @@ watch(
 )
 
 const percent = computed(() => summary.value?.receivedPercent ?? null)
-/** `33.33` ditulis `33,33`; tanpa nilai kontrak tidak ada persentase. */
-const percentText = computed(() =>
-  percent.value === null ? '-' : `${String(percent.value).replace('.', ',')}%`,
+/** `33.33` ditulis `33,33`; tanpa nilai kontrak tidak ada persentase untuk ditampilkan. */
+const receivedHint = computed(() =>
+  percent.value === null
+    ? 'Nilai kontrak belum diisi'
+    : `${String(percent.value).replace('.', ',')}% dari kontrak`,
 )
 /** Batang kemajuan berhenti di 100% walau yang diterima melebihi kontrak. */
 const progress = computed(() => Math.min(percent.value ?? 0, 100))
-const overpaid = computed(() => summary.value?.outstanding.startsWith('-') ?? false)
+// Tanpa nilai kontrak, sisa yang negatif bukan berarti kontraknya dibayar lebih.
+const overpaid = computed(
+  () => percent.value !== null && (summary.value?.outstanding.startsWith('-') ?? false),
+)
 
 const costs = computed(() =>
   (summary.value?.costByCategory ?? []).map(({ categoryId, name, amount }) => ({
@@ -57,7 +62,7 @@ const costs = computed(() =>
         label="Diterima"
         :amount="summary.received"
         tone="income"
-        :hint="`${percentText} dari kontrak`"
+        :hint="receivedHint"
         data-testid="summary-received"
       >
         <div v-if="progress > 0" class="mt-2 h-2 rounded-full bg-surface-100">

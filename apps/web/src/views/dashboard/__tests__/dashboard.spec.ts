@@ -123,6 +123,10 @@ describe('DashboardView', () => {
 
   it('shows the totals, with income and expense in their colours', async () => {
     const { wrapper } = await mountDashboard()
+    const colours = (id: string) => wrapper.get(`[data-testid="stat-${id}"] [data-testid="stat-amount"]`).classes()
+
+    expect(colours('income')).toContain('text-green-700')
+    expect(colours('expense')).toContain('text-red-700')
 
     expect(stat(wrapper, 'balance')).toContain('Rp 14.000.000')
     expect(stat(wrapper, 'income')).toContain('Rp 55.000.000')
@@ -143,6 +147,8 @@ describe('DashboardView', () => {
   it('lists each account with its balance, marking negative and inactive ones', async () => {
     const { wrapper } = await mountDashboard()
 
+    // Saldo tidak mengikuti periode; judulnya harus mengatakan itu.
+    expect(wrapper.text()).toContain('Saldo akun saat ini')
     const rows = wrapper.findAll('[data-testid="account-row"]')
     expect(rows.map((row) => row.text())).toEqual([
       expect.stringContaining('Bank Utama'),
@@ -253,8 +259,9 @@ describe('DashboardView: changing the period', () => {
   it('asks for the dates that were picked', async () => {
     const { wrapper } = await mountDashboard()
 
+    // Tanggal yang tidak disentuh tetap seperti yang tampil di layar, bukan bawaan API yang baru.
     await pickDates(wrapper, '2026-08-01', null)
-    expect(getDashboard).toHaveBeenLastCalledWith({ from: '2026-08-01' })
+    expect(getDashboard).toHaveBeenLastCalledWith({ from: '2026-08-01', to: '2026-10-07' })
 
     await pickDates(wrapper, null, '2026-08-31')
     expect(getDashboard).toHaveBeenLastCalledWith({ from: '2026-08-01', to: '2026-08-31' })
@@ -283,12 +290,46 @@ describe('DashboardView: changing the period', () => {
 
     expect(wrapper.get('#period-from-error').text()).toBe('Tanggal awal tidak boleh setelah tanggal akhir')
     expect(getDashboard).toHaveBeenCalledTimes(1)
-    expect(getDashboard).toHaveBeenLastCalledWith({ from: '2026-10-05' })
+    expect(getDashboard).toHaveBeenLastCalledWith({ from: '2026-10-05', to: '2026-10-07' })
     expect(stat(wrapper, 'income')).toContain('Rp 55.000.000')
 
     getDashboard.mockResolvedValue(OCTOBER)
     await pickDates(wrapper, '2026-10-01', '2026-10-07')
     expect(wrapper.find('#period-from-error').exists()).toBe(false)
+    expect(stat(wrapper, 'income')).toContain('Rp 25.000.000')
+  })
+
+  it('keeps the start on screen when only the end is changed', async () => {
+    const { wrapper } = await mountDashboard()
+
+    await pickDates(wrapper, null, '2026-03-31')
+
+    expect(getDashboard).toHaveBeenLastCalledWith({ from: '2025-11-01', to: '2026-03-31' })
+  })
+
+  it('checks a single changed date against the other one on screen', async () => {
+    const { wrapper } = await mountDashboard()
+    getDashboard.mockClear()
+
+    await pickDates(wrapper, null, '2025-06-30')
+
+    expect(wrapper.get('#period-from-error').text()).toBe('Tanggal awal tidak boleh setelah tanggal akhir')
+    expect(getDashboard).not.toHaveBeenCalled()
+  })
+
+  it('ignores the objection to a period the user has already moved on from', async () => {
+    const { wrapper } = await mountDashboard()
+    let refuse!: (cause: unknown) => void
+    getDashboard
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => (refuse = reject)))
+      .mockResolvedValueOnce(OCTOBER)
+
+    await pickDates(wrapper, '2020-01-01', null)
+    await preset(wrapper, 'thisMonth')
+    refuse(new ApiError(400, 'Validasi gagal', [{ field: 'to', messages: ['Rentang paling lama 60 bulan'] }]))
+    await flushPromises()
+
+    expect(wrapper.find('#period-to-error').exists()).toBe(false)
     expect(stat(wrapper, 'income')).toContain('Rp 25.000.000')
   })
 

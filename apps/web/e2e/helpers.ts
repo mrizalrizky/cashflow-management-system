@@ -72,3 +72,25 @@ export function horizontalOverflow(page: Page): Promise<number> {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   )
 }
+
+/**
+ * Elemen yang menjulur melewati tepi kanan layar dan tidak berada di dalam wadah yang
+ * menggulir atau memotong isinya; untuk menjelaskan penyebab saat halaman melebar. Elemen
+ * berposisi tetap (mis. wadah toast) tidak melebarkan halaman, jadi dilewati.
+ */
+export function overflowingElements(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const clipped = (el: Element): boolean => {
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        const style = getComputedStyle(node)
+        if (style.position === 'fixed') return true
+        if (node !== el && node !== document.documentElement && style.overflowX !== 'visible') return true
+      }
+      return false
+    }
+    return [...document.querySelectorAll('body *')]
+      .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1 && !clipped(el))
+      .slice(0, 8)
+      .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 80)} [${Math.round(el.getBoundingClientRect().right)}px]`)
+  })
+}

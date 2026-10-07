@@ -141,7 +141,8 @@ function openTransactionForm(): void {
       </TabList>
       <TabPanels>
         <TabPanel value="summary">
-          <ProjectSummaryPanel :project-id="project.id" />
+          <!-- Kunci berubah saat proyek diubah (mis. nilai kontrak), jadi ringkasan dimuat ulang. -->
+          <ProjectSummaryPanel :key="project.updatedAt" :project-id="project.id" />
         </TabPanel>
         <TabPanel value="transactions">
           <div v-if="canRecord" class="mb-4 flex justify-end">

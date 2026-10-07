@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { adminApi } from './api'
 import { ADMIN } from './env'
-import { horizontalOverflow, logout, signIn, type TestAccount } from './helpers'
+import { horizontalOverflow, logout, overflowingElements, signIn, type TestAccount } from './helpers'
 
 /**
  * Data file ini sengaja diletakkan pada Maret 2025, bulan yang tidak dipakai file test lain,
@@ -85,6 +85,8 @@ async function typeDate(page: Page, label: string, value: string): Promise<void>
   await field.fill(value)
   await field.press('Enter')
   await page.keyboard.press('Escape')
+  // Kalender menutup dengan animasi; ditunggu supaya tidak ikut terukur atau menutupi yang lain.
+  await expect(page.locator('.p-datepicker-panel')).toHaveCount(0)
 }
 
 async function showPeriod(page: Page, from: string, to: string, covered: string): Promise<void> {
@@ -108,15 +110,30 @@ test('the dashboard and a project summary show the figures computed by hand', as
     await expect(page.getByTestId('account-row').filter({ hasText: ACCOUNT })).toContainText('Rp 9.500.000')
   })
 
+  await test.step('a long period with figures fits a phone screen; only the chart scrolls', async () => {
+    // Hanya tanggal awal yang diubah; tanggal akhir tetap hari ini, jadi periodenya lebih dari setahun.
+    await typeDate(page, 'Dari tanggal', '01 Mar 2025')
+    await expect(page.getByTestId('period-covered')).toContainText('01 Mar 2025 –')
+    await expect(page.getByTestId('chart-scroll').getByRole('listitem').filter({ hasText: 'Mar 2025' })).toBeVisible()
+
+    await page.setViewportSize(PHONE)
+    expect(await overflowingElements(page)).toEqual([])
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+    const chart = page.getByTestId('chart-scroll')
+    expect(await chart.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+    await page.setViewportSize(DESKTOP)
+  })
+
   await test.step('for March 2025 the totals, the month and the categories match', async () => {
     await showPeriod(page, '01 Mar 2025', '31 Mar 2025', '01 Mar 2025 – 31 Mar 2025')
 
     await expect(page.getByTestId('stat-income')).toContainText('Rp 10.000.000')
     await expect(page.getByTestId('stat-expense')).toContainText('Rp 5.500.000')
     await expect(page.getByTestId('stat-net')).toContainText('Rp 4.500.000')
-    await expect(
-      page.getByLabel('Mar 2025: masuk Rp 10.000.000, keluar Rp 5.500.000, selisih Rp 4.500.000'),
-    ).toBeVisible()
+    const march = page.getByTestId('chart-scroll').getByRole('listitem').filter({ hasText: 'Mar 2025' })
+    await expect(march.getByTestId('month-income')).toHaveText('masuk Rp 10.000.000')
+    await expect(march.getByTestId('month-expense')).toHaveText('keluar Rp 5.500.000')
+    await expect(march.getByTestId('month-net')).toHaveText('selisih +Rp 4.500.000')
 
     const categories = page.locator('section', { hasText: 'Pengeluaran per kategori' }).getByRole('listitem')
     await expect(categories).toHaveCount(2)
@@ -143,12 +160,6 @@ test('the dashboard and a project summary show the figures computed by hand', as
     await page.getByTestId('preset-thisMonth').click()
     await expect(page.getByTestId('preset-thisMonth')).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByTestId('period-covered')).not.toHaveText('01 Jan 2024 – 31 Jan 2024')
-  })
-
-  await test.step('the dashboard fits a phone screen', async () => {
-    await page.setViewportSize(PHONE)
-    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
-    await page.setViewportSize(DESKTOP)
   })
 
   await test.step('the waiting count opens the pending transactions', async () => {

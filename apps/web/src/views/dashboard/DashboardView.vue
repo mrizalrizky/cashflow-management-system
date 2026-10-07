@@ -169,7 +169,7 @@ onMounted(reload)
 
       <div class="grid gap-6 lg:grid-cols-2">
         <section class="rounded-xl border border-surface-200 bg-surface-0 p-4">
-          <h2 class="mb-3 text-lg font-semibold">Saldo akun</h2>
+          <h2 class="mb-3 text-lg font-semibold">Saldo akun saat ini</h2>
           <p v-if="dashboard.accounts.length === 0" class="text-surface-500">Belum ada akun</p>
           <ul v-else class="divide-y divide-surface-200">
             <li

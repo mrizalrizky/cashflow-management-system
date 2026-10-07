@@ -22,13 +22,21 @@ function isActive(range: Partial<Period>): boolean {
   return samePeriod(range, period.value)
 }
 
-function setDate(field: keyof Period, value: string | null): void {
-  period.value = { ...period.value, [field]: value ?? undefined }
-}
-
 /** Tanggal yang dipilih; bila belum, tanggal yang dipakai API. */
 function shown(field: keyof Period): string | null {
   return period.value[field] ?? props.resolved?.[field] ?? null
+}
+
+/**
+ * Mengubah satu tanggal tidak boleh diam-diam menggeser yang lain: tanggal yang tidak
+ * disentuh dikirim seperti yang tampil di layar. Tanggal yang dikosongkan kembali ke bawaan API.
+ */
+function setDate(field: keyof Period, value: string | null): void {
+  period.value = {
+    from: shown('from') ?? undefined,
+    to: shown('to') ?? undefined,
+    [field]: value ?? undefined,
+  }
 }
 </script>
 

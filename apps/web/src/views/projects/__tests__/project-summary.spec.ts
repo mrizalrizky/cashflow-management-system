@@ -14,6 +14,7 @@ import { signInAs } from '@/test/session'
 import { KAFE, makeTransaction, pageOf, RUMAH } from '@/test/transactions'
 import TransactionFormDialog from '@/views/transactions/TransactionFormDialog.vue'
 import ProjectDetailView from '../ProjectDetailView.vue'
+import ProjectFormDialog from '../ProjectFormDialog.vue'
 import ProjectSummaryPanel from '../ProjectSummaryPanel.vue'
 
 vi.mock('@/api/projects')
@@ -139,8 +140,10 @@ describe('ProjectSummaryPanel', () => {
       makeSummary({ contractValue: '0', outstanding: '-30000000', receivedPercent: null }),
     )
 
-    expect(stat(wrapper, 'received').text()).toContain('- dari kontrak')
+    expect(stat(wrapper, 'received').text()).toContain('Nilai kontrak belum diisi')
     expect(progressWidth(wrapper)).toBeNull()
+    // Tanpa nilai kontrak, yang diterima bukan "melebihi kontrak".
+    expect(stat(wrapper, 'outstanding').text()).not.toContain('melebihi')
     expect(wrapper.text()).not.toMatch(/NaN|null|Infinity/)
   })
 
@@ -222,6 +225,21 @@ describe('ProjectDetailView: Ringkasan tab', () => {
 
     await openTab(wrapper, 'Transaksi')
     expect(wrapper.get('tbody tr').text()).toContain('Beli semen')
+  })
+
+  it('asks for the summary again when the project itself was edited', async () => {
+    const { wrapper } = await mountProject()
+    getSummary.mockClear()
+    getSummary.mockResolvedValue(makeSummary({ contractValue: '200000000', receivedPercent: 15 }))
+
+    wrapper
+      .findComponent(ProjectFormDialog)
+      .vm.$emit('saved', makeProject({ contractValue: '200000000', updatedAt: '2026-10-07T09:00:00.000Z' }))
+    await flushPromises()
+
+    expect(getSummary).toHaveBeenCalledExactlyOnceWith(RUMAH.id)
+    expect(stat(wrapper, 'contract').text()).toContain('Rp 200.000.000')
+    expect(stat(wrapper, 'received').text()).toContain('15% dari kontrak')
   })
 
   it('asks for the summary again after a transaction was recorded', async () => {

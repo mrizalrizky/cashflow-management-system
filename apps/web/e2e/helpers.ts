@@ -62,6 +62,8 @@ export async function openFromMenu(page: Page, label: string): Promise<void> {
 export async function choose(page: Page, scope: Locator, label: string, option: string): Promise<void> {
   await scope.getByRole('combobox', { name: label }).click()
   await page.getByRole('option', { name: option, exact: true }).click()
+  // Daftar pilihan menutup dengan animasi; ditunggu supaya tidak tertukar dengan dropdown berikutnya.
+  await expect(page.getByRole('listbox')).toHaveCount(0)
 }
 
 /** Selisih lebar isi halaman terhadap lebar layar; lebih dari 0 berarti halaman bisa digulir ke samping. */

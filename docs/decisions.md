@@ -74,3 +74,16 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Transfer antar akun** adalah dua transaksi `APPROVED` (kategori sistem Transfer Keluar dan Transfer Masuk) dengan `transfer_group_id` yang sama, tanpa proyek, hanya untuk admin. Satu sisi tidak bisa diubah sendiri; membatalkan salah satu membatalkan keduanya. Daftar transaksi bisa menyembunyikannya dengan `includeTransfers=false`.
 - **Tanggal transaksi tidak boleh di masa depan** (waktu Jakarta), dan nominal maksimal 13 digit.
 - **Untuk Fase 5:** cadangan harus mencakup folder `STORAGE_DIR`, bukan hanya database.
+
+## Fase 3b
+
+- **Tombol mengikuti `permissions` dari API.** Web tidak mengulang aturan siapa boleh apa pada transaksi; tiap tombol tampil hanya bila API menyatakannya boleh.
+- **Keputusan diambil di halaman detail, di samping buktinya.** Setujui, tolak, batalkan dan void tidak ada di daftar; daftar hanya menandai baris "Perlu ditinjau". Dengan begitu tidak ada yang disetujui tanpa buktinya terlihat.
+- **Peninjau memutuskan atas versi yang ia lihat.** Setujui dan tolak mengirim `updatedAt` transaksi yang tampil; bila API menjawab 409, halaman memuat versi terbaru dan memberi tahu, tanpa menyetujui apa pun.
+- **Bukti: gambar bisa dipratinjau, PDF hanya diunduh.** Berkas diambil dengan access token dan ditampilkan dari alamat blob; tidak ada isi bukti yang dirender sebagai HTML. Berkas yang pasti ditolak API (lebih dari 10 MB, jenis lain, HEIC dari iPhone, lebih dari 10 berkas) disaring sebelum diunggah, dengan alasannya.
+- **Simpan tidak pernah menjadi cara mengulang.** Begitu transaksi baru tersimpan, dialog selalu tertutup; bila bukti gagal diunggah atau persetujuan langsung gagal, pengguna dibawa ke halaman transaksi itu dengan pesan. Tombol simpan mati selama permintaan berjalan.
+- **"Langsung setujui" (admin)** menjalankan simpan, unggah bukti, lalu setujui secara berurutan, sehingga pengeluaran tetap wajib berbukti. Bila saldo akun menjadi minus, admin diberi peringatan.
+- **Proyek selalu dipilih secara tegas:** sebuah proyek atau "Tanpa proyek (overhead)". Kolom yang dikosongkan tidak diam-diam menjadi overhead. Koordinator tidak ditawari overhead.
+- **Pilihan di filter dan form hanya yang aktif**, kecuali milik transaksi yang sedang diubah (atau proyek halaman asalnya), yang tetap ditawarkan walau sudah nonaktif.
+- **Satu tabel transaksi** (`TransactionTable`) dipakai halaman Transaksi dan tab Transaksi di halaman proyek; batas tetap dari halaman pemakainya (`scope`) dibedakan dari filter pilihan pengguna.
+- **Nilai filter kosong tidak dikirim** ke API (teks kosong diperlakukan seperti tidak diisi), berlaku untuk semua permintaan.

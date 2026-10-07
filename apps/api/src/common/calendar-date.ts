@@ -68,3 +68,21 @@ export function startOfJakartaDay(date: string): Date {
 export function endOfJakartaDay(date: string): Date {
   return new Date(startOfJakartaDay(date).getTime() + DAY_MS);
 }
+
+const JAKARTA_TIMESTAMP = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** Sebuah saat sebagai `YYYY-MM-DD HH:mm` waktu Jakarta, mis. untuk berkas ekspor. */
+export function formatJakartaTimestamp(value: Date): string {
+  const parts = Object.fromEntries(
+    JAKARTA_TIMESTAMP.formatToParts(value).map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}

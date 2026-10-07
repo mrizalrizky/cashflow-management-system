@@ -9,7 +9,9 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser, Roles } from '../auth/decorators.js';
 import type { Paginated } from '../common/pagination.js';
@@ -19,12 +21,14 @@ import {
   ReasonDto,
   RejectDto,
   ReviewDto,
+  TransactionFiltersDto,
   TransferDto,
   UpdateTransactionDto,
 } from './dto/transaction.dto.js';
 import type { TransactionResponse } from './transaction.mapper.js';
 import { ApprovalResponse, TransactionWorkflowService } from './transaction-workflow.service.js';
 import { TransactionsService } from './transactions.service.js';
+import { TransactionExportService } from './transaction-export.service.js';
 import { TransfersService } from './transfers.service.js';
 
 /**
@@ -37,6 +41,7 @@ export class TransactionsController {
     private readonly transactions: TransactionsService,
     private readonly workflow: TransactionWorkflowService,
     private readonly transfers: TransfersService,
+    private readonly exporter: TransactionExportService,
   ) {}
 
   @Get()
@@ -45,6 +50,32 @@ export class TransactionsController {
     @Query() query: ListTransactionsQueryDto,
   ): Promise<Paginated<TransactionResponse>> {
     return this.transactions.list(user, query);
+  }
+
+  /**
+   * Daftar yang sama sebagai berkas CSV. Didaftarkan sebelum `:id` supaya `export` tidak
+   * dibaca sebagai id. Filter dan hak diperiksa sebelum berkas mulai dikirim.
+   */
+  @Get('export')
+  async export(
+    @CurrentUser() user: AuthUser,
+    @Query() filters: TransactionFiltersDto,
+    @Ip() ip: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const prepared = await this.exporter.prepare(user, filters, ip);
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${prepared.fileName}"`,
+      'X-Content-Type-Options': 'nosniff',
+    });
+    try {
+      await prepared.writeTo(res);
+      res.end();
+    } catch (error) {
+      // Berkas sudah mulai dikirim, jadi tidak bisa lagi dijawab dengan pesan error.
+      res.destroy(error instanceof Error ? error : undefined);
+    }
   }
 
   @Get(':id')

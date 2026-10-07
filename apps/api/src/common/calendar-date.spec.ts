@@ -3,6 +3,7 @@ import {
   currentYearInJakarta,
   IsCalendarDate,
   formatCalendarDate,
+  formatJakartaTimestamp,
   endOfJakartaDay,
   parseCalendarDate,
   startOfJakartaDay,
@@ -65,5 +66,13 @@ describe('Jakarta day boundaries', () => {
     expect(startOfJakartaDay('2026-10-06').toISOString()).toBe('2026-10-05T17:00:00.000Z');
     expect(endOfJakartaDay('2026-10-06').toISOString()).toBe('2026-10-06T17:00:00.000Z');
     expect(endOfJakartaDay('2026-12-31').toISOString()).toBe('2026-12-31T17:00:00.000Z');
+  });
+});
+
+describe('formatJakartaTimestamp', () => {
+  it('writes the Jakarta wall-clock time, crossing midnight and the year when needed', () => {
+    expect(formatJakartaTimestamp(new Date('2026-10-06T03:05:00.000Z'))).toBe('2026-10-06 10:05');
+    expect(formatJakartaTimestamp(new Date('2026-10-06T17:30:00.000Z'))).toBe('2026-10-07 00:30');
+    expect(formatJakartaTimestamp(new Date('2026-12-31T17:00:00.000Z'))).toBe('2027-01-01 00:00');
   });
 });

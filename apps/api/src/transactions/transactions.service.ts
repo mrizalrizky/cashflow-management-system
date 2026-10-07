@@ -14,6 +14,7 @@ import type {
   UpdateTransactionDto,
 } from './dto/transaction.dto.js';
 import { TransactionAccessService } from './transaction-access.service.js';
+import { TRANSACTION_LIST_ORDER, toTransactionWhere } from './transaction-filters.js';
 import { assertPermitted, TRANSACTION_ENTITY } from './transaction-guards.js';
 import {
   toAuditSnapshot,
@@ -24,31 +25,6 @@ import {
 import { EDITABLE_STATUSES } from './transaction-policy.js';
 import { ALL_REFERENCES, assertReferencesValid } from './transaction-references.js';
 import { TransactionWorkflowService } from './transaction-workflow.service.js';
-
-function toWhere(query: ListTransactionsQueryDto): Prisma.TransactionWhereInput {
-  if (query.projectId && query.overhead) {
-    throw validationFailed([
-      { field: 'overhead', messages: ['Tidak bisa digabung dengan filter proyek'] },
-    ]);
-  }
-
-  const where: Prisma.TransactionWhereInput = {};
-  if (query.dateFrom || query.dateTo) {
-    where.transaction_date = {
-      gte: query.dateFrom ? parseCalendarDate(query.dateFrom) : undefined,
-      lte: query.dateTo ? parseCalendarDate(query.dateTo) : undefined,
-    };
-  }
-  if (query.type) where.type = query.type;
-  if (query.status) where.status = query.status;
-  if (query.accountId) where.account_id = query.accountId;
-  if (query.categoryId) where.category_id = query.categoryId;
-  if (query.projectId) where.project_id = query.projectId;
-  if (query.overhead) where.project_id = null;
-  if (query.includeTransfers === false) where.transfer_group_id = null;
-  if (query.search) where.description = containsText(query.search);
-  return where;
-}
 
 @Injectable()
 export class TransactionsService {
@@ -65,13 +41,15 @@ export class TransactionsService {
   ): Promise<Paginated<TransactionResponse>> {
     const actor = await this.access.actorFor(this.prisma, user);
     // Filter dari klien hanya bisa mempersempit: scope selalu ikut di-AND-kan.
-    const where: Prisma.TransactionWhereInput = { AND: [this.access.scope(actor), toWhere(query)] };
+    const where: Prisma.TransactionWhereInput = {
+      AND: [this.access.scope(actor), toTransactionWhere(query)],
+    };
 
     const [transactions, total] = await Promise.all([
       this.prisma.transaction.findMany({
         where,
         include: TRANSACTION_INCLUDE,
-        orderBy: [{ transaction_date: 'desc' }, { created_at: 'desc' }, { id: 'desc' }],
+        orderBy: TRANSACTION_LIST_ORDER,
         ...toSkipTake(query),
       }),
       this.prisma.transaction.count({ where }),

@@ -25,6 +25,7 @@ import {
   TRANSFER_KELUAR,
   UPAH,
 } from '@/test/transactions'
+import TransactionFormDialog from '../TransactionFormDialog.vue'
 import TransactionsView from '../TransactionsView.vue'
 import TransactionTable from '../TransactionTable.vue'
 
@@ -276,6 +277,19 @@ describe('TransactionsView', () => {
     wrapper.findComponent(ToggleSwitch).vm.$emit('update:modelValue', true)
     await flushPromises()
     expect(lastListParams().includeTransfers).toBeUndefined()
+  })
+
+  it('opens the form from "Catat transaksi" and reloads the list after a save', async () => {
+    const { wrapper } = await mountList('STAFF')
+
+    await wrapper.get('[data-testid="add-transaction"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('#tx-amount').exists()).toBe(true)
+
+    vi.mocked(transactionsApi.listTransactions).mockClear()
+    wrapper.findComponent(TransactionFormDialog).vm.$emit('saved', SEMEN)
+    await flushPromises()
+    expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
   })
 
   it('offers a project manager no transfer controls and no overhead filter', async () => {

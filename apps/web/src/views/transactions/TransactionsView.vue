@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { useSessionStore } from '@/stores/session'
 import TransactionFilters from './TransactionFilters.vue'
+import TransactionFormDialog from './TransactionFormDialog.vue'
 import TransactionTable from './TransactionTable.vue'
 
 const { isAdmin, role } = storeToRefs(useSessionStore())
@@ -17,6 +18,14 @@ const seesOverhead = computed(() => role.value !== 'PROJECT_MANAGER')
 
 const options = useTransactionOptions()
 const filters = ref<Filters>({})
+
+const table = ref<InstanceType<typeof TransactionTable> | null>(null)
+const formOpen = ref(false)
+
+// Pemberitahuan dan perpindahan halaman diurus dialognya; halaman ini cukup memuat ulang.
+function reloadTable(): void {
+  void table.value?.reload()
+}
 </script>
 
 <template>
@@ -29,7 +38,12 @@ const filters = ref<Filters>({})
         severity="secondary"
         data-testid="add-transfer"
       />
-      <Button label="Catat transaksi" icon="pi pi-plus" data-testid="add-transaction" />
+      <Button
+        label="Catat transaksi"
+        icon="pi pi-plus"
+        data-testid="add-transaction"
+        @click="formOpen = true"
+      />
     </template>
   </PageHeader>
 
@@ -53,5 +67,12 @@ const filters = ref<Filters>({})
     :transfer-switch="isAdmin"
   />
 
-  <TransactionTable :filters="filters" :show-creator="!isStaff" />
+  <TransactionTable ref="table" :filters="filters" :show-creator="!isStaff" />
+
+  <TransactionFormDialog
+    v-model:visible="formOpen"
+    :transaction="null"
+    :options="options"
+    @saved="reloadTable"
+  />
 </template>

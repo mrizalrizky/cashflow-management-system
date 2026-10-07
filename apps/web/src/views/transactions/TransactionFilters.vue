@@ -10,9 +10,7 @@ import FilterSelect from '@/components/FilterSelect.vue'
 import { useDebouncedInput } from '@/composables/useDebouncedInput'
 import { projectLabel, type TransactionOptions } from '@/composables/useTransactionOptions'
 import { TX_STATUS_OPTIONS, TX_TYPE_OPTIONS, type Option } from '@/lib/labels'
-
-/** Nilai pilihan "tanpa proyek" di dropdown proyek. */
-const OVERHEAD = 'overhead'
+import { OVERHEAD } from '@/lib/transactions'
 
 const props = defineProps<{
   options: TransactionOptions

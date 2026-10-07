@@ -70,13 +70,14 @@ export function cancelTransaction(id: string, reason: string): Promise<Transacti
 
 /**
  * `expectedUpdatedAt` adalah `updatedAt` transaksi yang dilihat peninjau; API menolak (409)
- * bila transaksi atau buktinya berubah sesudah itu.
+ * bila transaksi atau buktinya berubah sesudah itu. Hanya boleh dikosongkan oleh pembuat
+ * yang menyetujui transaksinya sendiri begitu selesai dicatat.
  */
 export function approveTransaction(
   id: string,
-  expectedUpdatedAt: string,
+  expectedUpdatedAt?: string,
 ): Promise<ApprovedTransaction> {
-  return action(id, 'approve', { expectedUpdatedAt })
+  return action(id, 'approve', expectedUpdatedAt ? { expectedUpdatedAt } : {})
 }
 
 export function rejectTransaction(

@@ -160,6 +160,7 @@ model Transaction {
   attachments Attachment[]
 
   @@index([transaction_date], map: "idx_transactions_transaction_date")
+  @@index([status, transaction_date], map: "idx_transactions_status_transaction_date")
   @@index([project_id, status], map: "idx_transactions_project_id_status")
   @@index([account_id, status], map: "idx_transactions_account_id_status")
   @@index([created_by_id], map: "idx_transactions_created_by_id")

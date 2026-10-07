@@ -57,6 +57,15 @@ describe('database schema', () => {
     ]);
   });
 
+  it('indexes transactions for the reports', async () => {
+    const rows = await prisma.$queryRaw<{ indexdef: string }[]>`
+      SELECT indexdef FROM pg_indexes
+      WHERE schemaname = 'public' AND indexname = 'idx_transactions_status_transaction_date'`;
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.indexdef).toContain('(status, transaction_date)');
+  });
+
   async function createTransactionWithAmount(amount: bigint) {
     const user = await prisma.user.create({
       data: { name: 'A', email: 'a@example.com', password_hash: 'x', role: 'SUPER_ADMIN' },

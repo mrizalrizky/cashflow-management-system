@@ -205,6 +205,12 @@ export function createTransaction(
     amount: bigint;
     status?: TxStatus;
     projectId?: string;
+    /** Tanggal transaksi `YYYY-MM-DD`. */
+    date?: string;
+    description?: string;
+    /** Waktu pencatatan, untuk test yang bergantung pada urutan. */
+    createdAt?: Date;
+    transferGroupId?: string;
   },
 ): Promise<Transaction> {
   return prisma.transaction.create({
@@ -212,12 +218,14 @@ export function createTransaction(
       type: input.type,
       amount: input.amount,
       status: input.status ?? 'APPROVED',
-      transaction_date: new Date('2026-10-06T00:00:00.000Z'),
-      description: 'uji',
+      transaction_date: new Date(`${input.date ?? '2026-10-06'}T00:00:00.000Z`),
+      description: input.description ?? 'uji',
       account_id: input.accountId,
       category_id: input.categoryId,
       created_by_id: input.createdById,
       project_id: input.projectId,
+      created_at: input.createdAt,
+      transfer_group_id: input.transferGroupId,
     },
   });
 }

@@ -11,17 +11,19 @@ import {
   Query,
 } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types.js';
-import { CurrentUser } from '../auth/decorators.js';
+import { CurrentUser, Roles } from '../auth/decorators.js';
 import type { Paginated } from '../common/pagination.js';
 import {
   CreateTransactionDto,
   ListTransactionsQueryDto,
   ReasonDto,
+  TransferDto,
   UpdateTransactionDto,
 } from './dto/transaction.dto.js';
 import type { TransactionResponse } from './transaction.mapper.js';
 import { ApprovalResponse, TransactionWorkflowService } from './transaction-workflow.service.js';
 import { TransactionsService } from './transactions.service.js';
+import { TransfersService } from './transfers.service.js';
 
 /**
  * Semua peran boleh memanggil rute ini; yang membatasi adalah scope (apa yang terlihat)
@@ -32,6 +34,7 @@ export class TransactionsController {
   constructor(
     private readonly transactions: TransactionsService,
     private readonly workflow: TransactionWorkflowService,
+    private readonly transfers: TransfersService,
   ) {}
 
   @Get()
@@ -57,6 +60,17 @@ export class TransactionsController {
     @Ip() ip: string,
   ): Promise<TransactionResponse> {
     return this.transactions.create(user, dto, ip);
+  }
+
+  /** Transfer antar akun menyentuh saldo, jadi hanya untuk SUPER_ADMIN. */
+  @Roles('SUPER_ADMIN')
+  @Post('transfer')
+  transfer(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: TransferDto,
+    @Ip() ip: string,
+  ): Promise<TransactionResponse[]> {
+    return this.transfers.create(user, dto, ip);
   }
 
   @Patch(':id')

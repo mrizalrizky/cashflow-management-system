@@ -60,14 +60,21 @@ export class TransactionAccessService {
   /**
    * Seperti `loadForUser`, tetapi mengunci baris transaksi sampai transaksi database selesai.
    * Dipakai sebelum mengubah status atau bukti, supaya keduanya tidak saling mendahului
-   * (mis. bukti terakhir dihapus tepat saat pengeluaran disetujui).
+   * (mis. bukti terakhir dihapus tepat saat pengeluaran disetujui). Untuk sisi transfer,
+   * pasangannya ikut dikunci, selalu dalam urutan yang sama, supaya dua orang yang
+   * membatalkan sisi berbeda saling menunggu dan tidak saling mengunci (deadlock).
    */
   async loadForUpdate(
     tx: Prisma.TransactionClient,
     actor: PolicyActor,
     id: string,
   ): Promise<TransactionWithRelations> {
-    await tx.$queryRaw`SELECT id FROM transactions WHERE id = ${id} FOR UPDATE`;
+    await tx.$queryRaw`
+      SELECT id FROM transactions
+      WHERE id = ${id}
+         OR transfer_group_id = (SELECT transfer_group_id FROM transactions WHERE id = ${id})
+      ORDER BY id
+      FOR UPDATE`;
     return this.loadForUser(tx, actor, id);
   }
 }

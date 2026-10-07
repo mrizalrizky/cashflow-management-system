@@ -114,10 +114,10 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 ## Fase 5a
 
 - **Log audit hanya bisa dibaca**, oleh SUPER_ADMIN, lewat `GET /audit-logs` (filter jenis data, id data, pengguna, tindakan, dan rentang hari waktu Jakarta). Tidak ada rute untuk menambah, mengubah, atau menghapusnya.
-- **Ekspor transaksi berupa CSV** (`GET /transactions/export`), bukan `.xlsx`: UTF-8 dengan BOM dan pemisah `;`, yang dibuka Excel berbahasa Indonesia langsung sebagai kolom. Isinya persis daftar transaksi pengguna itu dengan filter yang sama (scope, filter dan urutan memakai fungsi yang sama dengan daftar).
+- **Ekspor transaksi berupa CSV** (`GET /transactions/export`), bukan `.xlsx`: UTF-8 dengan BOM dan pemisah `;`, yang dibuka Excel pada komputer berpengaturan regional Indonesia langsung sebagai kolom. Pada komputer berpengaturan regional Inggris (pemisah koma) berkas terbuka dalam satu kolom dan harus diimpor lewat Data > From Text; di sana penetralan rumus juga tidak berlaku untuk teks sesudah koma. Isinya persis daftar transaksi pengguna itu dengan filter yang sama (scope, filter dan urutan memakai fungsi yang sama dengan daftar).
 - **Sel yang bisa dibaca sebagai rumus dinetralkan:** yang diawali `=`, `+`, `-`, `@`, tab atau CR diberi tanda petik tunggal di depannya.
-- **Ekspor dialirkan per 1.000 baris**, tidak dimuat sekaligus. Baris yang dicatat selagi ekspor berjalan bisa ikut atau tidak ikut dalam berkas itu.
-- **Mengekspor dicatat di log audit** (`EXPORT`: siapa, filter apa, berapa baris).
+- **Ekspor dialirkan per 1.000 baris**, tidak dimuat sekaligus, dan dilanjutkan dari posisi baris terakhir yang sudah dibaca (bukan dengan membaca ulang baris itu), sehingga transaksi yang diubah orang lain selagi ekspor berjalan tidak membuat baris lain terlewat. Baris yang dicatat atau diubah selagi ekspor berjalan bisa ikut atau tidak ikut dalam berkas itu.
+- **Mengekspor dicatat di log audit sebelum berkas dikirim** (`EXPORT`: siapa, filter apa, berapa baris yang cocok), sehingga memutus sambungan di tengah jalan tidak menghindari pencatatan.
 - **Header keamanan lewat `helmet`:** API hanya mengirim JSON dan berkas, jadi kebijakannya `default-src 'none'` dan tidak boleh dibingkai. Halaman dokumentasi (`/api/docs`, hanya di luar produksi) punya kebijakan sendiri yang lebih longgar.
 - **CORS tertutup secara bawaan.** Web dan API disajikan dari alamat yang sama; web lain hanya diizinkan bila alamat persisnya didaftarkan di `CORS_ORIGINS` (tanpa wildcard).
 - **Satu test menjaga semua rute:** `test/route-guards.e2e-spec.ts` membaca rute yang terdaftar dan gagal bila ada rute di luar daftar terbuka yang bisa dipanggil tanpa token. Menambah rute terbuka berarti mengubah daftar di test itu.

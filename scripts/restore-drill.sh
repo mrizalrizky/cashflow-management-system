@@ -40,7 +40,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "1/5 Menyiapkan database dan berkas sumber..."
+echo "1/7 Menyiapkan database dan berkas sumber..."
 drop_databases
 query "$admin_url" "CREATE DATABASE $source_db" > /dev/null
 query "$admin_url" "CREATE DATABASE $target_db" > /dev/null
@@ -48,20 +48,47 @@ query "$admin_url" "CREATE DATABASE $target_db" > /dev/null
 (cd "$root/apps/api" && DATABASE_URL="$source_url" npx prisma migrate deploy > /dev/null)
 (cd "$root/apps/api" && DATABASE_URL="$source_url" STORAGE_DIR="$source_files" npx tsx scripts/drill-seed.ts)
 
-echo "2/5 Mencadangkan..."
+echo "2/7 Mencadangkan..."
 DATABASE_URL="$source_url" STORAGE_DIR="$source_files" BACKUP_DIR="$backups" "$root/scripts/backup.sh"
 backup="$(find "$backups" -mindepth 1 -maxdepth 1 -type d -name 'cashflow-*')"
 
-echo "3/5 Memulihkan ke tujuan kosong..."
+echo "3/7 Memulihkan ke tujuan kosong..."
 DATABASE_URL="$target_url" STORAGE_DIR="$target_files" "$root/scripts/restore.sh" "$backup"
 
-echo "4/5 Memastikan pemulihan menolak menimpa tanpa --force, dan mau dengan --force..."
+echo "4/7 Memastikan pemulihan menolak menimpa tanpa --force, dan mau dengan --force..."
 if DATABASE_URL="$target_url" STORAGE_DIR="$target_files" "$root/scripts/restore.sh" "$backup" > /dev/null 2>&1; then
   die "restore.sh menimpa tujuan yang berisi tanpa --force"
 fi
 DATABASE_URL="$target_url" STORAGE_DIR="$target_files" "$root/scripts/restore.sh" "$backup" --force > /dev/null
 
-echo "5/5 Membandingkan sumber dan hasil pemulihan..."
+echo "5/7 Memastikan --force tidak menghapus apa pun bila cadangannya tidak bisa dipulihkan..."
+tables_before="$(query "$target_url" "SELECT count(*) FROM transactions")"
+broken="$work/broken/$(basename "$backup")"
+mkdir -p "$broken"
+cp "$backup/attachments.tar.gz" "$broken/"
+echo "ini bukan hasil pg_dump" > "$broken/database.dump"
+(cd "$broken" && sha256sum database.dump attachments.tar.gz > SHA256SUMS)
+if DATABASE_URL="$target_url" STORAGE_DIR="$target_files" "$root/scripts/restore.sh" "$broken" --force > /dev/null 2>&1; then
+  die "restore.sh menerima cadangan yang tidak bisa dibaca"
+fi
+[ "$(query "$target_url" "SELECT count(*) FROM transactions")" = "$tables_before" ] ||
+  die "restore.sh --force mengosongkan database sebelum tahu cadangannya bisa dipulihkan"
+[ "$(find "$target_files" -type f | wc -l | tr -d ' ')" -gt 0 ] ||
+  die "restore.sh --force mengosongkan folder bukti sebelum tahu cadangannya bisa dipulihkan"
+
+echo "6/7 Memastikan cadangan yang berada di dalam folder bukti tidak ikut terhapus..."
+nested_files="$work/nested-files"
+mkdir -p "$nested_files"
+cp -r "$backup" "$nested_files/"
+nested="$nested_files/$(basename "$backup")"
+if DATABASE_URL="$target_url" STORAGE_DIR="$nested_files" "$root/scripts/restore.sh" "$nested" --force > /dev/null 2>&1; then
+  die "restore.sh mau memulihkan dari cadangan yang berada di dalam folder tujuannya"
+fi
+[ -f "$nested/database.dump" ] || die "restore.sh --force menghapus cadangan yang sedang dipakainya"
+[ "$(query "$target_url" "SELECT count(*) FROM transactions")" = "$tables_before" ] ||
+  die "restore.sh --force mengosongkan database walau menolak memulihkan"
+
+echo "7/7 Membandingkan sumber dan hasil pemulihan..."
 # Jumlah baris tiap tabel, lalu sidik isi transaksi dan bukti.
 fingerprint() {
   local url="$1"
@@ -87,10 +114,12 @@ $actual"
   die "berkas bukti berbeda setelah dipulihkan"
 
 # Tiap baris bukti harus menunjuk berkas yang benar-benar ada di folder hasil pemulihan.
+keys="$(query "$target_url" "SELECT storage_key FROM attachments")"
+[ -n "$keys" ] || die "tidak ada baris bukti untuk diperiksa"
 missing=0
 while IFS= read -r key; do
-  [ -z "$key" ] || [ -f "$target_files/$key" ] || { echo "berkas hilang: $key" >&2; missing=1; }
-done < <(query "$target_url" "SELECT storage_key FROM attachments")
+  [ -f "$target_files/$key" ] || { echo "berkas hilang: $key" >&2; missing=1; }
+done <<< "$keys"
 [ "$missing" -eq 0 ] || die "ada bukti yang berkasnya tidak ikut pulih"
 
 echo "$expected" | sed 's/^/   /'

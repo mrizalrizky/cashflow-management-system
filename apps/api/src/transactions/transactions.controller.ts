@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Ip,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -37,6 +38,8 @@ import { TransfersService } from './transfers.service.js';
  */
 @Controller('transactions')
 export class TransactionsController {
+  private readonly logger = new Logger(TransactionsController.name);
+
   constructor(
     private readonly transactions: TransactionsService,
     private readonly workflow: TransactionWorkflowService,
@@ -67,14 +70,20 @@ export class TransactionsController {
     res.set({
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${prepared.fileName}"`,
-      'X-Content-Type-Options': 'nosniff',
     });
     try {
       await prepared.writeTo(res);
       res.end();
     } catch (error) {
-      // Berkas sudah mulai dikirim, jadi tidak bisa lagi dijawab dengan pesan error.
-      res.destroy(error instanceof Error ? error : undefined);
+      if (!res.headersSent) {
+        // Belum ada yang terkirim: jawab sebagai error biasa, bukan sebagai berkas.
+        res.removeHeader('Content-Disposition');
+        throw error;
+      }
+      // Berkas sudah mulai dikirim: sambungan diputus supaya berkas yang terpotong tidak
+      // disangka utuh, dan kegagalannya dicatat.
+      this.logger.error('Ekspor transaksi gagal di tengah jalan', error instanceof Error ? error.stack : error);
+      res.destroy();
     }
   }
 

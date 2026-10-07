@@ -22,7 +22,7 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 
 - **Di mana:** `src/auth/jwt-auth.guard.ts` dan `roles.guard.ts` berlaku global; rute terbuka harus ditandai `@Public()`. Scoping proyek di `src/projects/project-access.service.ts`; scoping transaksi dan bukti di `src/transactions/transaction-access.service.ts`; siapa boleh apa di `src/transactions/transaction-policy.ts`.
 - **Bukti:**
-  - `test/route-guards.e2e-spec.ts` membaca semua rute yang terdaftar dan memastikan tiap rute di luar daftar terbuka (health, login, refresh, logout) menjawab 401 tanpa token maupun dengan token palsu, dan tiap rute khusus admin menjawab 403 untuk peran lain. Rute baru yang lupa dijaga membuat test ini gagal.
+  - `test/route-guards.e2e-spec.ts` membaca semua rute yang terdaftar dan memastikan tiap rute di luar daftar terbuka (health, login, refresh, logout) menjawab 401 tanpa token maupun dengan token palsu, dan tiap rute khusus admin menjawab 403 untuk peran lain. Rute baru yang bisa dipanggil tanpa login membuat test ini gagal. Yang tidak dijaga test ini: rute baru yang seharusnya khusus admin tetapi lupa diberi `@Roles` (tetap wajib login), dan rute yang disembunyikan dari dokumen OpenAPI.
   - IDOR: `test/project-access.e2e-spec.ts`, `test/transaction-read.e2e-spec.ts`, `test/transaction-edit.e2e-spec.ts`, `test/attachments.e2e-spec.ts`, `test/project-summary.e2e-spec.ts`, `test/transaction-export.e2e-spec.ts` ("never hands over rows that are not the user's to see"). Data di luar jangkauan dijawab 404, sama seperti data yang tidak ada.
   - `test/auth-roles.e2e-spec.ts`: user yang dinonaktifkan atau dicabut dari proyek kehilangan akses pada request berikutnya.
 

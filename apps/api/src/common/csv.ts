@@ -1,7 +1,7 @@
 /** Pemisah kolom yang dipakai Excel pada komputer berbahasa Indonesia. */
 export const CSV_SEPARATOR = ';';
 /** Penanda di awal berkas supaya program spreadsheet membacanya sebagai UTF-8. */
-export const CSV_BOM = '﻿';
+export const CSV_BOM = '\uFEFF';
 
 const FORMULA_START = /^[=+\-@\t\r]/;
 const NEEDS_QUOTES = /[;"\r\n]/;

@@ -11,6 +11,9 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# Cadangan memuat seluruh data keuangan dan hash password: hanya pemiliknya yang boleh membaca.
+umask 077
+
 require_env DATABASE_URL STORAGE_DIR BACKUP_DIR
 [ -d "$STORAGE_DIR" ] || die "STORAGE_DIR bukan folder: $STORAGE_DIR"
 keep_days="${BACKUP_KEEP_DAYS:-14}"
@@ -26,7 +29,8 @@ mkdir -p "$partial"
 trap 'rm -rf "$partial"' EXIT
 
 # Database lebih dulu, baru berkas: bukti yang diunggah di antaranya ikut terarsip tanpa
-# barisnya (tidak berbahaya), dan tidak pernah ada baris yang berkasnya belum terarsip.
+# barisnya (tidak berbahaya). Bukti yang DIHAPUS di antaranya masih punya baris di cadangan
+# tetapi berkasnya tidak; karena itu cadangan terjadwal dijalankan saat aplikasi sepi.
 pg pg_dump --format=custom --no-owner --no-privileges --dbname="$DATABASE_URL" > "$partial/database.dump"
 [ -s "$partial/database.dump" ] || die "hasil pg_dump kosong"
 

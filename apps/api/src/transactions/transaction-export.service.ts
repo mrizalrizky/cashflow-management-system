@@ -86,11 +86,33 @@ function toCells(row: ExportRow): (string | null)[] {
   ];
 }
 
-/** Sebuah ekspor yang sudah lolos pemeriksaan dan siap ditulis. */
+/** Sebuah ekspor yang sudah lolos pemeriksaan, sudah dicatat di log audit, dan siap ditulis. */
 export interface PreparedExport {
   fileName: string;
-  /** Menulis seluruh berkas ke `out` dan mengembalikan jumlah barisnya. */
+  /**
+   * Menulis berkas ke `out` dan mengembalikan jumlah baris yang tertulis. Berhenti (tanpa
+   * melempar) bila penerimanya menutup sambungan di tengah jalan.
+   */
   writeTo(out: Writable): Promise<number>;
+}
+
+/** Posisi sebuah baris dalam urutan daftar; cukup untuk melanjutkan tepat sesudahnya. */
+type Position = Pick<ExportRow, 'transaction_date' | 'created_at' | 'id'>;
+
+/**
+ * Baris-baris sesudah `last` menurut `TRANSACTION_LIST_ORDER` (semuanya menurun). Posisinya
+ * diambil dari nilai yang sudah dibaca, bukan dibaca ulang dari database, sehingga baris
+ * batas yang diubah orang lain selagi ekspor berjalan tidak membuat baris lain terlewat.
+ */
+function after(last: Position): Prisma.TransactionWhereInput {
+  const { transaction_date, created_at, id } = last;
+  return {
+    OR: [
+      { transaction_date: { lt: transaction_date } },
+      { transaction_date, created_at: { lt: created_at } },
+      { transaction_date, created_at, id: { lt: id } },
+    ],
+  };
 }
 
 /**
@@ -106,7 +128,11 @@ export class TransactionExportService {
     private readonly audit: AuditService,
   ) {}
 
-  /** Memeriksa filter dan hak lebih dulu, supaya kesalahan dijawab sebelum berkas mulai dikirim. */
+  /**
+   * Memeriksa filter dan hak, lalu mencatat ekspor di log audit, semuanya sebelum satu byte
+   * pun dikirim. Dengan begitu kesalahan masih bisa dijawab sebagai error biasa, dan ekspor
+   * tetap tercatat walau penerimanya memutus sambungan sebelum berkas selesai.
+   */
   async prepare(
     user: AuthUser,
     filters: TransactionFiltersDto,
@@ -118,49 +144,57 @@ export class TransactionExportService {
     };
     const stamp = formatJakartaTimestamp(new Date()).replace(/[-:]/g, '').replace(' ', '-');
 
-    return {
-      fileName: `transaksi-${stamp}.csv`,
-      writeTo: async (out) => {
-        const rows = await this.stream(where, out);
-        await this.audit.log(this.prisma, {
-          userId: user.id,
-          action: 'EXPORT',
-          entityType: TRANSACTION_ENTITY,
-          entityId: 'export',
-          after: { filters, rows },
-          ip,
-        });
-        return rows;
-      },
-    };
+    await this.audit.log(this.prisma, {
+      userId: user.id,
+      action: 'EXPORT',
+      entityType: TRANSACTION_ENTITY,
+      entityId: 'export',
+      // Jumlah baris yang cocok saat ekspor diminta.
+      after: { filters, rows: await this.prisma.transaction.count({ where }) },
+      ip,
+    });
+
+    return { fileName: `transaksi-${stamp}.csv`, writeTo: (out) => this.stream(where, out) };
   }
 
   private async stream(where: Prisma.TransactionWhereInput, out: Writable): Promise<number> {
     let rows = 0;
-    let lastId: string | undefined;
-    await write(out, CSV_BOM + toCsvRow(HEADER));
+    let last: Position | undefined;
 
     for (;;) {
       const batch: ExportRow[] = await this.prisma.transaction.findMany({
-        where,
+        where: last ? { AND: [where, after(last)] } : where,
         select: EXPORT_SELECT,
         orderBy: TRANSACTION_LIST_ORDER,
         take: EXPORT_BATCH_SIZE,
-        // Lanjut tepat setelah baris terakhir kelompok sebelumnya, menurut urutan yang sama.
-        ...(lastId ? { cursor: { id: lastId }, skip: 1 } : {}),
       });
-      if (batch.length === 0) break;
 
-      await write(out, batch.map((row) => toCsvRow(toCells(row))).join(''));
+      // Judul kolom baru ditulis setelah pembacaan pertama berhasil, supaya kegagalan
+      // database tidak menghasilkan berkas yang tampak sah tetapi kosong.
+      const head = last ? '' : CSV_BOM + toCsvRow(HEADER);
+      const delivered = await write(out, head + batch.map((row) => toCsvRow(toCells(row))).join(''));
+      if (!delivered) break;
+
       rows += batch.length;
-      lastId = batch[batch.length - 1]!.id;
       if (batch.length < EXPORT_BATCH_SIZE) break;
+      last = batch[batch.length - 1]!;
     }
     return rows;
   }
 }
 
-/** Menulis dan, bila penerimanya lambat, menunggu sampai ia siap lagi. */
-async function write(out: Writable, chunk: string): Promise<void> {
-  if (!out.write(chunk)) await once(out, 'drain');
+/**
+ * Menulis dan, bila penerimanya lambat, menunggu sampai ia siap lagi. Mengembalikan false
+ * bila penerima sudah menutup sambungan, supaya pembacaan dari database berhenti.
+ */
+async function write(out: Writable, chunk: string): Promise<boolean> {
+  if (out.destroyed) return false;
+  if (!out.write(chunk)) {
+    // Menunggu mana yang lebih dulu: penerima siap lagi, atau sambungannya putus.
+    const waiting = new AbortController();
+    const settled = (event: string) => once(out, event, { signal: waiting.signal }).catch(() => undefined);
+    await Promise.race([settled('drain'), settled('close')]);
+    waiting.abort();
+  }
+  return !out.destroyed;
 }

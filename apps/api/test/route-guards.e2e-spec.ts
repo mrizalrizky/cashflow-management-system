@@ -16,6 +16,7 @@ const PUBLIC = ['GET /api/v1/health', 'POST /api/v1/auth/login', 'POST /api/v1/a
 const ADMIN_ONLY = [
   'GET /api/v1/users',
   'POST /api/v1/users',
+  'GET /api/v1/users/{id}',
   'PATCH /api/v1/users/{id}',
   'POST /api/v1/users/{id}/reset-password',
   'GET /api/v1/accounts',

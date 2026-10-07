@@ -4,8 +4,6 @@ import type { AuthUser } from '../auth/auth.types.js';
 import { formatCalendarDate, parseCalendarDate } from '../common/calendar-date.js';
 import { toMoney } from '../common/money.js';
 import { Paginated, paginated, toSkipTake } from '../common/pagination.js';
-import { containsText } from '../common/search.js';
-import { validationFailed } from '../common/validation.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import type {

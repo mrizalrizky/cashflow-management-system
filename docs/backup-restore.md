@@ -31,7 +31,9 @@ BACKUP_DIR="/srv/backup/cashflow" \
 scripts/backup.sh
 ```
 
-- Aman dijalankan selagi aplikasi berjalan. Database dicadangkan lebih dulu, baru berkas, sehingga tidak pernah ada baris bukti yang berkasnya belum terarsip.
+- Boleh dijalankan selagi aplikasi berjalan, tetapi jadwalkan saat sepi (malam hari). Database dicadangkan lebih dulu, baru berkas, sehingga bukti yang diunggah di antaranya tetap utuh. Dua hal yang bisa terjadi bila ada yang bekerja tepat saat itu: bukti yang **dihapus** di antara kedua langkah akan punya baris di cadangan tanpa berkasnya, dan `tar` bisa gagal bila sebuah berkas sedang ditulis (cadangan itu batal, tanpa meninggalkan apa pun; jalankan lagi).
+- Folder cadangan hanya bisa dibaca pemiliknya (`umask 077`): isinya seluruh data keuangan dan hash password.
+- Password di `DATABASE_URL` terlihat di daftar proses selagi skrip berjalan. Di server bersama, simpan password di `~/.pgpass` dan tulis `DATABASE_URL` tanpa password.
 - Bila gagal di tengah jalan, tidak ada folder cadangan setengah jadi yang tertinggal, dan skrip keluar dengan kode bukan nol.
 - Cadangan yang lebih tua dari `BACKUP_KEEP_DAYS` hari (bawaan 14) dihapus. Yang dihapus hanya subfolder `cashflow-...` buatan skrip ini di dalam `BACKUP_DIR`. Isi `0` untuk tidak pernah menghapus.
 
@@ -49,7 +51,7 @@ Pemasangan jadwal ini di server adalah bagian dari deployment (Fase 6).
 
 ### Simpan salinan di tempat lain
 
-Cadangan di disk yang sama dengan aplikasi ikut hilang bila disk itu rusak. Salin `BACKUP_DIR` secara berkala ke tempat lain (disk lain, NAS, atau penyimpanan awan), mis. dengan `rsync`.
+Cadangan di disk yang sama dengan aplikasi ikut hilang bila disk itu rusak. Salin `BACKUP_DIR` secara berkala ke tempat lain (disk lain, NAS, atau penyimpanan awan), mis. dengan `rsync`. Cadangan tidak dienkripsi; enkripsi dulu sebelum menyimpannya di tempat yang tidak sepenuhnya Anda kuasai.
 
 ## Memulihkan
 
@@ -62,14 +64,14 @@ scripts/restore.sh /srv/backup/cashflow/cashflow-20261007T013000Z
 Langkah demi langkah:
 
 1. **Hentikan aplikasi** (API), supaya tidak ada yang menulis selagi data diganti.
-2. Jalankan perintah di atas. Skrip memeriksa `SHA256SUMS` lebih dulu, lalu mencetak cadangan mana yang dipakai dan database serta folder mana yang menjadi tujuan.
+2. Jalankan perintah di atas **sebagai user database yang dipakai aplikasi** dan dengan `STORAGE_DIR` berupa jalur lengkap. Skrip memeriksa `SHA256SUMS`, memastikan cadangan bisa dibaca dan tidak berada di dalam folder tujuan, lalu mencetak cadangan mana yang dipakai dan database serta folder mana yang menjadi tujuan. Semua pemeriksaan itu terjadi sebelum ada yang diubah.
 3. Bila database tujuan sudah berisi tabel atau folder tujuan sudah berisi berkas, skrip **menolak**. Periksa tujuan yang dicetak. Bila memang itu yang hendak diganti, ulangi dengan `--force` di akhir: database dan folder tujuan **dikosongkan** lalu diisi dari cadangan.
 4. Jalankan `npx prisma migrate deploy` di `apps/api` bila versi aplikasi lebih baru daripada cadangan (migrasi yang belum ada di cadangan akan diterapkan).
 5. Jalankan lagi aplikasi, login, dan buka satu transaksi yang punya bukti untuk memastikan buktinya bisa diunduh.
 
 ## Uji pulih
 
-Cadangan yang belum pernah dipulihkan belum terbukti. `scripts/restore-drill.sh` menguji seluruh alur tanpa menyentuh data sungguhan: ia membuat dua database sementara (namanya selalu diakhiri `_drill`) dan folder sementara, mengisi yang pertama dengan transaksi dan berkas bukti, mencadangkannya, memulihkan ke yang kedua, memastikan `restore.sh` menolak menimpa tanpa `--force`, lalu membandingkan jumlah baris tiap tabel, sidik isi transaksi, dan sidik tiap berkas bukti. Semua yang dibuatnya dihapus lagi di akhir.
+Cadangan yang belum pernah dipulihkan belum terbukti. `scripts/restore-drill.sh` menguji seluruh alur tanpa menyentuh data sungguhan: ia membuat dua database sementara (namanya selalu diakhiri `_drill`) dan folder sementara, mengisi yang pertama dengan transaksi dan berkas bukti, mencadangkannya, memulihkan ke yang kedua, memastikan `restore.sh` menolak menimpa tanpa `--force`, memastikan `--force` tidak menghapus apa pun bila cadangannya rusak atau berada di dalam folder tujuan, lalu membandingkan jumlah baris tiap tabel, sidik isi transaksi, dan sidik tiap berkas bukti. Semua yang dibuatnya dihapus lagi di akhir.
 
 ```bash
 DRILL_SERVER_URL="postgresql://cashflow:cashflow_dev@localhost:5432" \
@@ -77,18 +79,20 @@ PG_PREFIX="docker exec -i cash-flow-management-postgres-1" \
 npm run backup:drill
 ```
 
-Jalankan setelah mengubah skrip backup, setelah menaikkan versi PostgreSQL, dan sesekali di server.
+Jalankan setelah mengubah skrip backup, setelah menaikkan versi PostgreSQL, dan sesekali di server. Uji ini membutuhkan dependensi pengembangan (`npm ci` tanpa `--omit=dev`), karena mengisi datanya lewat Prisma. Yang diuji adalah pemulihan utuh dari cadangan yang diam; cadangan yang diambil selagi ada yang menulis tidak diuji di sini.
 
 ### Hasil uji terakhir
 
 Dijalankan 7 Oktober 2026 terhadap PostgreSQL 16 (container pengembangan), keluar dengan kode 0:
 
 ```
-1/5 Menyiapkan database dan berkas sumber...
-2/5 Mencadangkan...
-3/5 Memulihkan ke tujuan kosong...
-4/5 Memastikan pemulihan menolak menimpa tanpa --force, dan mau dengan --force...
-5/5 Membandingkan sumber dan hasil pemulihan...
+1/7 Menyiapkan database dan berkas sumber...
+2/7 Mencadangkan...
+3/7 Memulihkan ke tujuan kosong...
+4/7 Memastikan pemulihan menolak menimpa tanpa --force, dan mau dengan --force...
+5/7 Memastikan --force tidak menghapus apa pun bila cadangannya tidak bisa dipulihkan...
+6/7 Memastikan cadangan yang berada di dalam folder bukti tidak ikut terhapus...
+7/7 Membandingkan sumber dan hasil pemulihan...
    users=1
    accounts=1
    categories=1
@@ -97,8 +101,8 @@ Dijalankan 7 Oktober 2026 terhadap PostgreSQL 16 (container pengembangan), kelua
    transactions=5
    attachments=2
    audit_logs=1
-   transactions:7549d7b1b37a381bd02fbd0f187573d9
-   attachments:d31f1f333767616d0d5f9d8c5b345378
+   transactions:<sidik sama di sumber dan hasil>
+   attachments:<sidik sama di sumber dan hasil>
 UJI PULIH BERHASIL: database dan 2 berkas bukti pulih sama persis.
 ```
 

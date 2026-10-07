@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { Writable } from 'node:stream';
 import { SAMPLE_FILES } from '../src/attachments/testing/sample-files.js';
+import { toAuthUser } from '../src/auth/auth.types.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import type { Prisma } from '../src/generated/prisma/client.js';
-import { EXPORT_BATCH_SIZE } from '../src/transactions/transaction-export.service.js';
+import { EXPORT_BATCH_SIZE, TransactionExportService } from '../src/transactions/transaction-export.service.js';
 import { api, E2eContext, setupE2e } from './e2e-context.js';
 import { call, createAccount, createTransaction, errorFields, TestSession } from './fixtures.js';
 import { TRANSACTION_EXPORT, TRANSACTIONS } from './routes.js';
@@ -67,7 +69,7 @@ async function download(ctx: E2eContext, session: TestSession, query = '') {
     })
     .expect(200);
   const bytes = res.body as Buffer;
-  const [header, ...rows] = parseCsv(bytes.toString('utf8').replace(/^﻿/, ''));
+  const [header, ...rows] = parseCsv(bytes.toString('utf8').replace(/^\uFEFF/, ''));
   return { res, bytes, header, rows };
 }
 
@@ -279,7 +281,7 @@ describe('GET /transactions/export', () => {
     expect(rows.every((row) => row.length === HEADER.length)).toBe(true);
     expect(rows[0]![HEADER.indexOf('Akun')]).toBe(`'=cmd|x`);
     // Tidak ada sel yang dimulai langsung dengan karakter rumus.
-    expect(bytes.toString('utf8')).not.toMatch(/(^|;|\n)"?[=+@]/);
+    expect(bytes.toString('utf8')).not.toMatch(/(^|;|\n)"?[=+\-@]/);
   });
 
   it('exports 20,000 transactions in batches', async () => {
@@ -339,4 +341,101 @@ describe('GET /transactions/export', () => {
     expect(errorFields(res.body)).toEqual([field]);
     expect(await ctx.prisma.auditLog.count({ where: { action: 'EXPORT' } })).toBe(0);
   });
+});
+
+describe('TransactionExportService under awkward conditions', () => {
+  const ctx = setupE2e();
+
+  /** Lebih dari satu kelompok baca, semuanya menunggu, dengan urutan yang pasti. */
+  async function seedPending(world: World, count: number): Promise<void> {
+    const rows: Prisma.TransactionCreateManyInput[] = Array.from({ length: count }, (_unused, i) => ({
+      type: 'OUT',
+      amount: 1n,
+      status: 'PENDING',
+      transaction_date: new Date('2026-10-01T00:00:00.000Z'),
+      description: `baris ${i}`,
+      account_id: world.account.id,
+      category_id: world.expense.id,
+      created_by_id: world.admin.user.id,
+      created_at: new Date(Date.UTC(2026, 9, 2, 0, 0, 0, i)),
+    }));
+    await ctx.prisma.transaction.createMany({ data: rows });
+  }
+
+  /** Penerima yang menjalankan `onFirstChunk` setelah kelompok pertama diterima. */
+  function collector(onFirstChunk: () => Promise<void>) {
+    const chunks: string[] = [];
+    const out = new Writable({
+      write(chunk: Buffer, _encoding, done) {
+        chunks.push(chunk.toString('utf8'));
+        if (chunks.length === 1) void onFirstChunk().then(() => done(), done);
+        else done();
+      },
+    });
+    /** Keterangan tiap baris data yang tertulis (tanpa baris judul). */
+    const descriptions = () =>
+      chunks
+        .join('')
+        .split('\r\n')
+        .filter(Boolean)
+        .slice(1)
+        .map((line) => line.split(';')[DESCRIPTION]!);
+    return { out, descriptions };
+  }
+
+  it('records the export before the first byte is sent, so leaving early cannot avoid it', async () => {
+    const world = await setupWorld(ctx);
+    await seedPending(world, 3);
+    const service = ctx.app.get(TransactionExportService);
+
+    await service.prepare(toAuthUser(world.admin.user), { status: 'PENDING' }, '10.0.0.9');
+
+    const entries = await ctx.prisma.auditLog.findMany({ where: { action: 'EXPORT' } });
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      user_id: world.admin.user.id,
+      ip: '10.0.0.9',
+      after: { filters: { status: 'PENDING' }, rows: 3 },
+    });
+  });
+
+  it('stops, instead of waiting forever, when the client goes away mid-file', async () => {
+    const world = await setupWorld(ctx);
+    await seedPending(world, EXPORT_BATCH_SIZE * 2 + 5);
+    const service = ctx.app.get(TransactionExportService);
+    // Penerima yang tidak pernah selesai menerima kelompok pertama, lalu memutus sambungan.
+    const out = new Writable({ highWaterMark: 1, write: () => undefined });
+    setTimeout(() => out.destroy(), 200);
+
+    const prepared = await service.prepare(toAuthUser(world.admin.user), {}, null);
+    const written = await prepared.writeTo(out);
+
+    expect(written).toBeLessThan(EXPORT_BATCH_SIZE * 2 + 5);
+  }, 10_000);
+
+  it.each([
+    ['leaves the filter', { status: 'APPROVED' as const }],
+    ['moves elsewhere in the order', { transaction_date: new Date('2020-01-01T00:00:00.000Z') }],
+  ])('loses no row when the last row of a batch %s before the next batch is read', async (_label, change) => {
+    const world = await setupWorld(ctx);
+    const total = EXPORT_BATCH_SIZE + 5;
+    await seedPending(world, total);
+    const service = ctx.app.get(TransactionExportService);
+    // Baris terakhir kelompok pertama: yang ke-1.000 menurut urutan daftar (terbaru dicatat dulu).
+    const boundary = await ctx.prisma.transaction.findFirstOrThrow({
+      where: { description: `baris ${total - EXPORT_BATCH_SIZE}` },
+    });
+    const { out, descriptions } = collector(async () => {
+      await ctx.prisma.transaction.update({ where: { id: boundary.id }, data: change });
+    });
+
+    const prepared = await service.prepare(toAuthUser(world.admin.user), { status: 'PENDING' }, null);
+    const written = await prepared.writeTo(out);
+
+    // Baris yang berubah sudah telanjur tertulis, dan boleh muncul sekali lagi bila ia pindah
+    // ke belakang; yang tidak boleh terjadi adalah baris lain hilang.
+    expect(new Set(descriptions()).size).toBe(total);
+    expect(written).toBe(descriptions().length);
+    expect(written).toBeLessThanOrEqual(total + 1);
+  }, 30_000);
 });

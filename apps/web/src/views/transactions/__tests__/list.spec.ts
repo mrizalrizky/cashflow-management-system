@@ -102,10 +102,14 @@ afterEach(() => {
 })
 
 describe('TransactionsView', () => {
-  async function mountList(role: Role, rows: Transaction[] = [SEMEN, TERMIN_MASUK, LISTRIK, TRANSFER]) {
+  async function mountList(
+    role: Role,
+    rows: Transaction[] = [SEMEN, TERMIN_MASUK, LISTRIK, TRANSFER],
+    path = '/transaksi',
+  ) {
     signInAs(role)
     vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf(rows))
-    return mountView(TransactionsView, { path: '/transaksi', withOverlays: true })
+    return mountView(TransactionsView, { path, withOverlays: true })
   }
 
   it('lists transactions with date, description, category, project, account, amount, status and creator', async () => {
@@ -234,6 +238,34 @@ describe('TransactionsView', () => {
     const pickers = wrapper.findAllComponents(DatePicker)
     expect(pickers.map((p) => p.props('ariaLabel'))).toEqual(['Dari tanggal', 'Sampai tanggal'])
     expect(pickers.map((p) => p.props('placeholder'))).toEqual(['Dari tanggal', 'Sampai tanggal'])
+  })
+
+  it('opens on the status named in the address, with one request', async () => {
+    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN], '/transaksi?status=PENDING')
+
+    expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
+    expect(lastListParams()).toMatchObject({ status: 'PENDING', page: 1 })
+    expect(select(wrapper, 'Status').props('modelValue')).toBe('PENDING')
+
+    await wrapper.get('[data-testid="reset-filters"]').trigger('click')
+    await flushPromises()
+    expect(lastListParams().status).toBeUndefined()
+    expect(select(wrapper, 'Status').props('modelValue')).toBeUndefined()
+  })
+
+  it('ignores a status in the address that does not exist', async () => {
+    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN], '/transaksi?status=apa&status=PENDING')
+
+    expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
+    expect(lastListParams().status).toBeUndefined()
+    expect(select(wrapper, 'Status').props('modelValue')).toBeUndefined()
+  })
+
+  it('makes a single request when the address names no status', async () => {
+    await mountList('SUPER_ADMIN')
+
+    expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
+    expect(lastListParams().status).toBeUndefined()
   })
 
   it('clears every filter with Reset', async () => {

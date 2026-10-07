@@ -121,6 +121,17 @@ describe('TransactionDetailView', () => {
     expect(manager.wrapper.get('[data-testid="tx-project"] a').attributes('href')).toBe('/proyek/p-rumah')
   })
 
+  it('links an admin, and nobody else, to the history of this transaction', async () => {
+    const admin = await mountDetail('SUPER_ADMIN')
+    expect(admin.wrapper.get('[data-testid="transaction-history"]').attributes('href')).toBe(
+      '/audit-log?entityType=transaction&entityId=t-semen',
+    )
+
+    freshPinia()
+    const manager = await mountDetail('PROJECT_MANAGER')
+    expect(manager.wrapper.find('[data-testid="transaction-history"]').exists()).toBe(false)
+  })
+
   it.each([404, 400])('shows "tidak ditemukan" for a %i, without an error toast', async (status) => {
     signInAs('PROJECT_MANAGER')
     vi.mocked(transactionsApi.getTransaction).mockRejectedValue(new ApiError(status, 'Transaksi tidak ditemukan'))

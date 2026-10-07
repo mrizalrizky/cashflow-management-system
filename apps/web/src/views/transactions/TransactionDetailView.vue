@@ -34,7 +34,7 @@ import TransactionFormDialog from './TransactionFormDialog.vue'
 const NOT_FOUND_STATUSES = [400, 404]
 
 const route = useRoute()
-const { role } = storeToRefs(useSessionStore())
+const { role, isAdmin } = storeToRefs(useSessionStore())
 const notify = useNotify()
 
 const transactionId = computed(() => String(route.params.id))
@@ -247,6 +247,17 @@ function openForm(): void {
         </dd>
       </div>
     </dl>
+
+    <!-- Riwayat perubahan ada di log audit, yang hanya bisa dibuka admin. -->
+    <RouterLink
+      v-if="isAdmin"
+      :to="{ path: PATHS.auditLog, query: { entityType: 'transaction', entityId: transaction.id } }"
+      class="mb-6 inline-flex items-center gap-2 text-sm text-primary-700 hover:underline"
+      data-testid="transaction-history"
+    >
+      <i class="pi pi-history" aria-hidden="true" />
+      Riwayat perubahan
+    </RouterLink>
 
     <section class="flex flex-col gap-3">
       <h2 class="text-lg font-semibold">Bukti</h2>

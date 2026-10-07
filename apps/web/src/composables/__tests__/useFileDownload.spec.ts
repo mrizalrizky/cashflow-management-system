@@ -49,7 +49,7 @@ describe('useFileDownload', () => {
   it('is busy while the file is fetched, and runs one download at a time', async () => {
     const files = await setup()
     let finish!: (file: DownloadedFile) => void
-    const fetch = vi.fn(() => new Promise<DownloadedFile>((resolve) => (finish = resolve)))
+    const fetch = vi.fn<() => Promise<DownloadedFile>>(() => new Promise((resolve) => (finish = resolve)))
 
     const first = files.download(fetch, 'transaksi.csv')
     expect(files.downloading.value).toBe(true)

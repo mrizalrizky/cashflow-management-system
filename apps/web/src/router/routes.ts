@@ -69,5 +69,10 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/users/UsersView.vue'),
     meta: { roles: ['SUPER_ADMIN'], title: 'Pengguna' },
   },
+  {
+    path: PATHS.auditLog,
+    component: () => import('@/views/audit/AuditLogView.vue'),
+    meta: { roles: ['SUPER_ADMIN'], title: 'Audit log' },
+  },
   { path: '/:pathMatch(.*)*', redirect: PATHS.root },
 ]

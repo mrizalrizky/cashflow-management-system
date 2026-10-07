@@ -29,7 +29,7 @@ beforeEach(() => {
 
 describe('AppLayout', () => {
   it.each<[Role, string, string[]]>([
-    ['SUPER_ADMIN', '/dashboard', ['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna']],
+    ['SUPER_ADMIN', '/dashboard', ['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna', 'Audit log']],
     ['PROJECT_MANAGER', '/proyek', ['Proyek Saya', 'Transaksi']],
     ['STAFF', '/transaksi', ['Transaksi']],
   ])('shows %s exactly their menu', async (role, path, labels) => {
@@ -91,6 +91,7 @@ describe('AppLayout', () => {
       'Proyek',
       'Master data',
       'Pengguna',
+      'Audit log',
     ])
     drawerLinks[4]!.click()
     await flushPromises()

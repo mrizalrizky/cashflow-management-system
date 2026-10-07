@@ -102,7 +102,7 @@ describe('master data page', () => {
 
 describe('menuFor', () => {
   it.each<[Role, string[]]>([
-    ['SUPER_ADMIN', ['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna']],
+    ['SUPER_ADMIN', ['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna', 'Audit log']],
     ['PROJECT_MANAGER', ['Proyek Saya', 'Transaksi']],
     ['STAFF', ['Transaksi']],
   ])('lists the pages for %s', (role, labels) => {

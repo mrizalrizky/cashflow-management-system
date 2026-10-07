@@ -27,7 +27,7 @@ test('login, forced password change, user management and role limits', async ({ 
   await test.step('after the change the admin lands on the dashboard with the full menu', async () => {
     await changePassword(page, ADMIN.temporaryPassword, ADMIN.password)
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(sidebarLinks(page)).toHaveText(['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna'])
+    await expect(sidebarLinks(page)).toHaveText(['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna', 'Audit log'])
     await expect(page.getByRole('banner')).toContainText(ADMIN.name)
   })
 

@@ -42,3 +42,15 @@ const JAKARTA_YEAR = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jakarta'
 export function currentYearInJakarta(now: Date = new Date()): number {
   return Number(JAKARTA_YEAR.format(now));
 }
+
+const JAKARTA_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** Tanggal hari ini menurut kalender Jakarta, sebagai `YYYY-MM-DD`. */
+export function todayInJakarta(now: Date = new Date()): string {
+  return JAKARTA_DATE.format(now);
+}

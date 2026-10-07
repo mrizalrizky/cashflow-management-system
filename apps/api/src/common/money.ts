@@ -24,3 +24,15 @@ export function toMoney(value: string): bigint {
 export function fromMoney(value: bigint): string {
   return value.toString();
 }
+
+/**
+ * Nominal yang harus lebih dari nol dan dibatasi jumlah digitnya, mis. nominal transaksi.
+ * Batas digit mencegah salah ketik yang akan mengacaukan semua saldo.
+ */
+export const IsPositiveMoneyString = (maxDigits: number) =>
+  applyDecorators(
+    IsString(),
+    Matches(new RegExp(`^[1-9][0-9]{0,${maxDigits - 1}}$`), {
+      message: `$property harus lebih dari 0, berupa bilangan bulat rupiah, maksimal ${maxDigits} digit`,
+    }),
+  );

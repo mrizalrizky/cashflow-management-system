@@ -11,7 +11,15 @@ export type AuditAction =
   | 'RESET_PASSWORD'
   | 'CREATE'
   | 'UPDATE'
-  | 'SET_MEMBERS';
+  | 'SET_MEMBERS'
+  | 'RESUBMIT'
+  | 'CANCEL'
+  | 'APPROVE'
+  | 'REJECT'
+  | 'VOID'
+  | 'TRANSFER'
+  | 'ATTACH'
+  | 'DETACH';
 
 export interface AuditEntry {
   userId: string | null;

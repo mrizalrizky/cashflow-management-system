@@ -10,6 +10,7 @@ import { validateEnv } from './config/env.validation.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
+import { TransactionsModule } from './transactions/transactions.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -23,6 +24,7 @@ import { UsersModule } from './users/users.module.js';
     AccountsModule,
     CategoriesModule,
     ProjectsModule,
+    TransactionsModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
 })

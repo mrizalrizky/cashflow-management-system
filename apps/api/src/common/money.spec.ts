@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { fromMoney, IsMoneyString, toMoney } from './money.js';
+import { fromMoney, IsMoneyString, IsPositiveMoneyString, toMoney } from './money.js';
 import { validateBody } from './testing/validate.js';
 
 class AmountDto {
@@ -53,5 +53,28 @@ describe('toMoney and fromMoney', () => {
   it('drops leading zeros and keeps the sign', () => {
     expect(fromMoney(toMoney('000123'))).toBe('123');
     expect(fromMoney(toMoney('-500000'))).toBe('-500000');
+  });
+});
+
+class PositiveDto {
+  @IsPositiveMoneyString(13)
+  amount: string;
+}
+
+describe('IsPositiveMoneyString', () => {
+  it.each(['1', '150000', '9999999999999'])('accepts %j', async (amount) => {
+    expect((await validateBody(PositiveDto, { amount })).rejected).toEqual([]);
+  });
+
+  it.each([
+    ['zero', '0'],
+    ['a negative amount', '-5'],
+    ['a decimal', '10.5'],
+    ['a leading zero', '0100'],
+    ['more digits than allowed', '10000000000000'],
+    ['a JSON number', 150000],
+    ['an empty string', ''],
+  ])('rejects %s', async (_label, amount) => {
+    expect((await validateBody(PositiveDto, { amount })).rejected).toEqual(['amount']);
   });
 });

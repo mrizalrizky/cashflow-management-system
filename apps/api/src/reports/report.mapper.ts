@@ -33,6 +33,51 @@ export interface CompanyDashboardResponse {
   pendingCount: number;
 }
 
+export interface ProjectSummaryResponse {
+  projectId: string;
+  contractValue: string;
+  /** Pemasukan proyek yang sudah disetujui. */
+  received: string;
+  /** Nilai kontrak dikurangi yang diterima; negatif bila yang diterima melebihi kontrak. */
+  outstanding: string;
+  /** Persentase kontrak yang sudah diterima, dua desimal; null bila nilai kontrak 0. */
+  receivedPercent: number | null;
+  /** Pengeluaran proyek yang sudah disetujui. */
+  cost: string;
+  /** Yang diterima dikurangi biaya. */
+  cashDifference: string;
+  costByCategory: CategoryAmountResponse[];
+  /** Transaksi proyek ini yang menunggu ditinjau. */
+  pendingCount: number;
+}
+
+/** Persentase dihitung dengan bilangan bulat (per sepuluh ribu) dan dibulatkan ke bawah. */
+function percentOf(part: bigint, whole: bigint): number | null {
+  if (whole === 0n) return null;
+  return Number((part * 10_000n) / whole) / 100;
+}
+
+export function toProjectSummary(data: {
+  projectId: string;
+  contractValue: bigint;
+  totals: TypeTotals;
+  costByCategory: CategoryTotal[];
+  pendingCount: number;
+}): ProjectSummaryResponse {
+  const { income: received, expense: cost } = data.totals;
+  return {
+    projectId: data.projectId,
+    contractValue: fromMoney(data.contractValue),
+    received: fromMoney(received),
+    outstanding: fromMoney(data.contractValue - received),
+    receivedPercent: percentOf(received, data.contractValue),
+    cost: fromMoney(cost),
+    cashDifference: fromMoney(received - cost),
+    costByCategory: toCategoryAmounts(data.costByCategory),
+    pendingCount: data.pendingCount,
+  };
+}
+
 export function toCashflow(totals: TypeTotals): CashflowResponse {
   return {
     income: fromMoney(totals.income),

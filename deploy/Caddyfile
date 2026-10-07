@@ -1,0 +1,55 @@
+# Caddy untuk aplikasi Arus Kas: menyajikan web hasil build dan meneruskan /api ke API.
+#
+# HTTPS tidak diurus di sini. Lalu lintas masuk lewat Cloudflare Tunnel (container
+# `cloudflared`), yang mengakhiri HTTPS di Cloudflare dan meneruskan HTTP biasa ke sini di
+# dalam jaringan Docker. Tidak ada port yang dibuka ke luar.
+{
+	auto_https off
+	admin off
+	servers {
+		# Alamat pengunjung dibaca dari X-Forwarded-* kiriman tunnel, yang berada di jaringan privat.
+		trusted_proxies static private_ranges
+	}
+}
+
+:8080 {
+	# Kompresi untuk berkas web dan jawaban JSON; gambar dan PDF bukti dilewatkan apa adanya.
+	encode zstd gzip
+	header -Server
+
+	handle /api/* {
+		request_body {
+			# Sedikit di atas batas unggah API (10 MB), supaya yang menjawab berkas terlalu
+			# besar adalah API, dengan pesannya sendiri, bukan halaman galat proxy.
+			max_size 12MB
+		}
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
+	handle {
+		root * /srv
+		header {
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy no-referrer
+			# Hanya milik aplikasi sendiri. Gaya inline dipakai PrimeVue; gambar blob: dan data:
+			# dipakai pratinjau bukti.
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		}
+
+		# Berkas hasil build bernama unik per isi, jadi boleh disimpan browser selamanya.
+		# Yang tidak ada dijawab 404, bukan halaman aplikasi.
+		handle /assets/* {
+			header Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
+
+		# Selain itu: halaman aplikasi, juga untuk alamat dalam seperti /transaksi/<id>.
+		# Selalu diperiksa ulang supaya versi baru langsung terpakai.
+		handle {
+			header Cache-Control "no-cache"
+			try_files {path} /index.html
+			file_server
+		}
+	}
+}

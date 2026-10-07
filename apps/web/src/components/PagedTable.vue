@@ -1,4 +1,5 @@
-<script setup lang="ts" generic="T, F extends object">
+<script setup lang="ts" generic="T extends { id: string }, F extends object">
+import { computed } from 'vue'
 import DataTable, { type DataTablePageEvent } from 'primevue/datatable'
 import ErrorState from '@/components/ErrorState.vue'
 import TableCard from '@/components/TableCard.vue'
@@ -16,7 +17,14 @@ const props = defineProps<{
   noMatchText: string
 }>()
 
-const { items, total, page, pageSize, loading, error, filtered } = props.list
+// Dibaca lewat `props.list` tiap kali, supaya tetap benar bila induk mengganti daftarnya.
+const items = computed(() => props.list.items.value)
+const total = computed(() => props.list.total.value)
+const page = computed(() => props.list.page.value)
+const pageSize = computed(() => props.list.pageSize.value)
+const loading = computed(() => props.list.loading.value)
+const error = computed(() => props.list.error.value)
+const filtered = computed(() => props.list.filtered.value)
 
 function onPage(event: DataTablePageEvent): void {
   props.list.setPage(event.page + 1, event.rows)

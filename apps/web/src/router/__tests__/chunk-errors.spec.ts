@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { isChunkLoadError, reloadOnChunkError } from '../chunk-errors'
+import { isChunkLoadError, pageLoadFailed, reloadOnChunkError } from '../chunk-errors'
 
 describe('isChunkLoadError', () => {
   it.each([
@@ -18,6 +18,11 @@ describe('isChunkLoadError', () => {
 })
 
 describe('reloadOnChunkError', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    pageLoadFailed.value = false
+  })
+
   function routerWith(load: () => Promise<never>) {
     return createRouter({
       history: createMemoryHistory(),
@@ -38,6 +43,40 @@ describe('reloadOnChunkError', () => {
     await router.push('/halaman?tab=2').catch(() => undefined)
 
     expect(navigate).toHaveBeenCalledExactlyOnceWith('/halaman?tab=2')
+  })
+
+  it('gives up after one reload of the same page, instead of reloading forever', async () => {
+    const navigate = vi.fn<(url: string) => void>()
+    const broken = () => Promise.reject(new TypeError('Failed to fetch dynamically imported module: /x.js'))
+
+    // Kunjungan pertama memuat ulang; setelah muat ulang, berkasnya masih tidak ada.
+    const first = routerWith(broken)
+    reloadOnChunkError(first, navigate)
+    await first.push('/halaman').catch(() => undefined)
+    const afterReload = routerWith(broken)
+    reloadOnChunkError(afterReload, navigate)
+    await afterReload.push('/halaman').catch(() => undefined)
+
+    expect(navigate).toHaveBeenCalledTimes(1)
+    expect(pageLoadFailed.value).toBe(true)
+  })
+
+  it('reloads again later, once some page has opened successfully in between', async () => {
+    const navigate = vi.fn<(url: string) => void>()
+    const broken = () => Promise.reject(new TypeError('Failed to fetch dynamically imported module: /x.js'))
+
+    const first = routerWith(broken)
+    reloadOnChunkError(first, navigate)
+    await first.push('/halaman').catch(() => undefined)
+    // Setelah muat ulang, halaman lain terbuka dengan baik.
+    await first.push('/')
+
+    const later = routerWith(broken)
+    reloadOnChunkError(later, navigate)
+    await later.push('/halaman').catch(() => undefined)
+
+    expect(navigate).toHaveBeenCalledTimes(2)
+    expect(pageLoadFailed.value).toBe(false)
   })
 
   it('does not reload for an ordinary navigation error', async () => {

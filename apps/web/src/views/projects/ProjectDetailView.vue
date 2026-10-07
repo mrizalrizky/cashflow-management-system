@@ -18,26 +18,37 @@ import { useNotify } from '@/composables/useNotify'
 import { formatCalendarDate } from '@/lib/format'
 import { formatRupiah } from '@/lib/money'
 import { PATHS } from '@/router/paths'
+import { storeToRefs } from 'pinia'
 import { useSessionStore } from '@/stores/session'
 import ProjectFormDialog from './ProjectFormDialog.vue'
 import ProjectMembersPanel from './ProjectMembersPanel.vue'
 
-const NOT_FOUND = 404
+// 404: tidak ada atau bukan proyeknya. 400: id di alamat bukan id yang sah (salah ketik).
+const NOT_FOUND_STATUSES = [400, 404]
 
 const route = useRoute()
-const session = useSessionStore()
+const { isAdmin } = storeToRefs(useSessionStore())
 const notify = useNotify()
 
-const isAdmin = computed(() => session.role === 'SUPER_ADMIN')
 const projectId = computed(() => String(route.params.id))
 
 const { data: project, loading, error, errorStatus, reload } = useAsyncData(() =>
   getProject(projectId.value),
 )
-watch(projectId, reload, { immediate: true })
+watch(
+  projectId,
+  () => {
+    // Proyek sebelumnya tidak ditampilkan selagi proyek lain dimuat.
+    project.value = null
+    void reload()
+  },
+  { immediate: true },
+)
 
 // Proyek orang lain dijawab API sama seperti proyek yang tidak ada.
-const notFound = computed(() => errorStatus.value === NOT_FOUND)
+const notFound = computed(
+  () => errorStatus.value !== null && NOT_FOUND_STATUSES.includes(errorStatus.value),
+)
 
 const details = computed(() =>
   project.value
@@ -91,9 +102,14 @@ function onSaved(saved: Project): void {
     </PageHeader>
 
     <dl class="mb-6 grid gap-4 rounded-xl border border-surface-200 bg-surface-0 p-4 sm:grid-cols-2 lg:grid-cols-4">
-      <div v-for="item in details" :key="item.id" :class="{ 'sm:col-span-2 lg:col-span-4': item.id === 'notes' }">
+      <div
+        v-for="item in details"
+        :key="item.id"
+        class="min-w-0"
+        :class="{ 'sm:col-span-2 lg:col-span-4': item.id === 'notes' }"
+      >
         <dt class="text-sm text-surface-500">{{ item.label }}</dt>
-        <dd class="font-medium whitespace-pre-line" :data-testid="`project-${item.id}`">{{ item.value }}</dd>
+        <dd class="font-medium break-words whitespace-pre-line" :data-testid="`project-${item.id}`">{{ item.value }}</dd>
       </div>
     </dl>
 

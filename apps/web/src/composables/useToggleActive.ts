@@ -1,4 +1,5 @@
 import { useConfirm } from 'primevue/useconfirm'
+import { dangerConfirm } from '@/lib/confirm'
 import { useNotify } from './useNotify'
 
 export interface Activatable {
@@ -42,14 +43,13 @@ export function useToggleActive<T extends Activatable>(
       return
     }
     const detail = options.describe?.(item)
-    confirm.require({
-      header: 'Nonaktifkan',
-      message: `Nonaktifkan ${item.name}?${detail ? ` ${detail}` : ''}`,
-      acceptLabel: 'Nonaktifkan',
-      rejectLabel: 'Batal',
-      acceptProps: { severity: 'danger' },
-      rejectProps: { severity: 'secondary', variant: 'text' },
-      accept: () => void setActive(item, false),
-    })
+    confirm.require(
+      dangerConfirm({
+        header: 'Nonaktifkan',
+        message: `Nonaktifkan ${item.name}?${detail ? ` ${detail}` : ''}`,
+        acceptLabel: 'Nonaktifkan',
+        accept: () => void setActive(item, false),
+      }),
+    )
   }
 }

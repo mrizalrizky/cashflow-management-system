@@ -48,3 +48,12 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Kode proyek memakai advisory lock**, bukan "retry bila melanggar `uq_projects_code`" seperti catatan di spec; hasilnya sama dan tidak ada request yang gagal.
 - **Tanggal kalender** hanya menerima tahun 1900 sampai 2999.
 - **Untuk Fase 6:** `NODE_ENV=production` wajib diset di compose produksi; tanpa itu dokumentasi API terbuka dan cookie tidak `Secure`.
+
+## Fase 2b
+
+- **Nominal di web selalu string digit**, dihitung dengan `BigInt`. `MoneyInput` menerima ketikan dan tempelan berpemisah ribuan, tetapi menolak desimal (mis. `1250000.00` dari spreadsheet) dengan keterangan, bukan menebak.
+- **Satu implementasi untuk tiap pola berulang:** `useEntityDialog` (dialog tambah/ubah, hanya mengirim field yang berubah), `usePagedList` + `PagedTable` (tabel berhalaman), `useToggleActive`, `useNotify`, `useAsyncData`, `TextField`/`SelectField`/`PasswordField`/`MoneyInput`/`DateField`.
+- **403 di tengah sesi:** web membaca ulang data user (`/auth/me`) dan memindahkan user bila halaman yang sedang dibuka tidak lagi boleh dibukanya (mis. password direset atau peran diganti admin).
+- **Halaman yang berkas kodenya gagal diambil** (tab lama setelah aplikasi diperbarui) dimuat ulang satu kali; bila masih gagal, ditampilkan pesan dengan tombol coba lagi.
+- **Test browser memakai hasil build produksi** (`vite preview`), bukan server pengembangan.
+- **Alamat proyek dengan id yang salah ketik** ditampilkan sebagai "Proyek tidak ditemukan", sama seperti proyek yang bukan miliknya.

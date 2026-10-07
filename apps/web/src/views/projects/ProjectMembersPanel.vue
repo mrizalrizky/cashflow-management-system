@@ -12,17 +12,17 @@ import FormField from '@/components/FormField.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import { useNotify } from '@/composables/useNotify'
+import { storeToRefs } from 'pinia'
+import { dangerConfirm } from '@/lib/confirm'
 import { useSessionStore } from '@/stores/session'
 
 const props = defineProps<{ project: Project }>()
 const emit = defineEmits<{ updated: [project: Project] }>()
 
-const session = useSessionStore()
+// Hanya SUPER_ADMIN yang mengatur koordinator; peran lain cukup melihat daftarnya.
+const { isAdmin: canEdit } = storeToRefs(useSessionStore())
 const confirm = useConfirm()
 const notify = useNotify()
-
-// Hanya SUPER_ADMIN yang mengatur koordinator; peran lain cukup melihat daftarnya.
-const canEdit = computed(() => session.role === 'SUPER_ADMIN')
 
 const managers = useAsyncData(listAssignableManagers)
 
@@ -35,7 +35,11 @@ watch(savedIds, (ids) => (selectedIds.value = [...ids]), { immediate: true })
  * Yang terakhir tetap ditampilkan supaya menyimpan tidak diam-diam mencabut penugasannya.
  */
 const options = computed(() => {
-  const active = managers.data.value ?? []
+  const active = managers.data.value
+  // Sebelum daftar koordinator aktif datang, belum bisa dikatakan siapa yang nonaktif.
+  if (active === null) {
+    return props.project.members.map((member) => ({ value: member.id, label: member.name }))
+  }
   const activeIds = new Set(active.map((manager) => manager.id))
   const inactive = props.project.members.filter((member) => !activeIds.has(member.id))
   return [
@@ -64,15 +68,15 @@ function onSave(): void {
     void save()
     return
   }
-  confirm.require({
-    header: 'Hapus semua koordinator',
-    message: 'Hapus semua koordinator dari proyek ini? Tidak ada koordinator yang bisa melihatnya lagi.',
-    acceptLabel: 'Hapus semua',
-    rejectLabel: 'Batal',
-    acceptProps: { severity: 'danger' },
-    rejectProps: { severity: 'secondary', variant: 'text' },
-    accept: () => void save(),
-  })
+  confirm.require(
+    dangerConfirm({
+      header: 'Hapus semua koordinator',
+      message:
+        'Hapus semua koordinator dari proyek ini? Tidak ada koordinator yang bisa melihatnya lagi.',
+      acceptLabel: 'Hapus semua',
+      accept: () => void save(),
+    }),
+  )
 }
 
 onMounted(() => {

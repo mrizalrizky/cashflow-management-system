@@ -305,6 +305,19 @@ describe('ProjectDetailView', () => {
     expect(document.querySelector('.p-toast-message')).toBeNull()
   })
 
+  it('treats an address with a malformed id as not found too', async () => {
+    signInAs('PROJECT_MANAGER')
+    vi.mocked(projectsApi.getProject).mockRejectedValue(
+      new ApiError(400, 'Validation failed (uuid is expected)'),
+    )
+
+    const { wrapper } = await mountDetail('/proyek/abc')
+
+    expect(wrapper.text()).toContain('Proyek tidak ditemukan')
+    expect(wrapper.text()).not.toContain('uuid')
+    expect(wrapper.find('[data-testid="retry"]').exists()).toBe(false)
+  })
+
   it('offers a retry for any other failure', async () => {
     signInAs('SUPER_ADMIN')
     vi.mocked(usersApi.listAssignableManagers).mockResolvedValue([])
@@ -415,6 +428,18 @@ describe('ProjectMembersPanel', () => {
       'Zaki',
     ])
     expect(picker.props('modelValue')).toEqual(['u-ani'])
+  })
+
+  it('does not call anyone inactive while the manager list is still loading', async () => {
+    signInAs('SUPER_ADMIN')
+    vi.mocked(usersApi.listAssignableManagers).mockReturnValue(new Promise(() => {}))
+
+    const { wrapper } = await mountPanel()
+
+    const labels = (wrapper.findComponent(MultiSelect).props('options') as { label: string }[]).map(
+      (o) => o.label,
+    )
+    expect(labels).toEqual(['Ani'])
   })
 
   it('saves a changed selection and reports the updated project', async () => {

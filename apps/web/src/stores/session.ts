@@ -12,6 +12,8 @@ export const useSessionStore = defineStore('session', () => {
 
   const isAuthenticated = computed(() => user.value !== null)
   const role = computed<Role | null>(() => user.value?.role ?? null)
+  /** Untuk memutuskan apa yang ditawarkan di layar; yang membatasi tetap API. */
+  const isAdmin = computed(() => role.value === 'SUPER_ADMIN')
 
   let restoring: Promise<void> | null = null
   let resyncing: Promise<void> | null = null
@@ -50,7 +52,9 @@ export const useSessionStore = defineStore('session', () => {
   function resync(): Promise<void> {
     resyncing ??= (async () => {
       try {
-        user.value = (await authApi.me()).user
+        const current = (await authApi.me()).user
+        // Bila user sudah logout selagi menunggu, jawaban ini tidak berlaku lagi.
+        if (user.value !== null) user.value = current
       } catch {
         // Tidak bisa memastikan; biarkan data yang ada.
       } finally {
@@ -101,6 +105,7 @@ export const useSessionStore = defineStore('session', () => {
     ready,
     isAuthenticated,
     role,
+    isAdmin,
     restore,
     resync,
     login,

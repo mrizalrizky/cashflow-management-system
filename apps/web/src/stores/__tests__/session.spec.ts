@@ -182,6 +182,25 @@ describe('session store', () => {
       expect(authApi.me).toHaveBeenCalledTimes(1)
     })
 
+    it('does not bring the user back when they logged out while the check was running', async () => {
+      const { session, onForbidden } = await signedIn()
+      let reply!: (value: { user: typeof USER }) => void
+      vi.mocked(authApi.me).mockReturnValue(new Promise((resolve) => (reply = resolve)))
+      vi.mocked(authApi.logout).mockResolvedValue(undefined)
+
+      onForbidden()
+      await session.logout()
+      reply({ user: USER })
+      await session.resync()
+
+      expect(session.user).toBeNull()
+    })
+
+    it('says whether the user is an admin', async () => {
+      const { session } = await signedIn()
+      expect(session.isAdmin).toBe(true)
+    })
+
     it('keeps the current user when the check itself fails', async () => {
       const { session, onForbidden } = await signedIn()
       vi.mocked(authApi.me).mockRejectedValue(new Error('offline'))

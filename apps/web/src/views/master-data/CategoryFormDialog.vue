@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
 import { createCategory, updateCategory, type CreateCategoryInput } from '@/api/categories'
 import type { Category, TxType } from '@/api/types'
 import FormDialog from '@/components/FormDialog.vue'
 import FormField from '@/components/FormField.vue'
+import SelectField from '@/components/SelectField.vue'
+import TextField from '@/components/TextField.vue'
 import { useEntityDialog } from '@/composables/useEntityDialog'
 import { omit } from '@/lib/changes'
 import { TX_TYPE_OPTIONS, txTypeLabel } from '@/lib/labels'
@@ -53,32 +53,26 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     :form-error="formError"
     @submit="onSubmit"
   >
-    <FormField id="category-name" v-slot="field" label="Nama" :error="fieldErrors.name">
-      <InputText
-        :id="field.id"
-        v-model="form.name"
-        :invalid="field.invalid"
-        :aria-describedby="field.describedBy"
-        fluid
-      />
-    </FormField>
+    <TextField
+      id="category-name"
+      v-model="form.name"
+      label="Nama"
+      :error="fieldErrors.name"
+    />
 
-    <FormField id="category-type" v-slot="field" label="Tipe" :error="fieldErrors.type">
-      <template v-if="editing">
-        <p class="font-medium">{{ form.type ? txTypeLabel(form.type) : '-' }}</p>
-        <small class="text-surface-500">Tipe kategori tidak bisa diubah.</small>
-      </template>
-      <Select
-        v-else
-        v-model="form.type"
-        :options="TX_TYPE_OPTIONS"
-        option-label="label"
-        option-value="value"
-        placeholder="Pilih tipe"
-        :invalid="field.invalid"
-        :aria-labelledby="field.labelId"
-        fluid
-      />
+    <!-- Tipe hanya bisa dipilih saat membuat. -->
+    <FormField v-if="editing" id="category-type" label="Tipe">
+      <p class="font-medium">{{ form.type ? txTypeLabel(form.type) : '-' }}</p>
+      <small class="text-surface-500">Tipe kategori tidak bisa diubah.</small>
     </FormField>
+    <SelectField
+      v-else
+      id="category-type"
+      v-model="form.type"
+      label="Tipe"
+      :options="TX_TYPE_OPTIONS"
+      placeholder="Pilih tipe"
+      :error="fieldErrors.type"
+    />
   </FormDialog>
 </template>

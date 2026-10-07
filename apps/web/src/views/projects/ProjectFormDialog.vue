@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 import { createProject, updateProject, type UpdateProjectInput } from '@/api/projects'
 import type { Project, ProjectStatus } from '@/api/types'
@@ -8,6 +6,8 @@ import DateField from '@/components/DateField.vue'
 import FormDialog from '@/components/FormDialog.vue'
 import FormField from '@/components/FormField.vue'
 import MoneyInput from '@/components/MoneyInput.vue'
+import SelectField from '@/components/SelectField.vue'
+import TextField from '@/components/TextField.vue'
 import { useEntityDialog } from '@/composables/useEntityDialog'
 import { omit } from '@/lib/changes'
 import { PROJECT_STATUS_OPTIONS } from '@/lib/labels'
@@ -94,25 +94,18 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     :form-error="formError"
     @submit="onSubmit"
   >
-    <FormField id="project-name" v-slot="field" label="Nama proyek" :error="fieldErrors.name">
-      <InputText
-        :id="field.id"
-        v-model="form.name"
-        :invalid="field.invalid"
-        :aria-describedby="field.describedBy"
-        fluid
-      />
-    </FormField>
-
-    <FormField id="project-client" v-slot="field" label="Nama klien" :error="fieldErrors.clientName">
-      <InputText
-        :id="field.id"
-        v-model="form.clientName"
-        :invalid="field.invalid"
-        :aria-describedby="field.describedBy"
-        fluid
-      />
-    </FormField>
+    <TextField
+      id="project-name"
+      v-model="form.name"
+      label="Nama proyek"
+      :error="fieldErrors.name"
+    />
+    <TextField
+      id="project-client"
+      v-model="form.clientName"
+      label="Nama klien"
+      :error="fieldErrors.clientName"
+    />
 
     <FormField
       id="project-contract"
@@ -126,25 +119,17 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
         :invalid="field.invalid"
         :aria-describedby="field.describedBy"
       />
+      <small class="text-surface-500">Kosong berarti 0.</small>
     </FormField>
 
-    <FormField
+    <SelectField
       v-if="editing"
       id="project-status"
-      v-slot="field"
+      v-model="form.status"
       label="Status"
+      :options="PROJECT_STATUS_OPTIONS"
       :error="fieldErrors.status"
-    >
-      <Select
-        v-model="form.status"
-        :options="PROJECT_STATUS_OPTIONS"
-        option-label="label"
-        option-value="value"
-        :invalid="field.invalid"
-        :aria-labelledby="field.labelId"
-        fluid
-      />
-    </FormField>
+    />
 
     <div class="grid gap-4 sm:grid-cols-2">
       <FormField id="project-start" v-slot="field" label="Tanggal mulai" :error="fieldErrors.startDate">

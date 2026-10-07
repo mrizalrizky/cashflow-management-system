@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatCalendarDate, fromLocalDate, toLocalDate } from '../format'
-import { formatRupiah, groupDigits, parseMoneyInput } from '../money'
+import { formatRupiah, groupDigits, parseMoneyInput, parsePastedMoney } from '../money'
 import { money } from '../validation'
 
 describe('formatRupiah', () => {
@@ -58,6 +58,36 @@ describe('parseMoneyInput', () => {
     expect(parseMoneyInput('-Rp 500.000', { allowNegative: true })).toBe('-500000')
     expect(parseMoneyInput('-0', { allowNegative: true })).toBe('0')
     expect(parseMoneyInput('5-00', { allowNegative: true })).toBeNull()
+  })
+})
+
+describe('parsePastedMoney', () => {
+  it.each([
+    ['1250000', '1250000'],
+    ['1.250.000', '1250000'],
+    ['Rp 1.250.000', '1250000'],
+    ['  rp1.250.000  ', '1250000'],
+    ['0', '0'],
+  ])('reads %j as %j', (text, expected) => {
+    expect(parsePastedMoney(text)).toBe(expected)
+  })
+
+  it.each([
+    ['a decimal point from a spreadsheet', '1250000.00'],
+    ['a short decimal', '1.5'],
+    ['two decimals', '12.50'],
+    ['a decimal comma', '1.250.000,00'],
+    ['misplaced separators', '12.50.000'],
+    ['letters', 'seribu'],
+    ['nothing', ''],
+    ['a negative amount', '-500.000'],
+  ])('refuses %s instead of guessing', (_label, text) => {
+    expect(parsePastedMoney(text)).toBeNull()
+  })
+
+  it('accepts a negative amount only when allowed', () => {
+    expect(parsePastedMoney('-500.000', { allowNegative: true })).toBe('-500000')
+    expect(parsePastedMoney('-Rp 500.000', { allowNegative: true })).toBe('-500000')
   })
 })
 

@@ -80,6 +80,86 @@ describe('MoneyInput', () => {
     expect(shown(signed)).toBe('-500.000')
   })
 
+  /** Mengetik di tengah teks: isi kotak dan posisi kursor setelah ketukan, seperti yang dilaporkan browser. */
+  async function typeAt(wrapper: VueWrapper, text: string, caret: number): Promise<HTMLInputElement> {
+    const input = wrapper.get('input').element as HTMLInputElement
+    input.value = text
+    input.setSelectionRange(caret, caret)
+    await wrapper.get('input').trigger('input')
+    await flushPromises()
+    return input
+  }
+
+  it('keeps the caret where the person is typing when the grouping changes', async () => {
+    const wrapper = await mountMoney({ modelValue: '999' })
+
+    // Kursor di awal, mengetik "1": browser melaporkan "1999" dengan kursor setelah angka 1.
+    const input = await typeAt(wrapper, '1999', 1)
+
+    expect(input.value).toBe('1.999')
+    expect(input.selectionStart).toBe(1)
+
+    // Lalu "2" di posisi yang sama: harus menjadi 12.999, bukan 19.992.
+    await typeAt(wrapper, '12.999', 2)
+    expect(emitted(wrapper)).toEqual(['1999', '12999'])
+    expect(input.selectionStart).toBe(2)
+  })
+
+  it('keeps the caret in place when a separator is deleted', async () => {
+    const wrapper = await mountMoney({ modelValue: '1250000' })
+
+    // Backspace atas titik pertama: "1250.000" dengan kursor setelah angka 1.
+    const input = await typeAt(wrapper, '1250.000', 1)
+
+    expect(input.value).toBe('1.250.000')
+    expect(input.selectionStart).toBe(1)
+    expect(emitted(wrapper)).toEqual([])
+  })
+
+  function paste(wrapper: VueWrapper, text: string) {
+    return wrapper.get('input').trigger('paste', { clipboardData: { getData: () => text } })
+  }
+
+  it('replaces the amount with a pasted one', async () => {
+    const wrapper = await mountMoney({ modelValue: '100' })
+
+    await paste(wrapper, 'Rp 3.000.000')
+    await flushPromises()
+
+    expect(emitted(wrapper)).toEqual(['3000000'])
+    expect(shown(wrapper)).toBe('3.000.000')
+  })
+
+  it('refuses a pasted decimal amount and says why, instead of misreading it', async () => {
+    const wrapper = await mountMoney({ modelValue: '100' })
+
+    await paste(wrapper, '1250000.00')
+    await flushPromises()
+
+    expect(emitted(wrapper)).toEqual([])
+    expect(shown(wrapper)).toBe('100')
+    expect(wrapper.get('[role="status"]').text()).toContain('angka bulat')
+  })
+
+  it('explains a refused keystroke and clears the hint on the next valid one', async () => {
+    const wrapper = await mountMoney({ modelValue: '100' })
+
+    await type(wrapper, '100x')
+    expect(wrapper.find('[role="status"]').exists()).toBe(true)
+
+    await type(wrapper, '1000')
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+
+  it('drops a minus sign left on its own when the field loses focus', async () => {
+    const wrapper = await mountMoney({ allowNegative: true })
+    await type(wrapper, '-')
+
+    await wrapper.get('input').trigger('blur')
+
+    expect(shown(wrapper)).toBe('')
+  })
+
   it('follows a value set from outside', async () => {
     const wrapper = await mountMoney({ modelValue: '100' })
     await wrapper.setProps({ modelValue: '7000' })

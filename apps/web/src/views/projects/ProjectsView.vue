@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -17,14 +17,12 @@ import { usePagedList } from '@/composables/usePagedList'
 import { PROJECT_STATUS_OPTIONS } from '@/lib/labels'
 import { formatRupiah } from '@/lib/money'
 import { projectPath } from '@/router/paths'
+import { storeToRefs } from 'pinia'
 import { useSessionStore } from '@/stores/session'
 import ProjectFormDialog from './ProjectFormDialog.vue'
 
-const session = useSessionStore()
+const { isAdmin } = storeToRefs(useSessionStore())
 const notify = useNotify()
-
-// Yang benar-benar membatasi adalah API; di sini hanya soal apa yang ditawarkan.
-const isAdmin = computed(() => session.role === 'SUPER_ADMIN')
 
 const list = usePagedList<Project, ProjectFilters>(listProjects, {
   search: undefined,

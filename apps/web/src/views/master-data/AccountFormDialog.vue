@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
 import { createAccount, updateAccount, type CreateAccountInput } from '@/api/accounts'
 import type { Account, AccountType } from '@/api/types'
 import FormDialog from '@/components/FormDialog.vue'
 import FormField from '@/components/FormField.vue'
 import MoneyInput from '@/components/MoneyInput.vue'
+import SelectField from '@/components/SelectField.vue'
+import TextField from '@/components/TextField.vue'
 import { useEntityDialog } from '@/composables/useEntityDialog'
 import { ACCOUNT_TYPE_OPTIONS } from '@/lib/labels'
 import { collectErrors, money, required } from '@/lib/validation'
@@ -63,28 +63,20 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     :form-error="formError"
     @submit="onSubmit"
   >
-    <FormField id="account-name" v-slot="field" label="Nama" :error="fieldErrors.name">
-      <InputText
-        :id="field.id"
-        v-model="form.name"
-        :invalid="field.invalid"
-        :aria-describedby="field.describedBy"
-        fluid
-      />
-    </FormField>
-
-    <FormField id="account-type" v-slot="field" label="Jenis" :error="fieldErrors.type">
-      <Select
-        v-model="form.type"
-        :options="ACCOUNT_TYPE_OPTIONS"
-        option-label="label"
-        option-value="value"
-        placeholder="Pilih jenis"
-        :invalid="field.invalid"
-        :aria-labelledby="field.labelId"
-        fluid
-      />
-    </FormField>
+    <TextField
+      id="account-name"
+      v-model="form.name"
+      label="Nama"
+      :error="fieldErrors.name"
+    />
+    <SelectField
+      id="account-type"
+      v-model="form.type"
+      label="Jenis"
+      :options="ACCOUNT_TYPE_OPTIONS"
+      placeholder="Pilih jenis"
+      :error="fieldErrors.type"
+    />
 
     <FormField
       id="account-opening"

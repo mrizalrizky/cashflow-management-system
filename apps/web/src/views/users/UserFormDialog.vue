@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
 import type { Role, User } from '@/api/types'
 import { createUser, updateUser, type CreateUserInput } from '@/api/users'
 import FormDialog from '@/components/FormDialog.vue'
-import FormField from '@/components/FormField.vue'
 import PasswordField from '@/components/PasswordField.vue'
+import SelectField from '@/components/SelectField.vue'
+import TextField from '@/components/TextField.vue'
 import { useEntityDialog } from '@/composables/useEntityDialog'
 import { omit } from '@/lib/changes'
 import { ROLE_OPTIONS } from '@/lib/labels'
@@ -65,39 +64,27 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     :form-error="formError"
     @submit="onSubmit"
   >
-    <FormField id="user-name" v-slot="field" label="Nama" :error="fieldErrors.name">
-      <InputText
-        :id="field.id"
-        v-model="form.name"
-        :invalid="field.invalid"
-        :aria-describedby="field.describedBy"
-        fluid
-      />
-    </FormField>
-
-    <FormField id="user-email" v-slot="field" label="Email" :error="fieldErrors.email">
-      <InputText
-        :id="field.id"
-        v-model="form.email"
-        type="email"
-        :invalid="field.invalid"
-        :aria-describedby="field.describedBy"
-        fluid
-      />
-    </FormField>
-
-    <FormField id="user-role" v-slot="field" label="Peran" :error="fieldErrors.role">
-      <Select
-        v-model="form.role"
-        :options="ROLE_OPTIONS"
-        option-label="label"
-        option-value="value"
-        placeholder="Pilih peran"
-        :invalid="field.invalid"
-        :aria-labelledby="field.labelId"
-        fluid
-      />
-    </FormField>
+    <TextField
+      id="user-name"
+      v-model="form.name"
+      label="Nama"
+      :error="fieldErrors.name"
+    />
+    <TextField
+      id="user-email"
+      v-model="form.email"
+      label="Email"
+      type="email"
+      :error="fieldErrors.email"
+    />
+    <SelectField
+      id="user-role"
+      v-model="form.role"
+      label="Peran"
+      :options="ROLE_OPTIONS"
+      placeholder="Pilih peran"
+      :error="fieldErrors.role"
+    />
 
     <PasswordField
       v-if="!editing"

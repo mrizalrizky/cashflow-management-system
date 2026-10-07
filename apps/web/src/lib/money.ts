@@ -49,3 +49,18 @@ export function parseMoneyInput(
   if (normalized.length > MONEY_MAX_DIGITS) return null
   return negative && normalized !== '0' ? `-${normalized}` : normalized
 }
+
+const PASTED = /^(-?)\s*(?:rp\s*)?(\d+|\d{1,3}(?:\.\d{3})+)$/i
+
+/**
+ * Membaca nominal yang ditempel. Lebih ketat daripada `parseMoneyInput`: titik hanya diterima
+ * sebagai pemisah ribuan yang lengkap, sehingga `1250000.00` dari spreadsheet ditolak dan tidak
+ * terbaca sebagai 125.000.000.
+ */
+export function parsePastedMoney(
+  text: string,
+  options: { allowNegative?: boolean } = {},
+): string | null {
+  const match = PASTED.exec(text.trim())
+  return match ? parseMoneyInput(`${match[1]}${match[2]}`, options) : null
+}

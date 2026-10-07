@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
+import { adminApi } from './api'
 import { ADMIN } from './env'
 import { choose, horizontalOverflow, logout, openFromMenu, signIn, type TestAccount } from './helpers'
 
@@ -32,37 +33,28 @@ const PROOF = {
 
 /** Menyiapkan akun, kategori, proyek dan pengguna lewat API, atas nama admin. */
 async function prepare(request: APIRequestContext): Promise<{ projectLabel: string }> {
-  const login = await request.post('/api/v1/auth/login', {
-    data: { email: ADMIN.email, password: ADMIN.password },
+  const api = await adminApi(request)
+
+  await api.post('/accounts', { name: CASH, type: 'CASH', openingBalance: '1000000' })
+  await api.post('/accounts', { name: BANK, type: 'BANK', openingBalance: '0' })
+  await api.post('/categories', { name: CATEGORY, type: 'OUT' })
+  await api.post('/users', {
+    name: STAFF.name,
+    email: STAFF.email,
+    role: 'STAFF',
+    password: STAFF.temporaryPassword,
   })
-  expect(login.ok()).toBe(true)
-  const headers = { Authorization: `Bearer ${(await login.json()).accessToken}` }
-
-  async function post<T>(path: string, data: unknown): Promise<T> {
-    const response = await request.post(`/api/v1${path}`, { headers, data })
-    expect(response.ok(), `${path}: ${await response.text()}`).toBe(true)
-    return response.json() as Promise<T>
-  }
-
-  await post('/accounts', { name: CASH, type: 'CASH', openingBalance: '1000000' })
-  await post('/accounts', { name: BANK, type: 'BANK', openingBalance: '0' })
-  await post('/categories', { name: CATEGORY, type: 'OUT' })
-  await post('/users', { name: STAFF.name, email: STAFF.email, role: 'STAFF', password: STAFF.temporaryPassword })
-  const coordinator = await post<{ id: string }>('/users', {
+  const coordinator = await api.post<{ id: string }>('/users', {
     name: COORDINATOR.name,
     email: COORDINATOR.email,
     role: 'PROJECT_MANAGER',
     password: COORDINATOR.temporaryPassword,
   })
-  const project = await post<{ id: string; code: string; name: string }>('/projects', {
+  const project = await api.post<{ id: string; code: string; name: string }>('/projects', {
     name: 'Gudang Uji',
     clientName: 'Klien Transaksi',
   })
-  const members = await request.put(`/api/v1/projects/${project.id}/members`, {
-    headers,
-    data: { userIds: [coordinator.id] },
-  })
-  expect(members.ok()).toBe(true)
+  await api.put(`/projects/${project.id}/members`, { userIds: [coordinator.id] })
   return { projectLabel: `${project.code} · ${project.name}` }
 }
 

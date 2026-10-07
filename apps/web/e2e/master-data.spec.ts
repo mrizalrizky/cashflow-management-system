@@ -83,6 +83,8 @@ test('master data, projects and what a project manager can see', async ({ page }
     await page.getByRole('link', { name: /Rumah Uji/ }).click()
     await expect(page.getByRole('heading', { name: /Rumah Uji/ })).toBeVisible()
 
+    await page.getByRole('tab', { name: 'Anggota' }).click()
+
     // Kotak isian aslinya tersembunyi di balik tampilan chip, jadi yang diklik adalah wadahnya.
     await expect(page.getByRole('combobox', { name: 'Koordinator proyek' })).toBeAttached()
     await page.locator('.p-multiselect').click()
@@ -107,6 +109,7 @@ test('master data, projects and what a project manager can see', async ({ page }
     await page.getByRole('link', { name: /Rumah Uji/ }).click()
     await expect(page.getByRole('heading', { name: /Rumah Uji/ })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Ubah proyek' })).toHaveCount(0)
+    await page.getByRole('tab', { name: 'Anggota' }).click()
     await expect(page.getByTestId('member')).toHaveText([new RegExp(COORDINATOR.email)])
     await expect(page.getByRole('button', { name: 'Simpan koordinator' })).toHaveCount(0)
   })

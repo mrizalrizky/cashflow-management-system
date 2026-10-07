@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -15,6 +15,10 @@ import PageHeader from '@/components/PageHeader.vue'
 import ProjectStatusTag from '@/components/ProjectStatusTag.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useNotify } from '@/composables/useNotify'
+import {
+  useTransactionOptions,
+  type TransactionOptions,
+} from '@/composables/useTransactionOptions'
 import { formatCalendarDate } from '@/lib/format'
 import { formatRupiah } from '@/lib/money'
 import { PATHS } from '@/router/paths'
@@ -22,6 +26,8 @@ import { storeToRefs } from 'pinia'
 import { useSessionStore } from '@/stores/session'
 import ProjectFormDialog from './ProjectFormDialog.vue'
 import ProjectMembersPanel from './ProjectMembersPanel.vue'
+import TransactionFormDialog from '@/views/transactions/TransactionFormDialog.vue'
+import TransactionTable from '@/views/transactions/TransactionTable.vue'
 
 // 404: tidak ada atau bukan proyeknya. 400: id di alamat bukan id yang sah (salah ketik).
 const NOT_FOUND_STATUSES = [400, 404]
@@ -67,6 +73,18 @@ const formOpen = ref(false)
 function onSaved(saved: Project): void {
   project.value = saved
   notify.success(`${saved.code} disimpan`)
+}
+
+// Transaksi proyek. Proyek yang sudah selesai atau dibatalkan hanya bisa diisi admin.
+const canRecord = computed(() => isAdmin.value || project.value?.status === 'ACTIVE')
+const transactionTable = ref<InstanceType<typeof TransactionTable> | null>(null)
+// Pilihan form baru dimuat saat pertama kali dibutuhkan.
+const transactionOptions = shallowRef<TransactionOptions | null>(null)
+const transactionFormOpen = ref(false)
+
+function openTransactionForm(): void {
+  transactionOptions.value ??= useTransactionOptions()
+  transactionFormOpen.value = true
 }
 </script>
 
@@ -123,11 +141,31 @@ function onSaved(saved: Project): void {
           <ProjectMembersPanel :project="project" @updated="project = $event" />
         </TabPanel>
         <TabPanel value="transactions">
-          <p class="text-surface-600">Daftar transaksi proyek dibangun pada fase berikutnya.</p>
+          <div v-if="canRecord" class="mb-4 flex justify-end">
+            <Button
+              label="Catat transaksi"
+              icon="pi pi-plus"
+              data-testid="add-project-transaction"
+              @click="openTransactionForm"
+            />
+          </div>
+          <TransactionTable
+            ref="transactionTable"
+            :scope="{ projectId: project.id }"
+            :show-project="false"
+          />
         </TabPanel>
       </TabPanels>
     </Tabs>
 
     <ProjectFormDialog v-if="isAdmin" v-model:visible="formOpen" :project="project" @saved="onSaved" />
+    <TransactionFormDialog
+      v-if="transactionOptions"
+      v-model:visible="transactionFormOpen"
+      :transaction="null"
+      :options="transactionOptions"
+      :preset-project="project"
+      @saved="transactionTable?.reload()"
+    />
   </template>
 </template>

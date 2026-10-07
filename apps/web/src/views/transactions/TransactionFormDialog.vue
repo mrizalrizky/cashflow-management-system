@@ -13,7 +13,7 @@ import {
   type ApprovedTransaction,
   type TransactionInput,
 } from '@/api/transactions'
-import type { Transaction, TxType } from '@/api/types'
+import type { ProjectOption, Transaction, TxType } from '@/api/types'
 import DateField from '@/components/DateField.vue'
 import FormDialog from '@/components/FormDialog.vue'
 import FormField from '@/components/FormField.vue'
@@ -47,6 +47,8 @@ const props = defineProps<{
   /** Transaksi yang diubah; null berarti mencatat transaksi baru. */
   transaction: Transaction | null
   options: TransactionOptions
+  /** Proyek yang sudah terpilih saat mencatat dari halaman sebuah proyek. */
+  presetProject?: ProjectOption
 }>()
 const emit = defineEmits<{ saved: [transaction: Transaction] }>()
 const visible = defineModel<boolean>('visible', { required: true })
@@ -146,7 +148,7 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     transactionDate: todayInJakarta(),
     accountId: null,
     categoryId: null,
-    projectId: null,
+    projectId: props.presetProject?.id ?? null,
     description: '',
     approveNow: false,
   }),
@@ -235,7 +237,8 @@ const categoryOptions = computed(() =>
   ),
 )
 const projectOptions = computed(() => {
-  const project = current.value?.project
+  // Proyek transaksi ini, atau proyek halaman asalnya, tetap ditawarkan walau sudah tidak aktif.
+  const project = current.value?.project ?? props.presetProject
   return [
     // Koordinator hanya boleh mencatat untuk proyeknya; overhead bukan pilihannya.
     ...(role.value === 'PROJECT_MANAGER'

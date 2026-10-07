@@ -34,7 +34,7 @@ test('login, forced password change, user management and role limits', async ({ 
   await test.step('a reload keeps the session and the page', async () => {
     await page.reload()
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(sidebarLinks(page)).toHaveCount(5)
+    await expect(sidebarLinks(page)).toHaveCount(6)
     await expect(page.getByRole('button', { name: 'Masuk' })).toHaveCount(0)
   })
 

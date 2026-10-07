@@ -123,3 +123,15 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Satu test menjaga semua rute:** `test/route-guards.e2e-spec.ts` membaca rute yang terdaftar dan gagal bila ada rute di luar daftar terbuka yang bisa dipanggil tanpa token. Menambah rute terbuka berarti mengubah daftar di test itu.
 - **Backup mencakup database dan folder bukti sekaligus** (`scripts/backup.sh`, `scripts/restore.sh`), dengan sidik SHA-256, masa simpan 14 hari, dan pemulihan yang menolak menimpa tanpa `--force`. `scripts/restore-drill.sh` membuktikan pemulihan pada database berakhiran `_drill`. Panduannya di `docs/backup-restore.md`.
 - **Untuk Fase 6:** pasang jadwal backup (cron) di server, dan simpan salinan cadangan di luar disk aplikasi.
+
+## Fase 5b
+
+- **Halaman Audit log hanya untuk SUPER_ADMIN** (menu dan rute), dan hanya untuk dibaca: tidak ada tombol yang mengubah atau menghapus catatan.
+- **Isi catatan audit selalu ditampilkan sebagai teks biasa.** Nilai dari `before`/`after` tidak pernah dirender sebagai HTML; teks panjang dipotong pada 300 karakter dan nilai bersarang ditampilkan sebagai JSON ringkas.
+- **Yang berubah dihitung di web** dari `before` dan `after` (`lib/audit.ts`), dan ditampilkan dengan nama field seperti yang disimpan (mis. `reject_reason`). Nominal yang dikenal (`amount`, `opening_balance`, `contract_value`) ditampilkan sebagai rupiah.
+- **Tindakan atau jenis data yang belum dikenal web ditampilkan apa adanya**, bukan disembunyikan, supaya tindakan baru dari API tetap terlihat.
+- **Riwayat satu transaksi:** halaman transaksi (untuk admin) menautkan ke Audit log yang sudah tersaring pada transaksi itu (`/audit-log?entityType=transaction&entityId=...`). Alamat itu dibaca sekali saat halaman dibuka dan hanya bila bentuknya wajar.
+- **Filter pengguna di Audit log** memuat 100 pengguna pertama; cukup untuk perusahaan ini.
+- **Ekspor memakai filter yang sedang dipakai daftar di layar**: pencarian yang masih diketik dan rentang tanggal yang terbalik belum atau tidak ikut, persis seperti daftarnya. Berkasnya apa adanya dari API; web tidak mengubah isinya. Satu ekspor pada satu waktu.
+- **Ekspor hanya ada di halaman Transaksi**, tidak di tab Transaksi halaman proyek; hasil yang sama didapat dengan menyaring proyek di halaman Transaksi.
+- **Rentang tanggal untuk filter** kini satu komponen (`DateRangeFilter`), dipakai filter transaksi dan Audit log.

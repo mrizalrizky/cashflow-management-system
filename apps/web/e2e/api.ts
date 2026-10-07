@@ -9,21 +9,25 @@ export interface UploadFile {
   buffer: Buffer
 }
 
-export interface AdminApi {
+export interface ApiSession {
   post<T = unknown>(path: string, data?: unknown): Promise<T>
   put<T = unknown>(path: string, data: unknown): Promise<T>
   upload(path: string, file: UploadFile): Promise<void>
 }
 
 /**
- * Menyiapkan data test langsung lewat API atas nama admin, supaya tiap file test browser tidak
- * bergantung pada data file lain. Admin harus sudah memakai password tetapnya (lihat `signIn`).
+ * Memanggil API langsung atas nama seorang pengguna, untuk menyiapkan data test tanpa
+ * bergantung pada file test lain. Pengguna itu harus sudah memakai password tetapnya
+ * (lihat `signIn`), karena password sementara tidak boleh dipakai selain untuk menggantinya.
  */
-export async function adminApi(request: APIRequestContext): Promise<AdminApi> {
+export async function apiAs(
+  request: APIRequestContext,
+  account: { email: string; password: string },
+): Promise<ApiSession> {
   const login = await request.post(`${API}/auth/login`, {
-    data: { email: ADMIN.email, password: ADMIN.password },
+    data: { email: account.email, password: account.password },
   })
-  expect(login.ok(), 'admin login lewat API').toBe(true)
+  expect(login.ok(), `login ${account.email} lewat API`).toBe(true)
   const headers = { Authorization: `Bearer ${(await login.json()).accessToken}` }
 
   async function send<T>(method: 'post' | 'put', path: string, options: object): Promise<T> {
@@ -37,4 +41,8 @@ export async function adminApi(request: APIRequestContext): Promise<AdminApi> {
     put: (path, data) => send('put', path, { data }),
     upload: (path, file) => send('post', path, { multipart: { file } }),
   }
+}
+
+export function adminApi(request: APIRequestContext): Promise<ApiSession> {
+  return apiAs(request, ADMIN)
 }

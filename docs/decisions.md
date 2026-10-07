@@ -149,3 +149,8 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Dockerfile tanpa baris `# syntax=`**, supaya membangun image tidak bergantung pada pengambilan tambahan dari Docker Hub. Pemasangan dependensi web memeriksa paket bawaan platform di langkah yang sama, supaya unduhan yang gagal tidak tersimpan diam-diam di cache.
 - **Cadangan dan pemulihan dijalankan dari image tersendiri** (klien PostgreSQL 17 dan skrip Fase 5a). Volume bukti dipasang hanya-baca di `backup`; pemulihan memakai layanan `restore` (profil `tools`) yang hanya berjalan bila dipanggil.
 - **Uji asap `deploy/smoke.sh`** mengganti Neon dengan PostgreSQL sementara dan tunnel dengan port di loopback. Sambungan tunnel dan Neon yang sebenarnya dipastikan pemilik pada pemasangan pertama.
+- **Akun dan kategori awal hanya dibuat pada pemasangan pertama** (saat admin pertama dibuat). Seed berjalan tiap deploy; bila selalu memastikan data awal ada, akun atau kategori yang sudah diganti namanya oleh admin muncul lagi. Dua kategori transfer milik sistem tetap dipastikan ada tiap kali.
+- **`GET /api/v1/health/live` tidak menyentuh database** dan dipakai pemeriksaan kesehatan container. `GET /api/v1/health` (dengan `SELECT 1`) tetap ada untuk pemantau. Pemeriksaan tiap 15 detik ke database membuat Neon tidak pernah menganggur.
+- **`DATABASE_URL` produksi memakai alamat langsung Neon** (bukan pooled), dan proyek Neon dibuat dengan PostgreSQL 17, sama dengan klien cadangan.
+- **`deploy/dc`** membungkus perintah Compose produksi, menggantikan alias shell yang hilang tiap sesi baru.
+- **Dua jaringan Docker:** `edge` (tunnel dan Caddy) dan `app` (Caddy, API, cadangan). Tunnel tidak bisa menjangkau API tanpa lewat Caddy. Log container dibatasi 5 berkas x 10 MB.

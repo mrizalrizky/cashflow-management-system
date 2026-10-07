@@ -58,11 +58,10 @@ Cadangan di disk yang sama dengan aplikasi ikut hilang bila disk itu rusak. Sali
 Skrip yang sama berjalan di dalam container, dengan variabelnya sudah diisi oleh Compose:
 
 ```bash
-alias dc='docker compose --env-file deploy/.env -f docker-compose.prod.yml'
-dc run --rm backup scripts/backup.sh                              # cadangan sekarang
-dc stop api web
-dc --profile tools run --rm restore /backups/<nama cadangan>      # tambahkan --force untuk mengganti isi
-dc up -d
+deploy/dc exec backup bash deploy/backup-loop.sh --run-once       # cadangan sekarang
+deploy/dc stop api web
+deploy/dc --profile tools run --rm restore /backups/<nama cadangan>      # tambahkan --force untuk mengganti isi
+deploy/dc up -d
 ```
 
 Bagian di bawah menjelaskan skripnya sendiri, untuk dijalankan langsung tanpa Docker.

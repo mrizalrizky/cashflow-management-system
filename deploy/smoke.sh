@@ -289,9 +289,21 @@ node -e '
   check(mount(s.api) && !mount(s.api).read_only, "api tidak bisa menulis berkas bukti");
   check(mount(s.backup)?.read_only === true, "backup bisa mengubah berkas bukti");
   check(s.restore.profiles.includes("tools"), "restore ikut menyala bersama yang lain");
+  const networks = (service) => Object.keys(service.networks ?? {}).sort().join(",");
+  check(networks(s.cloudflared) === "edge", "tunnel berada di jaringan yang sama dengan API");
+  check(networks(s.api) === "app", "API terjangkau dari jaringan tunnel");
+  check(networks(s.web) === "app,edge", "web tidak menghubungkan tunnel dan API");
+  for (const name of ["api", "web", "cloudflared", "backup"]) {
+    check(s[name].logging?.options?.["max-size"], `log ${name} tidak dibatasi`);
+  }
   if (problems.length) { console.error(problems.join("\n")); process.exit(1); }
 ' "$(hostpath "$work/config.json")" || fail "konfigurasi produksi tidak seperti yang dijanjikan"
-ok "produksi: tanpa port terbuka, NODE_ENV=production, dua proxy, urutan mulai, dan volume benar"
+ok "produksi: tanpa port terbuka, NODE_ENV=production, dua proxy, urutan mulai, jaringan, log dan volume benar"
+
+services="$(ENV_FILE="$work_host/env" deploy/dc config --services | tr -d '\r' | sort | tr '\n' ' ')"
+[ "$services" = "api backup cloudflared migrate web " ] || fail "deploy/dc tidak menjalankan Compose produksi: $services"
+if ENV_FILE="$work_host/tidak-ada" deploy/dc config > /dev/null 2>&1; then fail "deploy/dc jalan tanpa berkas env"; fi
+ok "deploy/dc memakai berkas Compose produksi dan menolak jalan tanpa berkas env"
 
 if grep -E '^\s+[A-Z_]*(PASSWORD|SECRET|TOKEN|DATABASE_URL): [^$ ]' docker-compose.prod.yml; then
   fail "ada nilai rahasia tertulis di docker-compose.prod.yml"

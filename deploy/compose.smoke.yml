@@ -11,6 +11,7 @@ services:
     # Di memori: hilang bersama container-nya.
     tmpfs:
       - /var/lib/postgresql/data
+    networks: [app]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U smoke -d cashflow"]
       interval: 2s

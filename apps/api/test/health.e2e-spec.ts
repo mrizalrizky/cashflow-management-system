@@ -38,6 +38,22 @@ describe('GET /api/v1/health', () => {
     expect(JSON.stringify(res.body)).not.toContain('connection refused');
   });
 
+  it('reports the application itself as alive without touching the database', async () => {
+    const queries = vi.fn<() => Promise<never>>(() => Promise.reject(new Error('connection refused')));
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PrismaService)
+      .useValue({ $queryRaw: queries })
+      .compile();
+    app = moduleRef.createNestApplication<TestApp>();
+    configureApp(app);
+    await app.init();
+
+    const res = await request(app.getHttpServer()).get('/api/v1/health/live').expect(200);
+
+    expect(res.body).toEqual({ status: 'ok' });
+    expect(queries).not.toHaveBeenCalled();
+  });
+
   it('is not served outside the /api/v1 prefix', async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication<TestApp>();

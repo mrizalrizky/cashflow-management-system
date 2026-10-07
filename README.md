@@ -31,17 +31,16 @@ Panduan lengkap, langkah demi langkah dari server kosong: [docs/deployment.md](d
 
 ```bash
 cp deploy/env.example deploy/.env      # lalu isi; berkas ini berisi semua rahasia
-alias dc='docker compose --env-file deploy/.env -f docker-compose.prod.yml'
-dc up -d --build                       # pasang atau perbarui
+deploy/dc up -d --build                       # pasang atau perbarui
 ```
 
 | Keperluan | Perintah |
 |---|---|
-| Memasang dan memperbarui | `dc up -d --build` |
-| Migrasi database dan seed admin pertama | otomatis tiap `dc up`, oleh layanan `migrate` |
-| Cadangan sekarang | `dc run --rm backup scripts/backup.sh` (terjadwal tiap malam oleh layanan `backup`) |
-| Memulihkan | `dc --profile tools run --rm restore /backups/<nama cadangan>` |
-| Melihat log | `dc logs -f api` |
+| Memasang dan memperbarui | `deploy/dc up -d --build` |
+| Migrasi database dan seed admin pertama | otomatis tiap `deploy/dc up`, oleh layanan `migrate` |
+| Cadangan sekarang | `deploy/dc exec backup bash deploy/backup-loop.sh --run-once` (terjadwal tiap malam oleh layanan `backup`) |
+| Memulihkan | `deploy/dc --profile tools run --rm restore /backups/<nama cadangan>` |
+| Melihat log | `deploy/dc logs -f api` |
 
 Database produksi berada di Neon; server hanya menjalankan aplikasi dan menyimpan berkas bukti. Tidak ada port yang dibuka: lalu lintas masuk lewat Cloudflare Tunnel. Susunan yang sama bisa diuji di mesin pengembangan dengan `npm run deploy:smoke`.
 

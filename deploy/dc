@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Docker Compose untuk pemasangan produksi, dengan berkas env dan berkas Compose yang benar.
+# Bisa dipanggil dari folder mana pun, juga lewat sudo:
+#
+#   deploy/dc up -d --build        memasang atau memperbarui
+#   deploy/dc ps                   melihat keadaan
+#   deploy/dc logs -f api          melihat log
+#
+# Berkas env bawaannya deploy/.env; ganti dengan variabel ENV_FILE bila perlu.
+
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root"
+
+env_file="${ENV_FILE:-deploy/.env}"
+[ -f "$env_file" ] || {
+  echo "Berkas env tidak ditemukan: $env_file. Salin deploy/env.example menjadi deploy/.env lalu isi." >&2
+  exit 1
+}
+
+exec docker compose --env-file "$env_file" -f docker-compose.prod.yml "$@"

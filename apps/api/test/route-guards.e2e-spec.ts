@@ -10,7 +10,13 @@ interface Route {
 }
 
 /** Rute yang sengaja terbuka tanpa login. Menambah isi daftar ini adalah keputusan keamanan. */
-const PUBLIC = ['GET /api/v1/health', 'POST /api/v1/auth/login', 'POST /api/v1/auth/refresh', 'POST /api/v1/auth/logout'];
+const PUBLIC = [
+  'GET /api/v1/health',
+  'GET /api/v1/health/live',
+  'POST /api/v1/auth/login',
+  'POST /api/v1/auth/refresh',
+  'POST /api/v1/auth/logout',
+];
 
 /** Rute yang hanya untuk SUPER_ADMIN; peran lain harus ditolak sebelum apa pun diproses. */
 const ADMIN_ONLY = [

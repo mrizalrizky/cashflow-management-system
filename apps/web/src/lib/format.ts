@@ -2,6 +2,8 @@ const DATE_OPTIONS = { day: '2-digit', month: 'short', year: 'numeric' } as cons
 const JAKARTA = new Intl.DateTimeFormat('id-ID', { ...DATE_OPTIONS, timeZone: 'Asia/Jakarta' })
 const UTC = new Intl.DateTimeFormat('id-ID', { ...DATE_OPTIONS, timeZone: 'UTC' })
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
+const CALENDAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
+const MONTH = new Intl.DateTimeFormat('id-ID', { month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 function toParts(formatter: Intl.DateTimeFormat, date: Date): string {
   const parts = Object.fromEntries(formatter.formatToParts(date).map((p) => [p.type, p.value]))
@@ -35,4 +37,13 @@ export function fromLocalDate(date: Date | null | undefined): string | null {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${date.getFullYear()}-${month}-${day}`
+}
+
+/** Bulan kalender `YYYY-MM` sebagai `MMM yyyy`, mis. `Okt 2026`. */
+export function formatMonth(value: string | null | undefined): string {
+  if (!value || !CALENDAR_MONTH.test(value)) return '-'
+  const parts = Object.fromEntries(
+    MONTH.formatToParts(new Date(`${value}-01T00:00:00.000Z`)).map((p) => [p.type, p.value]),
+  )
+  return `${parts.month} ${parts.year}`
 }

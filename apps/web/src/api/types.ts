@@ -146,3 +146,61 @@ export interface Transaction {
   createdAt: string
   updatedAt: string
 }
+
+/** Rentang tanggal kalender `YYYY-MM-DD`; kedua ujungnya ikut dihitung. */
+export interface Period {
+  from: string
+  to: string
+}
+
+/** Nominal laporan berupa string digit; `net` (masuk dikurangi keluar) bisa diawali `-`. */
+export interface Cashflow {
+  income: string
+  expense: string
+  net: string
+}
+
+export interface CategoryAmount {
+  categoryId: string
+  name: string
+  amount: string
+}
+
+export interface AccountBalance {
+  id: string
+  name: string
+  type: AccountType
+  isActive: boolean
+  /** Saldo saat ini, bukan saldo pada akhir periode. */
+  balance: string
+}
+
+export interface CompanyDashboard {
+  period: Period
+  accounts: AccountBalance[]
+  totalBalance: string
+  totals: Cashflow
+  /** Satu entri per bulan (`YYYY-MM`) dalam periode, berurutan. */
+  monthly: (Cashflow & { month: string })[]
+  expenseByCategory: CategoryAmount[]
+  expenseByScope: { overhead: string; project: string }
+  recentTransactions: Transaction[]
+  /** Transaksi yang menunggu ditinjau, tanpa melihat periode. */
+  pendingCount: number
+}
+
+/** Ringkasan sepanjang umur proyek; hanya transaksi yang disetujui yang dihitung. */
+export interface ProjectSummary {
+  projectId: string
+  contractValue: string
+  received: string
+  /** Nilai kontrak dikurangi yang diterima; negatif bila yang diterima melebihi kontrak. */
+  outstanding: string
+  /** Dua desimal; null bila nilai kontrak 0. */
+  receivedPercent: number | null
+  cost: string
+  /** Yang diterima dikurangi biaya. */
+  cashDifference: string
+  costByCategory: CategoryAmount[]
+  pendingCount: number
+}

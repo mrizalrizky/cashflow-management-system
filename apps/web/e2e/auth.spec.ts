@@ -1,28 +1,12 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { ADMIN } from './env'
+import { changePassword, horizontalOverflow, login, sidebarLinks } from './helpers'
 
 const STAFF = {
   name: 'Siti Lapangan',
   email: 'siti@example.com',
   temporaryPassword: 'sementara-siti-1',
   password: 'password-siti-1',
-}
-
-async function login(page: Page, email: string, password: string): Promise<void> {
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password', { exact: true }).fill(password)
-  await page.getByRole('button', { name: 'Masuk' }).click()
-}
-
-async function changePassword(page: Page, current: string, next: string): Promise<void> {
-  await page.getByLabel('Password saat ini').fill(current)
-  await page.getByLabel('Password baru', { exact: true }).fill(next)
-  await page.getByLabel('Ulangi password baru').fill(next)
-  await page.getByRole('button', { name: 'Simpan password' }).click()
-}
-
-function sidebarLinks(page: Page) {
-  return page.getByTestId('sidebar').getByRole('link')
 }
 
 test('login, forced password change, user management and role limits', async ({ page }) => {
@@ -100,10 +84,7 @@ test('login, forced password change, user management and role limits', async ({ 
     await page.setViewportSize({ width: 360, height: 740 })
     await expect(page.getByTestId('sidebar')).toBeHidden()
 
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    )
-    expect(overflow).toBeLessThanOrEqual(0)
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
 
     await page.getByRole('button', { name: 'Buka menu' }).click()
     await expect(page.getByTestId('drawer-nav').getByRole('link', { name: 'Transaksi' })).toBeVisible()

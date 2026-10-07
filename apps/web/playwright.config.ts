@@ -29,7 +29,9 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: `npx vite --port ${WEB_PORT} --strictPort`,
+      // Hasil build produksi, bukan server pengembangan: itulah yang dipakai pengguna, dan
+      // server pengembangan memuat ulang halaman saat menemukan dependensi baru.
+      command: `npx vite build --outDir dist-browser-test && npx vite preview --outDir dist-browser-test --port ${WEB_PORT} --strictPort`,
       env: { API_PROXY_TARGET: API_URL },
       url: WEB_URL,
       reuseExistingServer: false,

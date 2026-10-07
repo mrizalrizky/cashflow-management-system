@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
+import { reloadOnChunkError } from './chunk-errors'
 import { resolveNavigation } from './guards'
 import { routes } from './routes'
 
@@ -14,5 +15,7 @@ router.beforeEach(async (to) => {
   await session.restore()
   return resolveNavigation({ user: session.user, to })
 })
+
+reloadOnChunkError(router)
 
 export default router

@@ -18,8 +18,11 @@ const props = defineProps<{ log: AuditLog | null }>()
 const visible = defineModel<boolean>('visible', { required: true })
 
 const changes = computed(() => (props.log ? changedFields(props.log.before, props.log.after) : []))
-/** Tanpa keadaan sebelumnya, catatan ini adalah pembuatan data. */
-const isNewRecord = computed(() => props.log !== null && props.log.before === null && props.log.after !== null)
+/** Judul rincian: hanya tindakan membuat yang menghasilkan data baru. */
+const heading = computed(() => {
+  if (props.log?.action === 'CREATE') return 'Data baru'
+  return props.log?.before ? 'Yang berubah' : 'Rincian'
+})
 /** Hanya transaksi yang punya halaman sendiri, dan hanya bila id-nya memang sebuah id. */
 const transactionLink = computed(() =>
   props.log?.entityType === 'transaction' && UUID.test(props.log.entityId)
@@ -72,14 +75,14 @@ const transactionLink = computed(() =>
 
       <p v-if="changes.length === 0" class="text-surface-500">Tidak ada rincian perubahan</p>
       <template v-else>
-        <h3 class="mb-2 font-semibold">{{ isNewRecord ? 'Data baru' : 'Yang berubah' }}</h3>
+        <h3 class="mb-2 font-semibold">{{ heading }}</h3>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-surface-200 text-left text-surface-500">
-                <th class="py-1 pr-3 font-medium">Field</th>
-                <th class="py-1 pr-3 font-medium">Sebelum</th>
-                <th class="py-1 font-medium">Sesudah</th>
+                <th scope="col" class="py-1 pr-3 font-medium">Isian</th>
+                <th scope="col" class="py-1 pr-3 font-medium">Sebelum</th>
+                <th scope="col" class="py-1 font-medium">Sesudah</th>
               </tr>
             </thead>
             <tbody>

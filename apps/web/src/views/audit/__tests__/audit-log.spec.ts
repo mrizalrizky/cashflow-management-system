@@ -293,6 +293,17 @@ describe('AuditLogDetailDialog', () => {
     ])
   })
 
+  it('does not call an entry a new record unless it created one', async () => {
+    const failed = makeLog({ id: 'l-gagal', action: 'LOGIN_FAILED', entityType: 'user', before: null, after: { email: 'siapa@example.com' } })
+    const { wrapper } = await mountLog([failed])
+    await openDetail(wrapper, 'l-gagal')
+
+    const dialog = wrapper.get('[role="dialog"]')
+    expect(dialog.text()).not.toContain('Data baru')
+    expect(dialog.text()).toContain('Rincian')
+    expect(dialog.text()).toContain('siapa@example.com')
+  })
+
   it('says so when an entry recorded no details', async () => {
     const { wrapper } = await mountLog()
     await openDetail(wrapper, 'l-login')
@@ -319,6 +330,6 @@ describe('AuditLogDetailDialog', () => {
     expect((window as unknown as { dibajak?: boolean }).dibajak).toBeUndefined()
     expect(dialog.text()).toContain('{"status":"PENDING"}')
     const note = dialog.findAll('[data-testid="change-row"]').find((row) => row.text().startsWith('note'))!
-    expect(note.findAll('td')[2]!.text()).toHaveLength(301)
+    expect(note.findAll('td')[2]!.text()).toHaveLength(2001)
   })
 })

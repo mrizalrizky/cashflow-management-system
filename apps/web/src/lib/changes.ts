@@ -13,3 +13,8 @@ export function omit<T extends object, K extends keyof T>(value: T, key: K): Omi
   delete copy[key]
   return copy
 }
+
+/** Benar bila `key` adalah milik objek itu sendiri, bukan warisan seperti `constructor`. */
+export function hasOwn(value: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key)
+}

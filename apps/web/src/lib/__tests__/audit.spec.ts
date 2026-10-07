@@ -85,6 +85,11 @@ describe('audit labels', () => {
     expect(auditActionLabel('ARCHIVE')).toBe('ARCHIVE')
     expect(auditEntityLabel('invoice')).toBe('invoice')
   })
+
+  it('does not mistake a built-in property name for a label', () => {
+    expect(auditEntityLabel('constructor')).toBe('constructor')
+    expect(auditActionLabel('toString')).toBe('toString')
+  })
 })
 
 describe('describeValue', () => {
@@ -119,11 +124,26 @@ describe('describeValue', () => {
     expect(describeValue('removed_project_ids', ['p1', 'p2'])).toBe('["p1","p2"]')
   })
 
-  it('cuts very long text', () => {
-    const text = describeValue('description', 'x'.repeat(5000))
+  it('shows a full-length reason or description whole, and cuts only absurdly long text', () => {
+    // API mengizinkan 500 karakter; semuanya harus terbaca.
+    expect(describeValue('reject_reason', 'x'.repeat(500))).toHaveLength(500)
 
-    expect(text).toHaveLength(301)
+    const text = describeValue('description', 'x'.repeat(5000))
+    expect(text).toHaveLength(2001)
     expect(text.endsWith('…')).toBe(true)
+  })
+
+  it('shows timestamps in Jakarta time and calendar dates as dates', () => {
+    expect(describeValue('updated_at', '2026-10-06T17:30:00.000Z')).toBe('07 Okt 2026 00.30')
+    expect(describeValue('reviewed_at', '2026-10-06T03:05:00.000Z')).toBe('06 Okt 2026 10.05')
+    expect(describeValue('start_date', '2026-10-01T00:00:00.000Z')).toBe('01 Okt 2026')
+    expect(describeValue('transaction_date', '2026-10-01')).toBe('01 Okt 2026')
+  })
+
+  it('leaves a value alone when a date-like field does not hold a date', () => {
+    expect(describeValue('updated_at', 'kemarin')).toBe('kemarin')
+    expect(describeValue('start_date', 'segera')).toBe('segera')
+    expect(describeValue('created_at', null)).toBe('-')
   })
 })
 
@@ -160,13 +180,37 @@ describe('changedFields', () => {
 
   it('includes a field present on one side only', () => {
     expect(changedFields({ a: 1 }, { a: 1, updated_at: '2026-10-06T03:00:00.000Z' })).toEqual([
-      { field: 'updated_at', before: '-', after: '2026-10-06T03:00:00.000Z' },
+      { field: 'updated_at', before: '-', after: '06 Okt 2026 10.00' },
     ])
   })
 
   it('treats a snapshot that is not an object as one value', () => {
     expect(changedFields('lama', 'baru')).toEqual([{ field: 'nilai', before: 'lama', after: 'baru' }])
     expect(changedFields(null, ['a'])).toEqual([{ field: 'nilai', before: '-', after: '["a"]' }])
+  })
+
+  it('notices a change far into a long text', () => {
+    const start = 'x'.repeat(350)
+
+    const changes = changedFields({ description: `${start} lama` }, { description: `${start} baru` })
+
+    expect(changes).toHaveLength(1)
+    expect(changes[0]!.before.endsWith(' lama')).toBe(true)
+    expect(changes[0]!.after.endsWith(' baru')).toBe(true)
+  })
+
+  it('notices a change at the end of a long list', () => {
+    const ids = Array.from({ length: 12 }, (_unused, i) => `11111111-2222-4333-8444-${String(i).padStart(12, '0')}`)
+
+    expect(changedFields({ user_ids: ids.slice(0, 11) }, { user_ids: ids })).toHaveLength(1)
+  })
+
+  it('treats empty, null and missing as the same absence', () => {
+    expect(changedFields({ note: null, reason: '' }, { note: '', other: null })).toEqual([])
+  })
+
+  it('reads only the fields a snapshot really has', () => {
+    expect(changedFields({ constructor: 'a' }, {})).toEqual([{ field: 'constructor', before: 'a', after: '-' }])
   })
 
   it('compares nested values by content', () => {

@@ -127,7 +127,7 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 ## Fase 5b
 
 - **Halaman Audit log hanya untuk SUPER_ADMIN** (menu dan rute), dan hanya untuk dibaca: tidak ada tombol yang mengubah atau menghapus catatan.
-- **Isi catatan audit selalu ditampilkan sebagai teks biasa.** Nilai dari `before`/`after` tidak pernah dirender sebagai HTML; teks panjang dipotong pada 300 karakter dan nilai bersarang ditampilkan sebagai JSON ringkas.
+- **Isi catatan audit selalu ditampilkan sebagai teks biasa.** Nilai dari `before`/`after` tidak pernah dirender sebagai HTML; teks ditampilkan utuh sampai 2.000 karakter (batas API 500) dan nilai bersarang ditampilkan sebagai JSON ringkas. Perubahan dibandingkan pada nilai aslinya, dan waktu di dalam catatan (`*_at`, `*_date`) ditampilkan dalam waktu Jakarta seperti di halaman lain.
 - **Yang berubah dihitung di web** dari `before` dan `after` (`lib/audit.ts`), dan ditampilkan dengan nama field seperti yang disimpan (mis. `reject_reason`). Nominal yang dikenal (`amount`, `opening_balance`, `contract_value`) ditampilkan sebagai rupiah.
 - **Tindakan atau jenis data yang belum dikenal web ditampilkan apa adanya**, bukan disembunyikan, supaya tindakan baru dari API tetap terlihat.
 - **Riwayat satu transaksi:** halaman transaksi (untuk admin) menautkan ke Audit log yang sudah tersaring pada transaksi itu (`/audit-log?entityType=transaction&entityId=...`). Alamat itu dibaca sekali saat halaman dibuka dan hanya bila bentuknya wajar.

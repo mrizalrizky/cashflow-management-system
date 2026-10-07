@@ -1,4 +1,5 @@
 import type { AccountType, ProjectStatus, Role, TxStatus, TxType } from '@/api/types'
+import { hasOwn } from './changes'
 
 export interface Option<T> {
   value: T
@@ -72,7 +73,7 @@ export const ACTIVE_OPTIONS: Option<boolean>[] = [
  */
 function openLabelSet(labels: Record<string, string>) {
   return {
-    label: (value: string): string => labels[value] ?? value,
+    label: (value: string): string => (hasOwn(labels, value) ? labels[value]! : value),
     options: Object.entries(labels).map(([value, label]) => ({ value, label })),
   }
 }

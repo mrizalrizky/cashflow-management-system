@@ -70,7 +70,7 @@ TZ=Asia/Jakarta
 # Compose services: migrate (one-shot), api, web, cloudflared, backup
 # Set by Compose, not by the operator: NODE_ENV=production, PORT=3000, TRUST_PROXY_HOPS=2
 #   (Cloudflare, then Caddy), STORAGE_DIR=/data/storage, CORS_ORIGINS empty
-# Cloudflare dashboard: the tunnel's public hostname points at http://web:80
+# Cloudflare dashboard: the tunnel's public hostname points at http://web:8080
 
 # deploy/smoke.sh  (no arguments)  exit 0 when a from-zero deployment passes every check
 ```
@@ -154,7 +154,7 @@ TZ=Asia/Jakarta
 
 **Files:** Create `docs/deployment.md`. Modify `README.md`, `docs/security-checklist.md`, `docs/backup-restore.md`, `docs/decisions.md`.
 
-- [ ] **Step 1: Write `docs/deployment.md`** as numbered steps a person who has never seen the project can follow on a fresh Linux server: what is needed (Docker with Compose, a domain on Cloudflare, a Neon database); creating the tunnel in the Cloudflare dashboard and pointing its public hostname at `http://web:80`; recommended Cloudflare settings (Always Use HTTPS, HSTS without subdomains, upload size note); getting the code; copying `deploy/env.example` and filling each value, with how to generate the secrets; starting; first login and the forced password change; where the data lives; updating to a new version; viewing logs; stopping; the nightly backup, where files land, and keeping copies off the server; restoring; and a short "if something goes wrong" list (a required variable missing, tunnel not connecting, API unhealthy, database unreachable, disk full).
+- [ ] **Step 1: Write `docs/deployment.md`** as numbered steps a person who has never seen the project can follow on a fresh Linux server: what is needed (Docker with Compose, a domain on Cloudflare, a Neon database); creating the tunnel in the Cloudflare dashboard and pointing its public hostname at `http://web:8080`; recommended Cloudflare settings (Always Use HTTPS, HSTS without subdomains, upload size note); getting the code; copying `deploy/env.example` and filling each value, with how to generate the secrets; starting; first login and the forced password change; where the data lives; updating to a new version; viewing logs; stopping; the nightly backup, where files land, and keeping copies off the server; restoring; and a short "if something goes wrong" list (a required variable missing, tunnel not connecting, API unhealthy, database unreachable, disk full).
 - [ ] **Step 2: Verify the guide** by following every local step literally on this machine with throwaway values (the path the smoke test automates). The two steps that need the owner's real accounts (creating the tunnel, connecting to Neon) are marked in the guide as verified by the owner on first deployment. Record the date and versions.
 - [ ] **Step 3: Update** the README (short "Menjalankan di server" section linking to the guide; install, migrate, seed, backup and restore each named with their command), the security checklist (scheduling and `NODE_ENV=production` now met, with evidence), the backup guide (the container commands; Neon as the database), and this phase's rulings in `docs/decisions.md`.
 - [ ] **Step 4: Commit** `docs: add the deployment guide`.

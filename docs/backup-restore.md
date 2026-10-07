@@ -47,11 +47,25 @@ Contoh baris cron (pukul 01.30 waktu server), dengan variabel disimpan di berkas
 
 `/etc/cashflow/backup.env` berisi `export DATABASE_URL=...`, `export STORAGE_DIR=...`, `export BACKUP_DIR=...` (dan `export PG_PREFIX=...` bila perlu), dengan izin `chmod 600`.
 
-Pemasangan jadwal ini di server adalah bagian dari deployment (Fase 6).
+Di pemasangan dengan Docker (lihat [deployment.md](deployment.md)) baris cron ini tidak diperlukan: layanan `backup` menjalankan cadangan tiap malam pukul `BACKUP_AT`, dan databasenya adalah Neon.
 
 ### Simpan salinan di tempat lain
 
 Cadangan di disk yang sama dengan aplikasi ikut hilang bila disk itu rusak. Salin `BACKUP_DIR` secara berkala ke tempat lain (disk lain, NAS, atau penyimpanan awan), mis. dengan `rsync`. Cadangan tidak dienkripsi; enkripsi dulu sebelum menyimpannya di tempat yang tidak sepenuhnya Anda kuasai.
+
+## Di pemasangan dengan Docker
+
+Skrip yang sama berjalan di dalam container, dengan variabelnya sudah diisi oleh Compose:
+
+```bash
+alias dc='docker compose --env-file deploy/.env -f docker-compose.prod.yml'
+dc run --rm backup scripts/backup.sh                              # cadangan sekarang
+dc stop api web
+dc --profile tools run --rm restore /backups/<nama cadangan>      # tambahkan --force untuk mengganti isi
+dc up -d
+```
+
+Bagian di bawah menjelaskan skripnya sendiri, untuk dijalankan langsung tanpa Docker.
 
 ## Memulihkan
 

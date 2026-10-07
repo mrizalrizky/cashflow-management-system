@@ -135,3 +135,17 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Ekspor memakai filter yang sedang dipakai daftar di layar**: pencarian yang masih diketik dan rentang tanggal yang terbalik belum atau tidak ikut, persis seperti daftarnya. Berkasnya apa adanya dari API; web tidak mengubah isinya. Satu ekspor pada satu waktu.
 - **Ekspor hanya ada di halaman Transaksi**, tidak di tab Transaksi halaman proyek; hasil yang sama didapat dengan menyaring proyek di halaman Transaksi.
 - **Rentang tanggal untuk filter** kini satu komponen (`DateRangeFilter`), dipakai filter transaksi dan Audit log.
+
+## Fase 6
+
+- **Database produksi di Neon, bukan container.** Keputusan pemilik; menyimpang dari baris Compose di spec (yang menyebut `postgres`). Aplikasi menyambung lewat `DATABASE_URL`; cadangan men-dump Neon lewat jaringan.
+- **Jalan masuk lewat Cloudflare Tunnel; tidak ada port yang dibuka di server.** Keputusan pemilik, supaya alamat IP server tidak terlihat. HTTPS diakhiri di Cloudflare; HSTS diatur di dasbor Cloudflare dan tidak lagi dikirim API.
+- **Satu container Caddy, bukan nginx ditambah Caddy:** menyajikan web hasil build, meneruskan `/api`, dan mengompresi jawaban (gzip/zstd). HTTP biasa di port 8080 di dalam jaringan Docker, tanpa hak root.
+- **`TRUST_PROXY_HOPS=2`** (Cloudflare, lalu Caddy), ditetapkan di berkas Compose. Bila susunan proxy berubah, angka ini harus ikut diubah supaya batas percobaan login tetap per pengunjung.
+- **Batas badan permintaan di Caddy 12 MB**, sedikit di atas batas unggah API (10 MB), supaya yang menjawab "berkas terlalu besar" adalah API dengan pesannya sendiri.
+- **Migrasi dan seed berjalan otomatis tiap deploy** lewat layanan sekali jalan `migrate`; `api` baru menyala setelah itu berhasil.
+- **Compose menolak jalan bila nilai wajib kosong**, dan `NODE_ENV=production` ditetapkan Compose sendiri, bukan diisi pengelola.
+- **Image runtime API tetap memuat TypeScript dan Prisma CLI** (sekitar 930 MB): keduanya ditarik sebagai dependensi produksi oleh `@nestjs/swagger` dan `@prisma/client`. Tidak dipangkas dengan tangan karena berisiko; alat pengembangan sungguhan (Vitest, Nest CLI, oxlint) tidak ikut.
+- **Dockerfile tanpa baris `# syntax=`**, supaya membangun image tidak bergantung pada pengambilan tambahan dari Docker Hub. Pemasangan dependensi web memeriksa paket bawaan platform di langkah yang sama, supaya unduhan yang gagal tidak tersimpan diam-diam di cache.
+- **Cadangan dan pemulihan dijalankan dari image tersendiri** (klien PostgreSQL 17 dan skrip Fase 5a). Volume bukti dipasang hanya-baca di `backup`; pemulihan memakai layanan `restore` (profil `tools`) yang hanya berjalan bila dipanggil.
+- **Uji asap `deploy/smoke.sh`** mengganti Neon dengan PostgreSQL sementara dan tunnel dengan port di loopback. Sambungan tunnel dan Neon yang sebenarnya dipastikan pemilik pada pemasangan pertama.

@@ -5,7 +5,7 @@ const REFRESH_PATH = '/auth/refresh'
 const REFRESH_LOCK = 'auth-refresh'
 const REFRESH_RETRY_DELAY_MS = 250
 
-/** `null` dan `undefined` sama-sama berarti "tanpa filter". */
+/** `null`, `undefined` dan teks kosong sama-sama berarti "tanpa filter". */
 export type QueryValue = string | number | boolean | null | undefined
 
 export interface RequestOptions {
@@ -60,7 +60,7 @@ export function bindSessionEvents(events: SessionEvents): void {
 function buildUrl(path: string, query: RequestOptions['query']): string {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined && value !== null) params.set(key, String(value))
+    if (value !== undefined && value !== null && value !== '') params.set(key, String(value))
   }
   const search = params.toString()
   return `${BASE_URL}${path}${search ? `?${search}` : ''}`

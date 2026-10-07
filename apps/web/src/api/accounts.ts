@@ -1,5 +1,5 @@
 import { request } from './http'
-import type { Account, AccountType, PageParams, Paginated } from './types'
+import type { Account, AccountOption, AccountType, PageParams, Paginated } from './types'
 
 /** `null` diperlakukan sama dengan tidak diisi (nilai dari dropdown yang dikosongkan). */
 export interface AccountFilters {
@@ -26,4 +26,9 @@ export function createAccount(input: CreateAccountInput): Promise<Account> {
 
 export function updateAccount(id: string, input: UpdateAccountInput): Promise<Account> {
   return request(`/accounts/${id}`, { method: 'PATCH', body: input })
+}
+
+/** Akun aktif untuk dipilih saat mencatat transaksi; tersedia untuk semua peran, tanpa saldo. */
+export function listAccountOptions(): Promise<AccountOption[]> {
+  return request('/accounts/options')
 }

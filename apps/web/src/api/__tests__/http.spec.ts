@@ -79,6 +79,14 @@ describe('http client', () => {
       expect(urlOf(fetchMock.mock.calls[0]!)).toBe('/api/v1/users?page=1')
     })
 
+    it('treats an empty text query value as absent too', async () => {
+      respond(() => json(200, {}))
+
+      await http.request('/transactions', { query: { page: 1, search: '', dateFrom: '' } })
+
+      expect(urlOf(fetchMock.mock.calls[0]!)).toBe('/api/v1/transactions?page=1')
+    })
+
     it('sends a JSON body only when there is one', async () => {
       respond(() => json(200, {}))
 

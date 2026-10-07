@@ -39,6 +39,7 @@ export interface SessionResponse {
 export type AccountType = 'CASH' | 'BANK'
 export type TxType = 'IN' | 'OUT'
 export type ProjectStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
+export type TxStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID'
 
 /** Nominal (`openingBalance`, `balance`, `contractValue`) selalu string digit. */
 export interface Account {
@@ -77,6 +78,71 @@ export interface Project {
   endDate: string | null
   notes: string | null
   members: ProjectMember[]
+  createdAt: string
+  updatedAt: string
+}
+
+/** Pilihan akun untuk input transaksi; sengaja tanpa saldo. */
+export interface AccountOption {
+  id: string
+  name: string
+  type: AccountType
+}
+
+/** Proyek aktif yang boleh dipilih pengguna saat mencatat transaksi. */
+export interface ProjectOption {
+  id: string
+  code: string
+  name: string
+}
+
+export interface NamedRef {
+  id: string
+  name: string
+}
+
+export interface Attachment {
+  id: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  createdAt: string
+}
+
+/** Yang boleh dilakukan pengguna saat ini pada sebuah transaksi; ditentukan oleh API. */
+export interface TransactionPermissions {
+  canEdit: boolean
+  canCancel: boolean
+  /** Menyetujui atau menolak. */
+  canReview: boolean
+  canVoid: boolean
+  /** Menambah atau menghapus bukti. */
+  canAttach: boolean
+}
+
+/** `amount` string digit; `transactionDate` tanggal kalender `YYYY-MM-DD`. */
+export interface Transaction {
+  id: string
+  type: TxType
+  amount: string
+  transactionDate: string
+  description: string
+  status: TxStatus
+  account: NamedRef
+  category: NamedRef
+  /** `null` berarti overhead perusahaan. */
+  project: (NamedRef & { code: string }) | null
+  isTransfer: boolean
+  transferGroupId: string | null
+  createdBy: NamedRef
+  reviewedBy: NamedRef | null
+  reviewedAt: string | null
+  rejectReason: string | null
+  voidedBy: NamedRef | null
+  voidedAt: string | null
+  voidReason: string | null
+  attachments: Attachment[]
+  permissions: TransactionPermissions
   createdAt: string
   updatedAt: string
 }

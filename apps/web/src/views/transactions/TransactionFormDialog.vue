@@ -33,12 +33,13 @@ import { errorMessage } from '@/lib/errors'
 import { TX_TYPE_OPTIONS, type Option } from '@/lib/labels'
 import { MAX_PROOFS } from '@/lib/proof-files'
 import {
-  AMOUNT_MAX_DIGITS,
-  DESCRIPTION_MAX_LENGTH,
-  negativeBalanceWarning,
-  OVERHEAD,
-} from '@/lib/transactions'
-import { collectErrors, money, required } from '@/lib/validation'
+  amountRules,
+  chosen,
+  descriptionRules,
+  transactionDateRules,
+} from '@/lib/transaction-rules'
+import { negativeBalanceWarning, OVERHEAD } from '@/lib/transactions'
+import { collectErrors } from '@/lib/validation'
 import { transactionPath } from '@/router/paths'
 import { useSessionStore } from '@/stores/session'
 
@@ -73,33 +74,14 @@ interface Form {
 const files = ref<File[]>([])
 const isResubmit = computed(() => props.transaction?.status === 'REJECTED')
 
-function chooseOne(label: string) {
-  return (value: unknown) => (value ? null : `${label} wajib dipilih`)
-}
-
 function validate(values: Form, editing: boolean): Record<string, string> {
   const errors = collectErrors(values, {
-    amount: [
-      money('Jumlah'),
-      (amount) => (/^0+$/.test(String(amount)) ? 'Jumlah harus lebih dari 0' : null),
-      (amount) => (String(amount).length > AMOUNT_MAX_DIGITS ? 'Jumlah terlalu besar' : null),
-    ],
-    transactionDate: [
-      (date) => (date ? null : 'Tanggal transaksi wajib diisi'),
-      // Tanggal kalender `YYYY-MM-DD` bisa dibandingkan langsung sebagai teks.
-      (date) =>
-        String(date) > todayInJakarta() ? 'Tanggal transaksi tidak boleh di masa depan' : null,
-    ],
-    accountId: [chooseOne('Akun')],
-    categoryId: [chooseOne('Kategori')],
-    projectId: [chooseOne('Proyek')],
-    description: [
-      required('Keterangan'),
-      (text) =>
-        String(text).trim().length > DESCRIPTION_MAX_LENGTH
-          ? `Keterangan maksimal ${DESCRIPTION_MAX_LENGTH} karakter`
-          : null,
-    ],
+    amount: amountRules(),
+    transactionDate: transactionDateRules(),
+    accountId: [chosen('Akun')],
+    categoryId: [chosen('Kategori')],
+    projectId: [chosen('Proyek')],
+    description: descriptionRules(),
   })
   if (!editing && values.approveNow && values.type === 'OUT' && files.value.length === 0) {
     errors.proof = 'Pengeluaran perlu bukti untuk langsung disetujui'

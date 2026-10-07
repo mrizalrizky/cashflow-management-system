@@ -10,6 +10,7 @@ import { useSessionStore } from '@/stores/session'
 import TransactionFilters from './TransactionFilters.vue'
 import TransactionFormDialog from './TransactionFormDialog.vue'
 import TransactionTable from './TransactionTable.vue'
+import TransferDialog from './TransferDialog.vue'
 
 const { isAdmin, role } = storeToRefs(useSessionStore())
 // Staf hanya melihat transaksinya sendiri; koordinator tidak pernah melihat overhead.
@@ -21,6 +22,7 @@ const filters = ref<Filters>({})
 
 const table = ref<InstanceType<typeof TransactionTable> | null>(null)
 const formOpen = ref(false)
+const transferOpen = ref(false)
 
 // Pemberitahuan dan perpindahan halaman diurus dialognya; halaman ini cukup memuat ulang.
 function reloadTable(): void {
@@ -37,6 +39,7 @@ function reloadTable(): void {
         icon="pi pi-arrow-right-arrow-left"
         severity="secondary"
         data-testid="add-transfer"
+        @click="transferOpen = true"
       />
       <Button
         label="Catat transaksi"
@@ -72,6 +75,12 @@ function reloadTable(): void {
   <TransactionFormDialog
     v-model:visible="formOpen"
     :transaction="null"
+    :options="options"
+    @saved="reloadTable"
+  />
+  <TransferDialog
+    v-if="isAdmin"
+    v-model:visible="transferOpen"
     :options="options"
     @saved="reloadTable"
   />

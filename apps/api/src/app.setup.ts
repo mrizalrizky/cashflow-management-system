@@ -7,11 +7,16 @@ import { installBigIntJson } from './common/bigint-json.js';
 import { createValidationPipe } from './common/validation.js';
 import { DOCS_PATH } from './docs.js';
 
-const NO_FRAMING = { frameguard: { action: 'deny' } } as const;
+/**
+ * Berlaku untuk semua jawaban: tidak boleh dibingkai, dan tanpa HSTS. HSTS diatur di proxy
+ * HTTPS di depan aplikasi (Cloudflare), yang tahu nama host-nya; dari sini ia akan ikut
+ * mengikat subdomain lain milik perusahaan.
+ */
+const COMMON = { frameguard: { action: 'deny' }, hsts: false } as const;
 
 /** API hanya mengirim JSON dan berkas: browser tidak boleh memuat atau membingkai apa pun darinya. */
 const apiHeaders = helmet({
-  ...NO_FRAMING,
+  ...COMMON,
   contentSecurityPolicy: {
     useDefaults: false,
     directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
@@ -20,7 +25,7 @@ const apiHeaders = helmet({
 
 /** Halaman dokumentasi (hanya di luar produksi) perlu memuat skrip dan gayanya sendiri. */
 const docsHeaders = helmet({
-  ...NO_FRAMING,
+  ...COMMON,
   contentSecurityPolicy: {
     useDefaults: false,
     directives: {

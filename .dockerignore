@@ -1,0 +1,25 @@
+# Yang tidak boleh masuk ke image: rahasia, hasil build lokal, data, dan berkas yang tidak dipakai.
+.git
+.superpowers
+**/node_modules
+**/dist
+**/dist-browser-test
+**/coverage
+**/test-results
+**/playwright-report
+**/*.log
+**/*.tsbuildinfo
+
+# Rahasia dan konfigurasi setempat. Contohnya saja yang boleh ikut.
+**/.env
+**/.env.*
+!**/.env.example
+deploy/.env
+
+# Data: berkas bukti hanya hidup di volume, tidak pernah di image.
+apps/api/storage
+# Dibuat ulang oleh `prisma generate` di dalam image.
+apps/api/src/generated
+
+docs
+*.md

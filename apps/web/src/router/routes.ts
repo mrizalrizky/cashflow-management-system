@@ -39,7 +39,11 @@ export const routes: RouteRecordRaw[] = [
     component: placeholder,
     meta: { roles: ['SUPER_ADMIN'], title: 'Dashboard' },
   },
-  { path: PATHS.transactions, component: placeholder, meta: { title: 'Transaksi' } },
+  {
+    path: PATHS.transactions,
+    component: () => import('@/views/transactions/TransactionsView.vue'),
+    meta: { title: 'Transaksi' },
+  },
   {
     path: PATHS.projects,
     component: () => import('@/views/projects/ProjectsView.vue'),

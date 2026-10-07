@@ -4,12 +4,15 @@ import {
   Get,
   HttpCode,
   Ip,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser, Roles } from '../auth/decorators.js';
 import type { Paginated } from '../common/pagination.js';
@@ -19,12 +22,14 @@ import {
   ReasonDto,
   RejectDto,
   ReviewDto,
+  TransactionFiltersDto,
   TransferDto,
   UpdateTransactionDto,
 } from './dto/transaction.dto.js';
 import type { TransactionResponse } from './transaction.mapper.js';
 import { ApprovalResponse, TransactionWorkflowService } from './transaction-workflow.service.js';
 import { TransactionsService } from './transactions.service.js';
+import { TransactionExportService } from './transaction-export.service.js';
 import { TransfersService } from './transfers.service.js';
 
 /**
@@ -33,10 +38,13 @@ import { TransfersService } from './transfers.service.js';
  */
 @Controller('transactions')
 export class TransactionsController {
+  private readonly logger = new Logger(TransactionsController.name);
+
   constructor(
     private readonly transactions: TransactionsService,
     private readonly workflow: TransactionWorkflowService,
     private readonly transfers: TransfersService,
+    private readonly exporter: TransactionExportService,
   ) {}
 
   @Get()
@@ -45,6 +53,38 @@ export class TransactionsController {
     @Query() query: ListTransactionsQueryDto,
   ): Promise<Paginated<TransactionResponse>> {
     return this.transactions.list(user, query);
+  }
+
+  /**
+   * Daftar yang sama sebagai berkas CSV. Didaftarkan sebelum `:id` supaya `export` tidak
+   * dibaca sebagai id. Filter dan hak diperiksa sebelum berkas mulai dikirim.
+   */
+  @Get('export')
+  async export(
+    @CurrentUser() user: AuthUser,
+    @Query() filters: TransactionFiltersDto,
+    @Ip() ip: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const prepared = await this.exporter.prepare(user, filters, ip);
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${prepared.fileName}"`,
+    });
+    try {
+      await prepared.writeTo(res);
+      res.end();
+    } catch (error) {
+      if (!res.headersSent) {
+        // Belum ada yang terkirim: jawab sebagai error biasa, bukan sebagai berkas.
+        res.removeHeader('Content-Disposition');
+        throw error;
+      }
+      // Berkas sudah mulai dikirim: sambungan diputus supaya berkas yang terpotong tidak
+      // disangka utuh, dan kegagalannya dicatat.
+      this.logger.error('Ekspor transaksi gagal di tengah jalan', error instanceof Error ? error.stack : error);
+      res.destroy();
+    }
   }
 
   @Get(':id')

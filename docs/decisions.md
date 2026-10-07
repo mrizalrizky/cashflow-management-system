@@ -110,3 +110,16 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Tab halaman proyek:** Ringkasan (dibuka lebih dulu), Transaksi, Anggota. Tab yang tidak aktif tidak dipasang, jadi ringkasan dimuat ulang tiap kali dibuka.
 - **Kontrak yang dibayar lebih** ditampilkan apa adanya: persentase di atas 100, batang kemajuan penuh, dan sisa negatif berwarna merah dengan keterangan.
 - **Test browser menyiapkan datanya sendiri lewat API** (`e2e/api.ts`), dan data dashboard diletakkan pada bulan yang tidak dipakai file lain supaya angkanya tidak bergantung pada urutan file.
+
+## Fase 5a
+
+- **Log audit hanya bisa dibaca**, oleh SUPER_ADMIN, lewat `GET /audit-logs` (filter jenis data, id data, pengguna, tindakan, dan rentang hari waktu Jakarta). Tidak ada rute untuk menambah, mengubah, atau menghapusnya.
+- **Ekspor transaksi berupa CSV** (`GET /transactions/export`), bukan `.xlsx`: UTF-8 dengan BOM dan pemisah `;`, yang dibuka Excel pada komputer berpengaturan regional Indonesia langsung sebagai kolom. Pada komputer berpengaturan regional Inggris (pemisah koma) berkas terbuka dalam satu kolom dan harus diimpor lewat Data > From Text; di sana penetralan rumus juga tidak berlaku untuk teks sesudah koma. Isinya persis daftar transaksi pengguna itu dengan filter yang sama (scope, filter dan urutan memakai fungsi yang sama dengan daftar).
+- **Sel yang bisa dibaca sebagai rumus dinetralkan:** yang diawali `=`, `+`, `-`, `@`, tab atau CR diberi tanda petik tunggal di depannya.
+- **Ekspor dialirkan per 1.000 baris**, tidak dimuat sekaligus, dan dilanjutkan dari posisi baris terakhir yang sudah dibaca (bukan dengan membaca ulang baris itu), sehingga transaksi yang diubah orang lain selagi ekspor berjalan tidak membuat baris lain terlewat. Baris yang dicatat atau diubah selagi ekspor berjalan bisa ikut atau tidak ikut dalam berkas itu.
+- **Mengekspor dicatat di log audit sebelum berkas dikirim** (`EXPORT`: siapa, filter apa, berapa baris yang cocok), sehingga memutus sambungan di tengah jalan tidak menghindari pencatatan.
+- **Header keamanan lewat `helmet`:** API hanya mengirim JSON dan berkas, jadi kebijakannya `default-src 'none'` dan tidak boleh dibingkai. Halaman dokumentasi (`/api/docs`, hanya di luar produksi) punya kebijakan sendiri yang lebih longgar.
+- **CORS tertutup secara bawaan.** Web dan API disajikan dari alamat yang sama; web lain hanya diizinkan bila alamat persisnya didaftarkan di `CORS_ORIGINS` (tanpa wildcard).
+- **Satu test menjaga semua rute:** `test/route-guards.e2e-spec.ts` membaca rute yang terdaftar dan gagal bila ada rute di luar daftar terbuka yang bisa dipanggil tanpa token. Menambah rute terbuka berarti mengubah daftar di test itu.
+- **Backup mencakup database dan folder bukti sekaligus** (`scripts/backup.sh`, `scripts/restore.sh`), dengan sidik SHA-256, masa simpan 14 hari, dan pemulihan yang menolak menimpa tanpa `--force`. `scripts/restore-drill.sh` membuktikan pemulihan pada database berakhiran `_drill`. Panduannya di `docs/backup-restore.md`.
+- **Untuk Fase 6:** pasang jadwal backup (cron) di server, dan simpan salinan cadangan di luar disk aplikasi.

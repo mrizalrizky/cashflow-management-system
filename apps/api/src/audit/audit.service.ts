@@ -19,7 +19,8 @@ export type AuditAction =
   | 'VOID'
   | 'TRANSFER'
   | 'ATTACH'
-  | 'DETACH';
+  | 'DETACH'
+  | 'EXPORT';
 
 export interface AuditEntry {
   userId: string | null;

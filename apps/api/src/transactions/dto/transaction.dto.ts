@@ -10,6 +10,7 @@ import {
 import { IsCalendarDate } from '../../common/calendar-date.js';
 import { IsPositiveMoneyString } from '../../common/money.js';
 import { IsName } from '../../common/name.js';
+import { IntersectionType } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../common/pagination.js';
 import { ToBoolean, Trim } from '../../common/transforms.js';
 import { IsOptionalNotNull } from '../../common/validation.js';
@@ -115,7 +116,8 @@ export class TransferDto {
   description: string;
 }
 
-export class ListTransactionsQueryDto extends PaginationQueryDto {
+/** Filter daftar transaksi; dipakai juga, tanpa halaman, oleh ekspor. */
+export class TransactionFiltersDto {
   @IsOptionalNotNull()
   @IsCalendarDate()
   dateFrom?: string;
@@ -162,3 +164,8 @@ export class ListTransactionsQueryDto extends PaginationQueryDto {
   @MaxLength(100)
   search?: string;
 }
+
+export class ListTransactionsQueryDto extends IntersectionType(
+  PaginationQueryDto,
+  TransactionFiltersDto,
+) {}

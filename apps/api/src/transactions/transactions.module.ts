@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AccountsModule } from '../accounts/accounts.module.js';
 import { TransactionAccessService } from './transaction-access.service.js';
+import { TransactionExportService } from './transaction-export.service.js';
 import { TransactionWorkflowService } from './transaction-workflow.service.js';
 import { TransactionsController } from './transactions.controller.js';
 import { TransactionsService } from './transactions.service.js';
@@ -13,6 +14,7 @@ import { TransfersService } from './transfers.service.js';
     TransactionsService,
     TransactionWorkflowService,
     TransfersService,
+    TransactionExportService,
     TransactionAccessService,
   ],
   // Dipakai ulang oleh modul lampiran dan, nanti, ringkasan serta ekspor.

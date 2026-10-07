@@ -17,7 +17,9 @@
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e -w api",
     "test:browser": "npm run test:browser -w web",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "backup": "bash scripts/backup.sh",
+    "backup:drill": "bash scripts/restore-drill.sh"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,

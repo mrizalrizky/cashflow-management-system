@@ -54,3 +54,35 @@ const JAKARTA_DATE = new Intl.DateTimeFormat('en-CA', {
 export function todayInJakarta(now: Date = new Date()): string {
   return JAKARTA_DATE.format(now);
 }
+
+/** Jakarta selalu UTC+7 (tanpa waktu musim panas), jadi batas harinya bisa ditulis langsung. */
+const JAKARTA_OFFSET = '+07:00';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Saat sebuah hari kalender dimulai di Jakarta, untuk menyaring kolom waktu (timestamp). */
+export function startOfJakartaDay(date: string): Date {
+  return new Date(`${date}T00:00:00.000${JAKARTA_OFFSET}`);
+}
+
+/** Saat hari itu berakhir di Jakarta (awal hari berikutnya); dipakai sebagai batas eksklusif. */
+export function endOfJakartaDay(date: string): Date {
+  return new Date(startOfJakartaDay(date).getTime() + DAY_MS);
+}
+
+const JAKARTA_TIMESTAMP = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** Sebuah saat sebagai `YYYY-MM-DD HH:mm` waktu Jakarta, mis. untuk berkas ekspor. */
+export function formatJakartaTimestamp(value: Date): string {
+  const parts = Object.fromEntries(
+    JAKARTA_TIMESTAMP.formatToParts(value).map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}

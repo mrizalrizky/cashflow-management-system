@@ -87,3 +87,15 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Pilihan di filter dan form hanya yang aktif**, kecuali milik transaksi yang sedang diubah (atau proyek halaman asalnya), yang tetap ditawarkan walau sudah nonaktif.
 - **Satu tabel transaksi** (`TransactionTable`) dipakai halaman Transaksi dan tab Transaksi di halaman proyek; batas tetap dari halaman pemakainya (`scope`) dibedakan dari filter pilihan pengguna.
 - **Nilai filter kosong tidak dikirim** ke API (teks kosong diperlakukan seperti tidak diisi), berlaku untuk semua permintaan.
+
+## Fase 4a
+
+- **Yang dihitung didefinisikan di satu tempat:** `CashflowReportService`. Hanya transaksi `APPROVED`; angka perusahaan (masuk, keluar, per bulan, per kategori) tidak menghitung transfer antar akun. Semua penjumlahan dilakukan database, bukan dengan memuat baris.
+- **Periode bawaan dashboard:** bulan berjalan dan sebelas bulan sebelumnya (waktu Jakarta). Kedua ujung periode ikut dihitung. Rentang paling lama 60 bulan.
+- **Saldo akun di dashboard selalu saldo saat ini**, bukan saldo pada akhir periode. Yang mengikuti periode hanya masuk, keluar, arus kas bulanan, dan rincian pengeluaran.
+- **Arus kas bulanan** dikelompokkan langsung pada `transaction_date` (tanggal kalender, tanpa zona waktu); bulan tanpa transaksi tetap muncul dengan nol.
+- **"10 transaksi terbaru"** adalah yang terakhir dicatat (`created_at`), apa pun statusnya, termasuk transfer. Jumlah transaksi yang menunggu tidak mengikuti periode.
+- **Ringkasan proyek mencakup seluruh umur proyek**, tanpa filter periode. Sisa belum diterima bisa negatif (diterima melebihi kontrak); persentase diterima dua desimal, dibulatkan ke bawah, dan kosong bila nilai kontrak 0. Ditambah jumlah transaksi proyek yang menunggu ditinjau.
+- **Rute `/projects/:id/summary` dikelola modul laporan** (`ReportsModule`), supaya modul proyek tidak bergantung pada modul transaksi. Aksesnya tetap lewat `ProjectAccessService`: proyek di luar jangkauan dijawab 404.
+- **Index baru `idx_transactions_status_transaction_date`** (status, tanggal transaksi). Pada 10.000 transaksi, query arus kas bulanan memakainya (Bitmap Index Scan). Migrasinya ditulis tangan (`20261007090000_report_indexes`) supaya database pengembangan tidak disentuh; jalankan `npx prisma migrate deploy` (atau `migrate dev`) untuk menerapkannya.
+- **Batas waktu respons:** dashboard dan ringkasan proyek masing-masing di bawah 1.500 ms pada 10.000 transaksi, dijaga oleh `test/report-scale.e2e-spec.ts`.

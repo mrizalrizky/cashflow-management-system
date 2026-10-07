@@ -90,9 +90,10 @@ export class CashflowReportService {
 
   /** Arus kas tiap bulan dalam periode, tanpa transfer. Bulan tanpa transaksi berisi nol. */
   async monthly(db: Db, period: Period): Promise<MonthTotals[]> {
-    // Dikelompokkan langsung pada kolom tanggal kalender, jadi tidak ada konversi zona waktu.
+    // Dikelompokkan langsung pada kolom tanggal kalender. Cast ke `timestamp` (tanpa zona)
+    // memastikan zona waktu sesi database tidak ikut campur.
     const rows = await db.$queryRaw<{ month: string; type: 'IN' | 'OUT'; total: string }[]>(Prisma.sql`
-      SELECT to_char(transaction_date, 'YYYY-MM') AS month, type::text AS type, SUM(amount)::text AS total
+      SELECT to_char(transaction_date::timestamp, 'YYYY-MM') AS month, type::text AS type, SUM(amount)::text AS total
       FROM transactions
       WHERE status = 'APPROVED'
         AND transfer_group_id IS NULL

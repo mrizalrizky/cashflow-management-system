@@ -1,23 +1,34 @@
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
-import { parseCalendarDate } from '../common/calendar-date.js';
+import { formatCalendarDate, parseCalendarDate } from '../common/calendar-date.js';
 import { toMoney } from '../common/money.js';
 import { Paginated, paginated, toSkipTake } from '../common/pagination.js';
 import { containsText } from '../common/search.js';
 import { validationFailed } from '../common/validation.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
-import type { CreateTransactionDto, ListTransactionsQueryDto } from './dto/transaction.dto.js';
+import type {
+  CreateTransactionDto,
+  ListTransactionsQueryDto,
+  UpdateTransactionDto,
+} from './dto/transaction.dto.js';
 import { TransactionAccessService } from './transaction-access.service.js';
 import {
+  toAuditSnapshot,
+  toPolicySubject,
   toTransactionResponse,
   TRANSACTION_INCLUDE,
   TransactionResponse,
 } from './transaction.mapper.js';
+import { permissionsFor } from './transaction-policy.js';
 import { ALL_REFERENCES, assertReferencesValid } from './transaction-references.js';
-
-export const TRANSACTION_ENTITY = 'transaction';
+import {
+  notAllowed,
+  TRANSACTION_ENTITY,
+  TransactionWorkflowService,
+  wrongStatus,
+} from './transaction-workflow.service.js';
 
 function toWhere(query: ListTransactionsQueryDto): Prisma.TransactionWhereInput {
   if (query.projectId && query.overhead) {
@@ -49,6 +60,7 @@ export class TransactionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: TransactionAccessService,
+    private readonly workflow: TransactionWorkflowService,
     private readonly audit: AuditService,
   ) {}
 
@@ -112,15 +124,82 @@ export class TransactionsService {
           created_by_id: user.id,
         },
       });
+      const transaction = await this.access.loadForUser(tx, actor, created.id);
       await this.audit.log(tx, {
         userId: user.id,
         action: 'CREATE',
         entityType: TRANSACTION_ENTITY,
         entityId: created.id,
-        after: created,
+        after: toAuditSnapshot(transaction),
         ip,
       });
-      return toTransactionResponse(await this.access.loadForUser(tx, actor, created.id), actor);
+      return toTransactionResponse(transaction, actor);
+    });
+  }
+
+  /**
+   * Mengubah transaksi yang belum disetujui. Transaksi REJECTED yang diubah kembali menjadi
+   * PENDING (diajukan ulang), walau isinya tidak diubah.
+   */
+  async update(
+    user: AuthUser,
+    id: string,
+    dto: UpdateTransactionDto,
+    ip: string | null,
+  ): Promise<TransactionResponse> {
+    return this.prisma.$transaction(async (tx) => {
+      const actor = await this.access.actorFor(tx, user);
+      const before = await this.access.loadForUser(tx, actor, id);
+
+      const editable = before.status === 'PENDING' || before.status === 'REJECTED';
+      if (!editable || before.transfer_group_id) throw wrongStatus('diubah');
+      if (!permissionsFor(actor, toPolicySubject(before)).canEdit) throw notAllowed('mengubah');
+
+      // Aturan yang sama dengan saat membuat, diterapkan pada hasil akhirnya.
+      const projectId = dto.projectId === undefined ? before.project_id : dto.projectId;
+      await assertReferencesValid(
+        tx,
+        actor,
+        {
+          type: dto.type ?? before.type,
+          transactionDate: dto.transactionDate ?? formatCalendarDate(before.transaction_date),
+          accountId: dto.accountId ?? before.account_id,
+          categoryId: dto.categoryId ?? before.category_id,
+          projectId,
+        },
+        {
+          account: dto.accountId !== undefined && dto.accountId !== before.account_id,
+          category: dto.categoryId !== undefined && dto.categoryId !== before.category_id,
+          project: projectId !== before.project_id,
+        },
+      );
+
+      await this.workflow.transition(tx, { id }, before.status, {
+        type: dto.type,
+        amount: dto.amount === undefined ? undefined : toMoney(dto.amount),
+        transaction_date:
+          dto.transactionDate === undefined ? undefined : parseCalendarDate(dto.transactionDate),
+        description: dto.description,
+        account_id: dto.accountId,
+        category_id: dto.categoryId,
+        project_id: projectId,
+        status: 'PENDING',
+        reviewed_by_id: null,
+        reviewed_at: null,
+        reject_reason: null,
+      });
+
+      const after = await this.access.loadForUser(tx, actor, id);
+      await this.audit.log(tx, {
+        userId: user.id,
+        action: before.status === 'REJECTED' ? 'RESUBMIT' : 'UPDATE',
+        entityType: TRANSACTION_ENTITY,
+        entityId: id,
+        before: toAuditSnapshot(before),
+        after: toAuditSnapshot(after),
+        ip,
+      });
+      return toTransactionResponse(after, actor);
     });
   }
 }

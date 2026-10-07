@@ -75,6 +75,26 @@ export function toAttachmentResponse(attachment: Attachment): AttachmentResponse
   };
 }
 
+/** Isi transaksi untuk catatan audit: kolomnya sendiri, tanpa relasi. */
+export function toAuditSnapshot(tx: TransactionWithRelations): Record<string, unknown> {
+  return {
+    type: tx.type,
+    amount: tx.amount,
+    transaction_date: formatCalendarDate(tx.transaction_date),
+    description: tx.description,
+    status: tx.status,
+    account_id: tx.account_id,
+    category_id: tx.category_id,
+    project_id: tx.project_id,
+    transfer_group_id: tx.transfer_group_id,
+    reviewed_by_id: tx.reviewed_by_id,
+    reject_reason: tx.reject_reason,
+    voided_by_id: tx.voided_by_id,
+    void_reason: tx.void_reason,
+    attachment_ids: tx.attachments.map((attachment) => attachment.id),
+  };
+}
+
 /** Bentuk transaksi yang dinilai oleh policy. */
 export function toPolicySubject(tx: TransactionWithRelations): PolicySubject {
   return {

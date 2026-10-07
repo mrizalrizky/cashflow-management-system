@@ -76,7 +76,7 @@ apps/web/e2e/transactions.spec.ts
 // api/types.ts
 export type TxStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID';
 export interface NamedRef { id: string; name: string }
-export interface Attachment { id; fileName; mimeType; sizeBytes: number; createdAt; uploadedBy: NamedRef }
+export interface Attachment { id; fileName; mimeType; sizeBytes: number; createdAt }
 export interface TransactionPermissions { canEdit; canCancel; canReview; canVoid; canAttach: boolean }
 export interface Transaction {
   id; type: TxType; amount: string; transactionDate: string; description: string; status: TxStatus;
@@ -199,7 +199,7 @@ Routes: `/transaksi` becomes the real list (all roles), `/transaksi/:id` is the 
   - `checkProofFile`: JPEG, PNG, WebP and PDF up to exactly 10 MB pass; 10 MB + 1 byte → "Berkas terlalu besar (maksimal 10 MB)"; an empty file → "Berkas kosong"; `image/heic`, a `.docx`, and a file with no type → "Jenis berkas tidak didukung. Gunakan foto (JPG, PNG, WebP) atau PDF"; for HEIC the message adds that the phone camera should be set to JPG ("Paling Kompatibel").
   - `ProofPicker`: has a file input with `accept` set to the four types and `multiple`; choosing files emits them appended to the model; dropping files does the same; a refused file is not added and its reason is listed with its name; adding more than `max` keeps the first ones that fit and says "Maksimal 10 bukti per transaksi"; each chosen file shows name and size and can be removed; the same file chosen twice is added once; `disabled` blocks choosing and dropping.
   - `useProofUpload`: uploads files one at a time in order; `uploading` is true meanwhile; a refused file is reported in `failed` with the API's message and the remaining files are still tried; nothing throws.
-  - `ProofList`: lists name, size (`1,2 MB`, `340 KB`) and uploader; "Unduh" fetches the blob and saves it under the stored name; for an image, "Lihat" opens a dialog showing it from a blob URL that is revoked when the dialog closes; a PDF has no "Lihat"; with `canRemove`, "Hapus" asks for confirmation, calls the API, emits `removed`, and shows a toast; an API refusal shows its message and emits nothing; without `canRemove` there is no remove control; an empty list reads "Belum ada bukti".
+  - `ProofList`: lists name, size (`1,2 MB`, `340 KB`) and upload date; "Unduh" fetches the blob and saves it under the stored name; for an image, "Lihat" opens a dialog showing it from a blob URL that is revoked when the dialog closes; a PDF has no "Lihat"; with `canRemove`, "Hapus" asks for confirmation, calls the API, emits `removed`, and shows a toast; an API refusal shows its message and emits nothing; without `canRemove` there is no remove control; an empty list reads "Belum ada bukti".
 - [ ] **Step 2: Run.** Expected: fail.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** tests, lint, build. Expected: pass.

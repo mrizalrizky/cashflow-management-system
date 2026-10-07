@@ -394,4 +394,71 @@ describe('http client', () => {
       expect(onForbidden).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('downloads with filters and a name', () => {
+    const csv = (disposition?: string) =>
+      new Response('isi', {
+        status: 200,
+        headers: { 'Content-Type': 'text/csv', ...(disposition ? { 'Content-Disposition': disposition } : {}) },
+      })
+
+    beforeEach(() => http.setAccessToken('token-1'))
+
+    it('asks with the given filters and reads the name the API chose', async () => {
+      respond(() => csv('attachment; filename="transaksi-20261007-1005.csv"'))
+
+      const file = await http.requestFile('/transactions/export', { status: 'PENDING', search: '', type: null })
+
+      expect(urlOf(fetchMock.mock.calls[0]!)).toBe('/api/v1/transactions/export?status=PENDING')
+      expect(headersOf(fetchMock.mock.calls[0]!).Authorization).toBe('Bearer token-1')
+      expect(file.fileName).toBe('transaksi-20261007-1005.csv')
+      expect(await file.blob.text()).toBe('isi')
+    })
+
+    it('has no name when the API sent none', async () => {
+      respond(() => csv())
+
+      expect((await http.requestFile('/attachments/a1/download')).fileName).toBeNull()
+    })
+
+    it.each([
+      ['attachment; filename="../../etc/passwd"', 'passwd'],
+      ['attachment; filename="C:\\\\Users\\\\x\\\\nota.pdf"', 'nota.pdf'],
+      ['attachment; filename=".."', null],
+      ['attachment; filename=""', null],
+      ['attachment; filename=tanpa-kutip.csv', 'tanpa-kutip.csv'],
+    ])('keeps only a plain file name from %j', async (disposition, expected) => {
+      respond(() => csv(disposition))
+
+      expect((await http.requestFile('/transactions/export')).fileName).toBe(expected)
+    })
+
+    it('refreshes and retries like any other request', async () => {
+      respond((url, init) => {
+        if (url.endsWith('/auth/refresh')) return json(200, SESSION)
+        const auth = (init.headers as Record<string, string>).Authorization
+        return auth === 'Bearer token-baru' ? csv('attachment; filename="a.csv"') : unauthorized()
+      })
+
+      expect((await http.requestFile('/transactions/export')).fileName).toBe('a.csv')
+      expect(refreshCalls()).toBe(1)
+    })
+
+    it('rejects with the API message and field errors when the filters are refused', async () => {
+      respond(() =>
+        json(400, { statusCode: 400, message: 'Validasi gagal', errors: [{ field: 'status', messages: ['tidak valid'] }] }),
+      )
+
+      const failure = await failureOf(http.requestFile('/transactions/export', { status: 'LUNAS' }))
+
+      expect(failure).toMatchObject({ statusCode: 400, message: 'Validasi gagal' })
+      expect(failure.fieldErrors).toEqual([{ field: 'status', messages: ['tidak valid'] }])
+    })
+
+    it('still offers a plain blob download', async () => {
+      respond(() => csv('attachment; filename="nota.pdf"'))
+
+      expect(await (await http.requestBlob('/attachments/a1/download')).text()).toBe('isi')
+    })
+  })
 })

@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
@@ -10,6 +12,8 @@ const testEnv = {
   JWT_ACCESS_SECRET: 'test-secret-test-secret-test-secret-1234',
   // Cukup tinggi supaya test yang sering login tidak terkena batas.
   LOGIN_RATE_LIMIT: '1000',
+  // Berkas bukti dari test tidak boleh bercampur dengan milik pengembangan.
+  STORAGE_DIR: join(tmpdir(), 'cashflow-e2e-storage'),
 };
 Object.assign(process.env, testEnv);
 

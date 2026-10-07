@@ -13,6 +13,7 @@ describe('validateEnv', () => {
     expect(env.DATABASE_URL).toBe(valid.DATABASE_URL);
     expect(env.LOGIN_RATE_LIMIT).toBe(5);
     expect(env.TRUST_PROXY_HOPS).toBe(0);
+    expect(env.STORAGE_DIR).toBe('./storage');
   });
 
   it('converts numeric variables from strings', () => {

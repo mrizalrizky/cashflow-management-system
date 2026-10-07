@@ -56,4 +56,18 @@ export class TransactionAccessService {
     if (!transaction) throw transactionNotFound();
     return transaction;
   }
+
+  /**
+   * Seperti `loadForUser`, tetapi mengunci baris transaksi sampai transaksi database selesai.
+   * Dipakai sebelum mengubah status atau bukti, supaya keduanya tidak saling mendahului
+   * (mis. bukti terakhir dihapus tepat saat pengeluaran disetujui).
+   */
+  async loadForUpdate(
+    tx: Prisma.TransactionClient,
+    actor: PolicyActor,
+    id: string,
+  ): Promise<TransactionWithRelations> {
+    await tx.$queryRaw`SELECT id FROM transactions WHERE id = ${id} FOR UPDATE`;
+    return this.loadForUser(tx, actor, id);
+  }
 }

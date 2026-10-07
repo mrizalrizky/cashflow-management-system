@@ -149,7 +149,7 @@ export class TransactionsService {
   ): Promise<TransactionResponse> {
     return this.prisma.$transaction(async (tx) => {
       const actor = await this.access.actorFor(tx, user);
-      const before = await this.access.loadForUser(tx, actor, id);
+      const before = await this.access.loadForUpdate(tx, actor, id);
 
       const editable = before.status === 'PENDING' || before.status === 'REJECTED';
       if (!editable || before.transfer_group_id) throw wrongStatus('diubah');

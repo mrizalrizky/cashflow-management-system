@@ -10,6 +10,8 @@ defineProps<{
   error?: string
   options: Option<T>[]
   placeholder?: string
+  /** Pilihannya masih dimuat. */
+  loading?: boolean
 }>()
 
 const value = defineModel<T | null>({ required: true })
@@ -23,6 +25,7 @@ const value = defineModel<T | null>({ required: true })
       option-label="label"
       option-value="value"
       :placeholder="placeholder"
+      :loading="loading"
       :invalid="field.invalid"
       :aria-labelledby="field.labelId"
       fluid

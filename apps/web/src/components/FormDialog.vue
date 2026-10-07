@@ -3,7 +3,10 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import FormAlert from '@/components/FormAlert.vue'
 
-/** Kerangka dialog berisi formulir: judul, pesan error umum, tombol Batal dan Simpan. */
+/**
+ * Kerangka dialog berisi formulir: judul, pesan error umum, tombol Batal dan Simpan.
+ * Selama formulir dikirim dialog tidak bisa ditutup, supaya hasilnya tidak terlewat.
+ */
 defineProps<{
   title: string
   submitting: boolean
@@ -21,6 +24,8 @@ const visible = defineModel<boolean>('visible', { required: true })
     :header="title"
     modal
     :draggable="false"
+    :closable="!submitting"
+    :close-on-escape="!submitting"
     :style="{ width: '28rem' }"
     :breakpoints="{ '640px': '95vw' }"
   >
@@ -33,6 +38,7 @@ const visible = defineModel<boolean>('visible', { required: true })
           label="Batal"
           severity="secondary"
           variant="text"
+          :disabled="submitting"
           @click="visible = false"
         />
         <Button

@@ -1,5 +1,5 @@
 import { request } from './http'
-import type { PageParams, Paginated, Project, ProjectStatus } from './types'
+import type { PageParams, Paginated, Project, ProjectOption, ProjectStatus } from './types'
 
 export interface ProjectFilters {
   search?: string
@@ -36,4 +36,9 @@ export function updateProject(id: string, input: UpdateProjectInput): Promise<Pr
 /** Mengganti seluruh daftar koordinator proyek. */
 export function setProjectMembers(id: string, userIds: string[]): Promise<Project> {
   return request(`/projects/${id}/members`, { method: 'PUT', body: { userIds } })
+}
+
+/** Proyek aktif yang boleh dipilih pengguna saat mencatat transaksi. */
+export function listProjectOptions(): Promise<ProjectOption[]> {
+  return request('/projects/options')
 }

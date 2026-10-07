@@ -5,12 +5,15 @@ const REFRESH_PATH = '/auth/refresh'
 const REFRESH_LOCK = 'auth-refresh'
 const REFRESH_RETRY_DELAY_MS = 250
 
-/** `null` dan `undefined` sama-sama berarti "tanpa filter". */
+/** `null`, `undefined` dan teks kosong sama-sama berarti "tanpa filter". */
 export type QueryValue = string | number | boolean | null | undefined
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
+  /** Dikirim sebagai JSON. */
   body?: unknown
+  /** Dikirim apa adanya (unggah berkas); tidak bisa bersama `body`. */
+  form?: FormData
   query?: Record<string, QueryValue>
   /** `false` untuk rute tanpa access token (login, refresh, logout). */
   auth?: boolean
@@ -57,7 +60,7 @@ export function bindSessionEvents(events: SessionEvents): void {
 function buildUrl(path: string, query: RequestOptions['query']): string {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined && value !== null) params.set(key, String(value))
+    if (value !== undefined && value !== null && value !== '') params.set(key, String(value))
   }
   const search = params.toString()
   return `${BASE_URL}${path}${search ? `?${search}` : ''}`
@@ -73,10 +76,36 @@ function toApiError(status: number, payload: unknown): ApiError {
   return new ApiError(status, `Terjadi kesalahan pada server (${status})`)
 }
 
-/** Satu request ke API, tanpa percobaan ulang. Setiap kegagalan menjadi `ApiError`. */
-async function send<T>(path: string, options: RequestOptions): Promise<T> {
+async function readJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json()
+  } catch {
+    // Mis. halaman HTML dari proxy; bukan jawaban API.
+    throw new ApiError(response.status, `Respons server tidak dapat dibaca (${response.status})`)
+  }
+}
+
+function encodeBody(options: RequestOptions): BodyInit | undefined {
+  if (options.form) {
+    if (options.body !== undefined) throw new Error('Request tidak bisa membawa body dan form sekaligus')
+    return options.form
+  }
+  return options.body === undefined ? undefined : JSON.stringify(options.body)
+}
+
+/**
+ * Satu request ke API, tanpa percobaan ulang. Setiap kegagalan menjadi `ApiError`;
+ * jawaban yang berhasil dibaca oleh `read` (JSON atau berkas).
+ */
+async function send<T>(
+  path: string,
+  options: RequestOptions,
+  read: (response: Response) => Promise<T>,
+): Promise<T> {
+  const body = encodeBody(options)
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json'
+  // Untuk form, browser sendiri yang mengisi Content-Type beserta pembatasnya.
+  if (typeof body === 'string') headers['Content-Type'] = 'application/json'
   if (options.auth !== false && accessToken) headers.Authorization = `Bearer ${accessToken}`
 
   let response: Response
@@ -84,7 +113,7 @@ async function send<T>(path: string, options: RequestOptions): Promise<T> {
     response = await fetch(buildUrl(path, options.query), {
       method: options.method ?? 'GET',
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body,
       credentials: 'same-origin',
     })
   } catch {
@@ -92,16 +121,12 @@ async function send<T>(path: string, options: RequestOptions): Promise<T> {
   }
 
   if (response.status === 204) return undefined as T
+  if (!response.ok) throw toApiError(response.status, await readJson(response))
+  return read(response)
+}
 
-  let payload: unknown
-  try {
-    payload = await response.json()
-  } catch {
-    // Mis. halaman HTML dari proxy; bukan jawaban API.
-    throw new ApiError(response.status, `Respons server tidak dapat dibaca (${response.status})`)
-  }
-  if (!response.ok) throw toApiError(response.status, payload)
-  return payload as T
+function sendJson<T>(path: string, options: RequestOptions): Promise<T> {
+  return send(path, options, (response) => readJson(response) as Promise<T>)
 }
 
 type RefreshOutcome = SessionResponse | 'expired' | 'unavailable'
@@ -116,7 +141,7 @@ async function callRefresh(): Promise<RefreshOutcome> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (attempt > 0) await wait(REFRESH_RETRY_DELAY_MS)
     try {
-      return await send<SessionResponse>(REFRESH_PATH, { method: 'POST', auth: false })
+      return await sendJson<SessionResponse>(REFRESH_PATH, { method: 'POST', auth: false })
     } catch (error) {
       if (!(error instanceof ApiError) || error.statusCode !== 401) return 'unavailable'
     }
@@ -157,14 +182,24 @@ export function refreshSession(): Promise<SessionResponse | null> {
   return refreshing
 }
 
-/** Request ke API. Bila access token kedaluwarsa, sesi diperpanjang diam-diam lalu request diulang sekali. */
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+/** Bila access token kedaluwarsa, sesi diperpanjang diam-diam lalu request diulang sekali. */
+async function withSession<T>(options: RequestOptions, attempt: () => Promise<T>): Promise<T> {
   try {
-    return await send<T>(path, options)
+    return await attempt()
   } catch (error) {
     if (!(error instanceof ApiError) || options.auth === false) throw error
     if (error.statusCode === 403) sessionEvents?.onForbidden()
     if (error.statusCode !== 401 || !(await refreshSession())) throw error
-    return send<T>(path, options)
+    return attempt()
   }
+}
+
+/** Request ke API dengan jawaban JSON. */
+export function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return withSession(options, () => sendJson<T>(path, options))
+}
+
+/** Mengambil berkas dari API, dengan aturan sesi yang sama seperti `request`. */
+export function requestBlob(path: string): Promise<Blob> {
+  return withSession({}, () => send(path, {}, (response) => response.blob()))
 }

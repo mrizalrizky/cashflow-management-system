@@ -17,6 +17,8 @@ export interface EntityDialogOptions<E, F extends object, I extends object> {
   create: (input: I) => Promise<E>
   /** Hanya menerima field yang berubah. */
   update: (entity: E, changes: Partial<I>) => Promise<E>
+  /** Kirim `update` walau tidak ada field yang berubah, mis. untuk mengajukan ulang. */
+  alwaysUpdate?: (entity: E) => boolean
   onSaved: (entity: E) => void
   fieldForStatus?: Record<number, string>
 }
@@ -48,7 +50,8 @@ export function useEntityDialog<E, F extends object, I extends object>(
     if (entity === null) return options.create(input)
 
     const changes = pickChanged(input, options.toInput(options.fromEntity(entity)))
-    return Object.keys(changes).length > 0 ? options.update(entity, changes) : null
+    const needed = Object.keys(changes).length > 0 || options.alwaysUpdate?.(entity) === true
+    return needed ? options.update(entity, changes) : null
   }
 
   const { submitting, fieldErrors, formError, submit, reset } = useFormSubmit(save, {

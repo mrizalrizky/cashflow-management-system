@@ -18,6 +18,13 @@ export function projectPath(id: string): string {
   return `${PATHS.projects}/${id}`
 }
 
+/** Pola rute halaman detail transaksi. */
+export const TRANSACTION_DETAIL_ROUTE = `${PATHS.transactions}/:id`
+
+export function transactionPath(id: string): string {
+  return `${PATHS.transactions}/${id}`
+}
+
 const LANDING: Record<Role, string> = {
   SUPER_ADMIN: PATHS.dashboard,
   PROJECT_MANAGER: PATHS.projects,

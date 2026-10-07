@@ -1,4 +1,4 @@
-import type { AccountType, ProjectStatus, Role, TxType } from '@/api/types'
+import type { AccountType, ProjectStatus, Role, TxStatus, TxType } from '@/api/types'
 
 export interface Option<T> {
   value: T
@@ -42,6 +42,23 @@ export const PROJECT_STATUS_SEVERITY: Record<ProjectStatus, 'success' | 'info' |
   ACTIVE: 'success',
   COMPLETED: 'info',
   CANCELLED: 'secondary',
+}
+
+const txStatuses = labelSet<TxStatus>({
+  PENDING: 'Menunggu',
+  APPROVED: 'Disetujui',
+  REJECTED: 'Ditolak',
+  VOID: 'Dibatalkan',
+})
+export const txStatusLabel = txStatuses.label
+export const TX_STATUS_OPTIONS: Option<TxStatus>[] = txStatuses.options
+
+/** Warna tag PrimeVue untuk tiap status transaksi. */
+export const TX_STATUS_SEVERITY: Record<TxStatus, 'warn' | 'success' | 'danger' | 'secondary'> = {
+  PENDING: 'warn',
+  APPROVED: 'success',
+  REJECTED: 'danger',
+  VOID: 'secondary',
 }
 
 export const ACTIVE_OPTIONS: Option<boolean>[] = [

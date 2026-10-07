@@ -79,6 +79,14 @@ describe('http client', () => {
       expect(urlOf(fetchMock.mock.calls[0]!)).toBe('/api/v1/users?page=1')
     })
 
+    it('treats an empty text query value as absent too', async () => {
+      respond(() => json(200, {}))
+
+      await http.request('/transactions', { query: { page: 1, search: '', dateFrom: '' } })
+
+      expect(urlOf(fetchMock.mock.calls[0]!)).toBe('/api/v1/transactions?page=1')
+    })
+
     it('sends a JSON body only when there is one', async () => {
       respond(() => json(200, {}))
 
@@ -315,6 +323,75 @@ describe('http client', () => {
 
       expect(await http.refreshSession()).toBeNull()
       expect(expired).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('files and deletes', () => {
+    beforeEach(() => http.setAccessToken('token-1'))
+
+    it('sends DELETE and resolves undefined for 204', async () => {
+      respond(() => new Response(null, { status: 204 }))
+
+      expect(await http.request('/attachments/a1', { method: 'DELETE' })).toBeUndefined()
+
+      expect(fetchMock.mock.calls[0]![1]).toMatchObject({ method: 'DELETE' })
+    })
+
+    it('sends a form as it is, leaving the content type to the browser', async () => {
+      respond(() => json(201, { id: 'a1' }))
+      const form = new FormData()
+      form.append('file', new Blob(['isi']), 'nota.pdf')
+
+      expect(await http.request('/transactions/t1/attachments', { method: 'POST', form })).toEqual({ id: 'a1' })
+
+      const call = fetchMock.mock.calls[0]!
+      expect(call[1]?.body).toBe(form)
+      expect(headersOf(call)['Content-Type']).toBeUndefined()
+      expect(headersOf(call).Authorization).toBe('Bearer token-1')
+    })
+
+    it('refuses a request with both a JSON body and a form, before sending anything', async () => {
+      await expect(
+        http.request('/transactions', { method: 'POST', body: {}, form: new FormData() }),
+      ).rejects.toThrow('body')
+
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('returns a download as a blob', async () => {
+      respond(() => new Response('isi berkas', { status: 200, headers: { 'Content-Type': 'application/pdf' } }))
+
+      const blob = await http.requestBlob('/attachments/a1/download')
+
+      expect(await blob.text()).toBe('isi berkas')
+      expect(blob.type).toBe('application/pdf')
+      expect(urlOf(fetchMock.mock.calls[0]!)).toBe('/api/v1/attachments/a1/download')
+      expect(headersOf(fetchMock.mock.calls[0]!).Authorization).toBe('Bearer token-1')
+    })
+
+    it('refreshes and retries a download like any other request', async () => {
+      respond((url, init) => {
+        if (url.endsWith('/auth/refresh')) return json(200, SESSION)
+        const auth = (init.headers as Record<string, string>).Authorization
+        return auth === 'Bearer token-baru' ? new Response('isi') : unauthorized()
+      })
+
+      expect(await (await http.requestBlob('/attachments/a1/download')).text()).toBe('isi')
+      expect(refreshCalls()).toBe(1)
+    })
+
+    it('reports a refused download with the API message, and a 403 to the session listener', async () => {
+      const onForbidden = vi.fn<() => void>()
+      http.bindSessionEvents({ ...QUIET, onForbidden })
+      respond(() => json(404, { statusCode: 404, message: 'Bukti tidak ditemukan' }))
+
+      const missing = await failureOf(http.requestBlob('/attachments/a1/download'))
+      expect(missing).toMatchObject({ statusCode: 404, message: 'Bukti tidak ditemukan' })
+      expect(onForbidden).not.toHaveBeenCalled()
+
+      respond(() => json(403, { statusCode: 403, message: 'Anda tidak memiliki akses' }))
+      await failureOf(http.requestBlob('/attachments/a1/download'))
+      expect(onForbidden).toHaveBeenCalledTimes(1)
     })
   })
 })

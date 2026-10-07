@@ -1,6 +1,6 @@
 # Checklist keamanan dan kualitas
 
-Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di mana ia ditegakkan, dan test mana yang membuktikannya. Path test relatif terhadap `apps/api`. Diperiksa terakhir pada Fase 5a.
+Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di mana ia ditegakkan, dan test mana yang membuktikannya. Path test relatif terhadap `apps/api`. Diperiksa terakhir pada Fase 6.
 
 | # | Butir | Status |
 |---|-------|--------|
@@ -10,7 +10,7 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 | 4 | Unggah berkas: jenis sebenarnya, batas ukuran, nama dibuat ulang, unduh lewat endpoint terotentikasi | Terpenuhi |
 | 5 | Rate limit pada login | Terpenuhi |
 | 6 | Tidak ada secret di repo | Terpenuhi |
-| 7 | Backup terjadwal dan pernah diuji restore | Skrip dan uji restore terpenuhi; penjadwalan di server menunggu Fase 6 |
+| 7 | Backup terjadwal dan pernah diuji restore | Terpenuhi |
 | 8 | Test minimal: saldo, transfer, status transaksi, permission, agregasi dashboard | Terpenuhi |
 
 ## 1. Password dan token
@@ -53,7 +53,8 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 
 - **Di mana:** `scripts/backup.sh`, `scripts/restore.sh`, `scripts/restore-drill.sh`; panduan di `docs/backup-restore.md`.
 - **Bukti:** hasil uji restore tercatat di `docs/backup-restore.md`.
-- **Belum:** penjadwalan otomatis di server. Baris cron sudah didokumentasikan; pemasangannya bagian dari deployment (Fase 6).
+- **Terjadwal:** layanan `backup` di `docker-compose.prod.yml` menjalankan cadangan tiap malam (`deploy/backup-loop.sh`); cadangan yang gagal menandai container tidak sehat. Dibuktikan `deploy/smoke.sh` (bagian 3 dan 6), termasuk pemulihan dari cadangan yang dibuat di dalam container.
+- **Tanggung jawab pengelola server:** menyalin folder cadangan ke luar server.
 
 ## 8. Test minimal
 
@@ -73,5 +74,12 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 
 ## Yang masih terbuka
 
-- Penjadwalan backup di server dan `NODE_ENV=production` pada Compose produksi (Fase 6). Tanpa `NODE_ENV=production`, dokumentasi API terbuka dan cookie tidak `Secure`.
+- Tidak ada lagi butir bagian 13 yang terbuka. `NODE_ENV=production` ditetapkan oleh `docker-compose.prod.yml` sendiri, dan `deploy/smoke.sh` memastikan dokumentasi API tertutup dan cookie sesi `Secure` pada susunan produksi.
+- Tanggung jawab pengelola server, bukan aplikasi: menyalin cadangan ke luar server, menjaga `deploy/.env`, dan pengaturan HTTPS/HSTS di Cloudflare (lihat `docs/deployment.md`).
 - Pengiriman ulang permintaan simpan saat jaringan putus bisa mencatat transaksi dua kali (tidak ada kunci idempotensi). Dicatat pada tinjauan Fase 3b; bukan butir bagian 13.
+
+## Ditambahkan pada Fase 6
+
+- **Image tanpa rahasia dan tanpa hak root**, tanpa `.env`, kode sumber, test atau berkas bukti; **tidak ada port yang dibuka** di server (jalan masuk hanya Cloudflare Tunnel); Compose menolak jalan bila nilai wajib kosong. Dibuktikan `deploy/smoke.sh` bagian 1 sampai 3.
+- **Batas percobaan login tetap per pengunjung di balik dua proxy** (Cloudflare dan Caddy): `deploy/smoke.sh` bagian 4.
+- **Kebijakan keamanan browser (CSP) untuk halaman web** diuji dengan browser sungguhan: `deploy/smoke-browser.mjs`.

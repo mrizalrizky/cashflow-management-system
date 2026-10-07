@@ -1,0 +1,28 @@
+# Tambahan untuk uji asap (deploy/smoke.sh) saja; tidak dipakai di produksi.
+# Mengganti dua hal yang tidak ada saat pengujian: database Neon (diganti PostgreSQL sementara)
+# dan Cloudflare Tunnel (diganti port di loopback, tempat skrip uji berpura-pura menjadi tunnel).
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: smoke
+      POSTGRES_PASSWORD: smoke
+      POSTGRES_DB: cashflow
+    # Di memori: hilang bersama container-nya.
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks: [app]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smoke -d cashflow"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    ports:
+      - "127.0.0.1:${SMOKE_PORT:?}:8080"

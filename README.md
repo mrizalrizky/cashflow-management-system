@@ -25,6 +25,25 @@ npm run dev:web     # http://localhost:5173
 
 Seed aman dijalankan berulang. Admin pertama hanya dibuat bila belum ada SUPER_ADMIN, dan wajib ganti password saat login pertama.
 
+## Menjalankan di server
+
+Panduan lengkap, langkah demi langkah dari server kosong: [docs/deployment.md](docs/deployment.md). Ringkasnya:
+
+```bash
+cp deploy/env.example deploy/.env      # lalu isi; berkas ini berisi semua rahasia
+deploy/dc up -d --build                       # pasang atau perbarui
+```
+
+| Keperluan | Perintah |
+|---|---|
+| Memasang dan memperbarui | `deploy/dc up -d --build` |
+| Migrasi database dan seed admin pertama | otomatis tiap `deploy/dc up`, oleh layanan `migrate` |
+| Cadangan sekarang | `deploy/dc exec backup bash deploy/backup-loop.sh --run-once` (terjadwal tiap malam oleh layanan `backup`) |
+| Memulihkan | `deploy/dc --profile tools run --rm restore /backups/<nama cadangan>` |
+| Melihat log | `deploy/dc logs -f api` |
+
+Database produksi berada di Neon; server hanya menjalankan aplikasi dan menyimpan berkas bukti. Tidak ada port yang dibuka: lalu lintas masuk lewat Cloudflare Tunnel. Susunan yang sama bisa diuji di mesin pengembangan dengan `npm run deploy:smoke`.
+
 ## Berkas bukti transaksi
 
 Bukti transaksi (foto atau PDF nota) disimpan sebagai berkas di folder `STORAGE_DIR` (`apps/api/.env`, bawaan `./storage`), bukan di database. Database hanya menyimpan nama dan lokasi berkasnya.

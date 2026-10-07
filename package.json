@@ -19,7 +19,8 @@
     "test:browser": "npm run test:browser -w web",
     "build": "npm run build --workspaces --if-present",
     "backup": "bash scripts/backup.sh",
-    "backup:drill": "bash scripts/restore-drill.sh"
+    "backup:drill": "bash scripts/restore-drill.sh",
+    "deploy:smoke": "bash deploy/smoke.sh"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,

@@ -9,6 +9,17 @@ const HEALTH_TIMEOUT_MS = 3000;
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Aplikasinya sendiri hidup, tanpa menyentuh database. Dipakai pemeriksaan kesehatan
+   * container, yang berjalan tiap beberapa detik: bila ikut bertanya ke database, database
+   * terkelola (Neon) tidak pernah menganggur dan terus ditagih.
+   */
+  @Get('live')
+  live(): { status: 'ok' } {
+    return { status: 'ok' };
+  }
+
+  /** Aplikasi dan databasenya; untuk diperiksa orang atau pemantau, bukan tiap beberapa detik. */
   @Get()
   async check(): Promise<{ status: 'ok'; database: 'up' }> {
     let timer: NodeJS.Timeout | undefined;

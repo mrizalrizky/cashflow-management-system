@@ -64,6 +64,33 @@ describe('seedDatabase', () => {
     expect(await prisma.category.count()).toBe(17);
   });
 
+  it('does not bring back default accounts and categories that were renamed', async () => {
+    await seedDatabase(prisma, options);
+    await prisma.account.updateMany({ where: { name: 'Rekening Bank Utama' }, data: { name: 'BCA 1234' } });
+    await prisma.category.updateMany({ where: { name: 'Material' }, data: { name: 'Bahan Bangunan' } });
+
+    // Dijalankan lagi tiap deploy.
+    await seedDatabase(prisma, options);
+
+    expect(await prisma.account.count()).toBe(2);
+    expect(await prisma.account.count({ where: { name: 'Rekening Bank Utama' } })).toBe(0);
+    expect(await prisma.category.count()).toBe(17);
+    expect(await prisma.category.count({ where: { name: 'Material' } })).toBe(0);
+  });
+
+  it('still makes sure the transfer categories exist on every run', async () => {
+    await seedDatabase(prisma, options);
+    await prisma.category.deleteMany({ where: { is_system: true } });
+
+    await seedDatabase(prisma, options);
+
+    const system = await prisma.category.findMany({ where: { is_system: true }, orderBy: { name: 'asc' } });
+    expect(system.map((category) => [category.name, category.type])).toEqual([
+      ['Transfer Keluar', 'OUT'],
+      ['Transfer Masuk', 'IN'],
+    ]);
+  });
+
   it('refuses to run without an admin email', async () => {
     await expect(seedDatabase(prisma, { ...options, adminEmail: undefined })).rejects.toThrow(
       /SEED_ADMIN_EMAIL/,

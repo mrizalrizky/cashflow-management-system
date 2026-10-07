@@ -32,6 +32,8 @@ describe('security headers', () => {
     // API hanya mengirim JSON dan berkas: tidak ada yang boleh dimuat atau dibingkai dari sini.
     expect(res.headers['content-security-policy']).toBe("default-src 'none';frame-ancestors 'none'");
     expect(res.headers['x-powered-by']).toBeUndefined();
+    // Kebijakan HTTPS milik proxy di depan (Cloudflare), yang tahu nama host-nya.
+    expect(res.headers['strict-transport-security']).toBeUndefined();
   });
 
   it('let the documentation page load its own scripts, and nothing from elsewhere', async () => {

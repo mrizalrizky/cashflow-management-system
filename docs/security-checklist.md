@@ -47,7 +47,7 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 - **Bukti (diperiksa manual pada Fase 5a):**
   - `git ls-files` hanya memuat `apps/api/.env.example`, yang `JWT_ACCESS_SECRET` dan `SEED_ADMIN_PASSWORD`-nya kosong.
   - Pencarian `git grep` untuk pola `secret|password|token|api key = "<nilai>"` di luar test hanya menemukan nilai contoh `ganti-password-ini` di `src/database/seed.ts`, yang justru ditolak sebagai password (lihat `test/seed.e2e-spec.ts`).
-  - `docker-compose.yml` hanya untuk pengembangan; password database di dalamnya adalah bawaan lokal, bukan secret. Compose produksi (Fase 6) harus mengambilnya dari environment.
+  - `docker-compose.dev.yml` hanya untuk pengembangan; password database di dalamnya adalah bawaan lokal, bukan secret. Compose produksi (Fase 6) harus mengambilnya dari environment.
 
 ## 7. Backup dan restore
 

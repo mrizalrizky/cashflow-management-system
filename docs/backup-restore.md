@@ -1,0 +1,105 @@
+# Backup dan restore
+
+## Apa yang dicadangkan
+
+Data aplikasi ada di dua tempat, dan keduanya harus selalu dicadangkan dan dipulihkan **bersama**:
+
+1. **Database PostgreSQL**: transaksi, akun, proyek, pengguna, log audit.
+2. **Folder berkas bukti** (`STORAGE_DIR`): foto dan PDF nota. Database hanya menyimpan nama berkasnya.
+
+Database tanpa foldernya berarti bukti tidak bisa dibuka. Folder tanpa databasenya berarti berkas tanpa pemilik. Karena itu satu cadangan selalu berisi keduanya, dari waktu yang sama.
+
+Satu cadangan adalah satu folder `cashflow-<waktu UTC>` berisi:
+
+| Berkas | Isi |
+|--------|-----|
+| `database.dump` | hasil `pg_dump --format=custom` |
+| `attachments.tar.gz` | seluruh isi `STORAGE_DIR` |
+| `SHA256SUMS` | sidik kedua berkas di atas; diperiksa sebelum memulihkan |
+
+## Yang dibutuhkan
+
+- Bash, `tar`, `sha256sum`, `find` (ada di semua server Linux).
+- `pg_dump`, `pg_restore` dan `psql` versi 16. Bila alat itu hanya ada di dalam container PostgreSQL, isi `PG_PREFIX`, mis. `PG_PREFIX="docker exec -i cashflow-postgres"`. Dengan `PG_PREFIX`, alamat di `DATABASE_URL` harus bisa dijangkau dari dalam container itu.
+
+## Membuat cadangan
+
+```bash
+DATABASE_URL="postgresql://user:password@localhost:5432/cashflow" \
+STORAGE_DIR="/srv/cashflow/storage" \
+BACKUP_DIR="/srv/backup/cashflow" \
+scripts/backup.sh
+```
+
+- Aman dijalankan selagi aplikasi berjalan. Database dicadangkan lebih dulu, baru berkas, sehingga tidak pernah ada baris bukti yang berkasnya belum terarsip.
+- Bila gagal di tengah jalan, tidak ada folder cadangan setengah jadi yang tertinggal, dan skrip keluar dengan kode bukan nol.
+- Cadangan yang lebih tua dari `BACKUP_KEEP_DAYS` hari (bawaan 14) dihapus. Yang dihapus hanya subfolder `cashflow-...` buatan skrip ini di dalam `BACKUP_DIR`. Isi `0` untuk tidak pernah menghapus.
+
+### Terjadwal tiap malam
+
+Contoh baris cron (pukul 01.30 waktu server), dengan variabel disimpan di berkas yang hanya bisa dibaca pemiliknya:
+
+```cron
+30 1 * * * . /etc/cashflow/backup.env && /srv/cashflow/app/scripts/backup.sh >> /var/log/cashflow-backup.log 2>&1
+```
+
+`/etc/cashflow/backup.env` berisi `export DATABASE_URL=...`, `export STORAGE_DIR=...`, `export BACKUP_DIR=...` (dan `export PG_PREFIX=...` bila perlu), dengan izin `chmod 600`.
+
+Pemasangan jadwal ini di server adalah bagian dari deployment (Fase 6).
+
+### Simpan salinan di tempat lain
+
+Cadangan di disk yang sama dengan aplikasi ikut hilang bila disk itu rusak. Salin `BACKUP_DIR` secara berkala ke tempat lain (disk lain, NAS, atau penyimpanan awan), mis. dengan `rsync`.
+
+## Memulihkan
+
+```bash
+DATABASE_URL="postgresql://user:password@localhost:5432/cashflow" \
+STORAGE_DIR="/srv/cashflow/storage" \
+scripts/restore.sh /srv/backup/cashflow/cashflow-20261007T013000Z
+```
+
+Langkah demi langkah:
+
+1. **Hentikan aplikasi** (API), supaya tidak ada yang menulis selagi data diganti.
+2. Jalankan perintah di atas. Skrip memeriksa `SHA256SUMS` lebih dulu, lalu mencetak cadangan mana yang dipakai dan database serta folder mana yang menjadi tujuan.
+3. Bila database tujuan sudah berisi tabel atau folder tujuan sudah berisi berkas, skrip **menolak**. Periksa tujuan yang dicetak. Bila memang itu yang hendak diganti, ulangi dengan `--force` di akhir: database dan folder tujuan **dikosongkan** lalu diisi dari cadangan.
+4. Jalankan `npx prisma migrate deploy` di `apps/api` bila versi aplikasi lebih baru daripada cadangan (migrasi yang belum ada di cadangan akan diterapkan).
+5. Jalankan lagi aplikasi, login, dan buka satu transaksi yang punya bukti untuk memastikan buktinya bisa diunduh.
+
+## Uji pulih
+
+Cadangan yang belum pernah dipulihkan belum terbukti. `scripts/restore-drill.sh` menguji seluruh alur tanpa menyentuh data sungguhan: ia membuat dua database sementara (namanya selalu diakhiri `_drill`) dan folder sementara, mengisi yang pertama dengan transaksi dan berkas bukti, mencadangkannya, memulihkan ke yang kedua, memastikan `restore.sh` menolak menimpa tanpa `--force`, lalu membandingkan jumlah baris tiap tabel, sidik isi transaksi, dan sidik tiap berkas bukti. Semua yang dibuatnya dihapus lagi di akhir.
+
+```bash
+DRILL_SERVER_URL="postgresql://cashflow:cashflow_dev@localhost:5432" \
+PG_PREFIX="docker exec -i cash-flow-management-postgres-1" \
+npm run backup:drill
+```
+
+Jalankan setelah mengubah skrip backup, setelah menaikkan versi PostgreSQL, dan sesekali di server.
+
+### Hasil uji terakhir
+
+Dijalankan 7 Oktober 2026 terhadap PostgreSQL 16 (container pengembangan), keluar dengan kode 0:
+
+```
+1/5 Menyiapkan database dan berkas sumber...
+2/5 Mencadangkan...
+3/5 Memulihkan ke tujuan kosong...
+4/5 Memastikan pemulihan menolak menimpa tanpa --force, dan mau dengan --force...
+5/5 Membandingkan sumber dan hasil pemulihan...
+   users=1
+   accounts=1
+   categories=1
+   projects=0
+   project_members=0
+   transactions=5
+   attachments=2
+   audit_logs=1
+   transactions:7549d7b1b37a381bd02fbd0f187573d9
+   attachments:d31f1f333767616d0d5f9d8c5b345378
+UJI PULIH BERHASIL: database dan 2 berkas bukti pulih sama persis.
+```
+
+Data ujinya memuat nominal di atas 2^53 (9.007.199.254.740.993), yang pulih tanpa berubah.

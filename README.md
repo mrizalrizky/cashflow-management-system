@@ -31,6 +31,8 @@ Bukti transaksi (foto atau PDF nota) disimpan sebagai berkas di folder `STORAGE_
 
 Karena itu **cadangkan folder `STORAGE_DIR` bersama database**, dan pulihkan keduanya dari waktu yang sama. Database tanpa foldernya berarti bukti tidak bisa dibuka; folder tanpa databasenya berarti berkas tanpa pemilik.
 
+Cara mencadangkan, memulihkan, dan menguji pemulihan ada di [docs/backup-restore.md](docs/backup-restore.md). Daftar periksa keamanan ada di [docs/security-checklist.md](docs/security-checklist.md).
+
 ## Dokumentasi API
 
 Saat API berjalan di luar produksi, daftar rute bisa dibuka di http://localhost:3000/api/docs.

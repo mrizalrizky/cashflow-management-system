@@ -4,6 +4,7 @@ import {
   IsCalendarDate,
   formatCalendarDate,
   parseCalendarDate,
+  todayInJakarta,
 } from './calendar-date.js';
 import { validateBody } from './testing/validate.js';
 
@@ -47,5 +48,12 @@ describe('currentYearInJakarta', () => {
   it('uses the Jakarta calendar, which is ahead of UTC at year end', () => {
     expect(currentYearInJakarta(new Date('2026-12-31T16:59:59Z'))).toBe(2026);
     expect(currentYearInJakarta(new Date('2026-12-31T17:00:00Z'))).toBe(2027);
+  });
+});
+
+describe('todayInJakarta', () => {
+  it('follows the Jakarta calendar, seven hours ahead of UTC', () => {
+    expect(todayInJakarta(new Date('2026-10-06T16:59:59Z'))).toBe('2026-10-06');
+    expect(todayInJakarta(new Date('2026-10-06T17:00:00Z'))).toBe('2026-10-07');
   });
 });

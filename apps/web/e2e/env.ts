@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /** Pengaturan bersama untuk test browser. Port dan database terpisah dari milik pengembangan. */
@@ -27,6 +29,7 @@ export const apiEnv: Record<string, string> = {
   DATABASE_URL,
   JWT_ACCESS_SECRET: 'browser-test-secret-browser-test-secret-1234',
   LOGIN_RATE_LIMIT: '1000',
+  STORAGE_DIR: join(tmpdir(), 'cashflow-browser-test-storage'),
   SEED_ADMIN_NAME: ADMIN.name,
   SEED_ADMIN_EMAIL: ADMIN.email,
   SEED_ADMIN_PASSWORD: ADMIN.temporaryPassword,

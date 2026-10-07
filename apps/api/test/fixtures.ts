@@ -97,7 +97,7 @@ export function errorFields(body: { errors: { field: string }[] }): string[] {
   return body.errors.map((e) => e.field);
 }
 
-export type Method = 'get' | 'post' | 'patch' | 'put';
+export type Method = 'get' | 'post' | 'patch' | 'put' | 'delete';
 
 /** Request atas nama sebuah sesi. */
 export function call(ctx: E2eContext, session: TestSession, method: Method, path: string) {

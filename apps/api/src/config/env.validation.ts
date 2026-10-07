@@ -36,6 +36,11 @@ export class EnvVars {
   @Min(1)
   LOGIN_RATE_LIMIT: number = 5;
 
+  /** Folder tempat berkas bukti disimpan; harus ikut dicadangkan bersama database. */
+  @IsString()
+  @IsNotEmpty()
+  STORAGE_DIR: string = './storage';
+
   /** Jumlah reverse proxy di depan API; 0 berarti diakses langsung. */
   @Type(() => Number)
   @IsInt()

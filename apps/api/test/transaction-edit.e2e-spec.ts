@@ -1,5 +1,5 @@
 import { E2eContext, setupE2e } from './e2e-context.js';
-import { assign, call, createProject, errorFields } from './fixtures.js';
+import { assign, call, createAccount, createCategory, createProject, errorFields } from './fixtures.js';
 import { expenseBody, record, setupWorld, transactionUrl, World } from './transaction-fixtures.js';
 
 /** Menandai transaksi sebagai ditolak langsung di database, seperti hasil peninjauan. */
@@ -71,6 +71,33 @@ describe('PATCH /transactions/:id', () => {
     await ctx.prisma.category.update({ where: { id: world.expense.id }, data: { is_active: false } });
 
     await call(ctx, world.staff, 'patch', transactionUrl(tx.id)).send({ amount: '99000' }).expect(200);
+  });
+
+  it.each([
+    [
+      'an inactive account',
+      async (c: E2eContext) => ({ accountId: (await createAccount(c.prisma, { isActive: false })).id }),
+      'accountId',
+    ],
+    [
+      'an inactive category',
+      async (c: E2eContext) => ({ categoryId: (await createCategory(c.prisma, { isActive: false })).id }),
+      'categoryId',
+    ],
+    [
+      'a category reserved for transfers',
+      async (c: E2eContext) => ({ categoryId: (await createCategory(c.prisma, { isSystem: true })).id }),
+      'categoryId',
+    ],
+  ])('refuses to move a transaction to %s', async (_label, change, field) => {
+    const world = await setupWorld(ctx);
+    const tx = await record(ctx, world.staff, expenseBody(world));
+
+    const res = await call(ctx, world.staff, 'patch', transactionUrl(tx.id)).send(await change(ctx)).expect(400);
+
+    expect(errorFields(res.body)).toEqual([field]);
+    const row = await ctx.prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
+    expect([row.account_id, row.category_id]).toEqual([world.account.id, world.expense.id]);
   });
 
   it('lets an admin edit anyone’s pending transaction, but not a project manager', async () => {

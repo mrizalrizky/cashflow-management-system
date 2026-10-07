@@ -9,8 +9,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma, TxType } from '../generated/prisma/client.js';
 import type { TransferDto } from './dto/transaction.dto.js';
 import { TransactionAccessService } from './transaction-access.service.js';
+import { TRANSACTION_ENTITY } from './transaction-guards.js';
 import { toTransactionResponse, TransactionResponse } from './transaction.mapper.js';
-import { TRANSACTION_ENTITY } from './transaction-workflow.service.js';
 
 /**
  * Transfer antar akun dicatat sebagai dua transaksi APPROVED yang terhubung lewat

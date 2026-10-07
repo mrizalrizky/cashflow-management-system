@@ -17,6 +17,8 @@ import {
   CreateTransactionDto,
   ListTransactionsQueryDto,
   ReasonDto,
+  RejectDto,
+  ReviewDto,
   TransferDto,
   UpdateTransactionDto,
 } from './dto/transaction.dto.js';
@@ -99,9 +101,10 @@ export class TransactionsController {
   approve(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReviewDto,
     @Ip() ip: string,
   ): Promise<ApprovalResponse> {
-    return this.workflow.approve(user, id, ip);
+    return this.workflow.approve(user, id, ip, dto.expectedUpdatedAt);
   }
 
   @Post(':id/reject')
@@ -109,10 +112,10 @@ export class TransactionsController {
   reject(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ReasonDto,
+    @Body() dto: RejectDto,
     @Ip() ip: string,
   ): Promise<TransactionResponse> {
-    return this.workflow.reject(user, id, dto.reason, ip);
+    return this.workflow.reject(user, id, dto.reason, ip, dto.expectedUpdatedAt);
   }
 
   @Post(':id/void')

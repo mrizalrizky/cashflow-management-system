@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { AccountBalanceService } from '../accounts/account-balance.service.js';
 import { AuditAction, AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
@@ -12,41 +7,29 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma, TxStatus } from '../generated/prisma/client.js';
 import { TransactionAccessService } from './transaction-access.service.js';
 import {
+  alreadyProcessed,
+  assertPermitted,
+  assertSeenVersion,
+  GuardedAction,
+  TRANSACTION_ENTITY,
+} from './transaction-guards.js';
+import {
   toAuditSnapshot,
-  toPolicySubject,
   toTransactionResponse,
   TRANSACTION_INCLUDE,
   TransactionResponse,
   TransactionWithRelations,
 } from './transaction.mapper.js';
-import { permissionsFor, PolicyActor, TransactionPermissions } from './transaction-policy.js';
-
-export const TRANSACTION_ENTITY = 'transaction';
-
-export function alreadyProcessed(): ConflictException {
-  return new ConflictException('Transaksi sudah diproses pengguna lain');
-}
-
-export function wrongStatus(action: string): ConflictException {
-  return new ConflictException(`Transaksi tidak bisa ${action} pada status ini`);
-}
-
-export function notAllowed(action: string): ForbiddenException {
-  return new ForbiddenException(`Anda tidak boleh ${action} transaksi ini`);
-}
 
 /** Hasil menyetujui: admin juga diberi saldo akun sesudahnya, supaya saldo minus bisa diperingatkan. */
 export type ApprovalResponse = TransactionResponse & { accountBalance?: string };
 
 /** Satu langkah perubahan status. */
-interface Transition {
-  /** Untuk pesan status yang salah, mis. "dibatalkan". */
-  verb: string;
-  /** Untuk pesan larangan, mis. "membatalkan". */
-  activeVerb: string;
+interface Transition extends Omit<GuardedAction, 'statuses'> {
   from: TxStatus;
-  permission: keyof TransactionPermissions;
   audit: AuditAction;
+  /** Versi yang dilihat peninjau; lihat `assertSeenVersion`. */
+  expectedUpdatedAt?: string;
   data: (now: Date) => Prisma.TransactionUncheckedUpdateManyInput;
   /** Syarat tambahan sebelum status diubah, mis. bukti untuk pengeluaran. */
   precondition?: (transaction: TransactionWithRelations) => void;
@@ -78,13 +61,19 @@ export class TransactionWorkflowService {
     });
   }
 
-  async approve(user: AuthUser, id: string, ip: string | null): Promise<ApprovalResponse> {
+  async approve(
+    user: AuthUser,
+    id: string,
+    ip: string | null,
+    expectedUpdatedAt?: string,
+  ): Promise<ApprovalResponse> {
     const approved = await this.run(user, id, ip, {
       verb: 'disetujui',
       activeVerb: 'menyetujui',
       from: 'PENDING',
       permission: 'canReview',
       audit: 'APPROVE',
+      expectedUpdatedAt,
       data: (now) => ({ status: 'APPROVED', reviewed_by_id: user.id, reviewed_at: now }),
       precondition: (transaction) => {
         if (transaction.type === 'OUT' && transaction.attachments.length === 0) {
@@ -97,13 +86,20 @@ export class TransactionWorkflowService {
     return { ...approved, accountBalance: await this.balanceOf(approved.account.id) };
   }
 
-  reject(user: AuthUser, id: string, reason: string, ip: string | null): Promise<TransactionResponse> {
+  reject(
+    user: AuthUser,
+    id: string,
+    reason: string,
+    ip: string | null,
+    expectedUpdatedAt?: string,
+  ): Promise<TransactionResponse> {
     return this.run(user, id, ip, {
       verb: 'ditolak',
       activeVerb: 'menolak',
       from: 'PENDING',
       permission: 'canReview',
       audit: 'REJECT',
+      expectedUpdatedAt,
       data: (now) => ({
         status: 'REJECTED',
         reviewed_by_id: user.id,
@@ -137,7 +133,8 @@ export class TransactionWorkflowService {
     return this.prisma.$transaction(async (tx) => {
       const actor = await this.access.actorFor(tx, user);
       const target = await this.access.loadForUpdate(tx, actor, id);
-      this.assertAllowed(actor, target, step);
+      assertPermitted(actor, target, { ...step, statuses: [step.from] });
+      assertSeenVersion(target, step.expectedUpdatedAt);
       step.precondition?.(target);
 
       // Transfer diproses sebagai satu kesatuan: semua sisinya berubah, atau tidak sama sekali.
@@ -164,16 +161,6 @@ export class TransactionWorkflowService {
       }
       return toTransactionResponse(await this.access.loadForUser(tx, actor, id), actor);
     });
-  }
-
-  private assertAllowed(
-    actor: PolicyActor,
-    transaction: TransactionWithRelations,
-    step: Transition,
-  ): void {
-    if (permissionsFor(actor, toPolicySubject(transaction))[step.permission]) return;
-    // Status yang salah adalah soal keadaan transaksi; selebihnya soal hak pelaku.
-    throw transaction.status === step.from ? notAllowed(step.activeVerb) : wrongStatus(step.verb);
   }
 
   private async withTransferSiblings(

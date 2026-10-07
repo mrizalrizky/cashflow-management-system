@@ -7,13 +7,13 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Attachment, Prisma } from '../generated/prisma/client.js';
 import { StorageService } from '../storage/storage.service.js';
 import { TransactionAccessService } from '../transactions/transaction-access.service.js';
-import { toPolicySubject, TransactionWithRelations } from '../transactions/transaction.mapper.js';
-import { permissionsFor, PolicyActor } from '../transactions/transaction-policy.js';
 import {
+  assertPermitted,
   notAllowed,
   TRANSACTION_ENTITY,
-  wrongStatus,
-} from '../transactions/transaction-workflow.service.js';
+} from '../transactions/transaction-guards.js';
+import type { TransactionWithRelations } from '../transactions/transaction.mapper.js';
+import { EDITABLE_STATUSES, PolicyActor } from '../transactions/transaction-policy.js';
 import { sanitizeFileName } from './file-name.js';
 import { sniffFileType } from './file-sniffer.js';
 
@@ -75,7 +75,7 @@ export class AttachmentsService {
             uploaded_by_id: user.id,
           },
         });
-        await this.logChange(tx, 'ATTACH', user, attachment, ip);
+        await this.recordChange(tx, 'ATTACH', user, attachment, ip);
         return attachment;
       });
     } catch (error) {
@@ -107,17 +107,18 @@ export class AttachmentsService {
         throw notAllowed('menghapus bukti');
       }
       await tx.attachment.delete({ where: { id: attachment.id } });
-      await this.logChange(tx, 'DETACH', user, attachment, ip);
+      await this.recordChange(tx, 'DETACH', user, attachment, ip);
     });
     await this.removeFile(attachment.storage_key);
   }
 
   private assertCanChangeProof(actor: PolicyActor, transaction: TransactionWithRelations): void {
-    const editable = transaction.status === 'PENDING' || transaction.status === 'REJECTED';
-    if (!editable || transaction.transfer_group_id) throw wrongStatus('diberi bukti');
-    if (!permissionsFor(actor, toPolicySubject(transaction)).canAttach) {
-      throw notAllowed('mengubah bukti');
-    }
+    assertPermitted(actor, transaction, {
+      permission: 'canAttach',
+      statuses: EDITABLE_STATUSES,
+      verb: 'diberi bukti',
+      activeVerb: 'mengubah bukti',
+    });
   }
 
   private async findInScope(actor: PolicyActor, attachmentId: string): Promise<Attachment> {
@@ -128,7 +129,11 @@ export class AttachmentsService {
     return attachment;
   }
 
-  private logChange(
+  /**
+   * Mencatat perubahan bukti dan menandai transaksinya berubah, supaya peninjau yang
+   * membukanya sebelum ini tidak menyetujui bukti yang belum ia lihat.
+   */
+  private async recordChange(
     tx: Prisma.TransactionClient,
     action: 'ATTACH' | 'DETACH',
     user: AuthUser,
@@ -141,7 +146,11 @@ export class AttachmentsService {
       mime_type: attachment.mime_type,
       size_bytes: attachment.size_bytes,
     };
-    return this.audit.log(tx, {
+    await tx.transaction.update({
+      where: { id: attachment.transaction_id },
+      data: { updated_at: new Date() },
+    });
+    await this.audit.log(tx, {
       userId: user.id,
       action,
       entityType: TRANSACTION_ENTITY,

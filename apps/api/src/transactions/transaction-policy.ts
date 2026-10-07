@@ -44,8 +44,11 @@ const NOTHING: TransactionPermissions = {
   canAttach: false,
 };
 
+/** Status tempat isi dan bukti transaksi masih boleh diubah. */
+export const EDITABLE_STATUSES: readonly TxStatus[] = ['PENDING', 'REJECTED'];
+
 function isEditable(status: TxStatus): boolean {
-  return status === 'PENDING' || status === 'REJECTED';
+  return EDITABLE_STATUSES.includes(status);
 }
 
 /** Yang boleh dilakukan pembuat pada transaksinya sendiri (tanpa hak meninjau). */

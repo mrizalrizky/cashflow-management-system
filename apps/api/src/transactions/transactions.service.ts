@@ -14,21 +14,16 @@ import type {
   UpdateTransactionDto,
 } from './dto/transaction.dto.js';
 import { TransactionAccessService } from './transaction-access.service.js';
+import { assertPermitted, TRANSACTION_ENTITY } from './transaction-guards.js';
 import {
   toAuditSnapshot,
-  toPolicySubject,
   toTransactionResponse,
   TRANSACTION_INCLUDE,
   TransactionResponse,
 } from './transaction.mapper.js';
-import { permissionsFor } from './transaction-policy.js';
+import { EDITABLE_STATUSES } from './transaction-policy.js';
 import { ALL_REFERENCES, assertReferencesValid } from './transaction-references.js';
-import {
-  notAllowed,
-  TRANSACTION_ENTITY,
-  TransactionWorkflowService,
-  wrongStatus,
-} from './transaction-workflow.service.js';
+import { TransactionWorkflowService } from './transaction-workflow.service.js';
 
 function toWhere(query: ListTransactionsQueryDto): Prisma.TransactionWhereInput {
   if (query.projectId && query.overhead) {
@@ -151,9 +146,12 @@ export class TransactionsService {
       const actor = await this.access.actorFor(tx, user);
       const before = await this.access.loadForUpdate(tx, actor, id);
 
-      const editable = before.status === 'PENDING' || before.status === 'REJECTED';
-      if (!editable || before.transfer_group_id) throw wrongStatus('diubah');
-      if (!permissionsFor(actor, toPolicySubject(before)).canEdit) throw notAllowed('mengubah');
+      assertPermitted(actor, before, {
+        permission: 'canEdit',
+        statuses: EDITABLE_STATUSES,
+        verb: 'diubah',
+        activeVerb: 'mengubah',
+      });
 
       // Aturan yang sama dengan saat membuat, diterapkan pada hasil akhirnya.
       const projectId = dto.projectId === undefined ? before.project_id : dto.projectId;

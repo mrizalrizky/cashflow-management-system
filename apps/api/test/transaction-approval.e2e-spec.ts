@@ -1,7 +1,7 @@
 import { SAMPLE_FILES } from '../src/attachments/testing/sample-files.js';
 import { E2eContext, setupE2e } from './e2e-context.js';
 import { assign, call, errorFields, loginAs, TestSession } from './fixtures.js';
-import { ACCOUNTS } from './routes.js';
+import { ACCOUNTS, ATTACHMENTS } from './routes.js';
 import {
   expenseBody,
   incomeBody,
@@ -281,5 +281,62 @@ describe('POST /transactions/:id/void', () => {
 
     await act(ctx, world.admin, approved.id, 'void', 'Salah akun').expect(200);
     await act(ctx, world.admin, approved.id, 'void', 'Lagi').expect(409);
+  });
+});
+
+describe('reviewing only the version that was seen', () => {
+  const ctx = setupE2e();
+  const CHANGED = 'Transaksi berubah sejak Anda membukanya. Periksa lagi sebelum memproses.';
+
+  function review(session: TestSession, id: string, action: 'approve' | 'reject', expectedUpdatedAt: string) {
+    const reason = action === 'reject' ? { reason: 'Tidak sesuai' } : {};
+    return call(ctx, session, 'post', transactionUrl(id, action)).send({ ...reason, expectedUpdatedAt });
+  }
+
+  async function seen(session: TestSession, id: string): Promise<string> {
+    const res = await call(ctx, session, 'get', transactionUrl(id)).expect(200);
+    return res.body.updatedAt as string;
+  }
+
+  it.each(['approve', 'reject'] as const)(
+    'refuses to %s a transaction that was edited after the reviewer opened it',
+    async (action) => {
+      const world = await setupWorld(ctx);
+      const tx = await expenseWithProof(ctx, world);
+      const opened = await seen(world.manager, tx.id);
+      await call(ctx, world.staff, 'patch', transactionUrl(tx.id)).send({ amount: '9000000' }).expect(200);
+
+      const res = await review(world.manager, tx.id, action, opened).expect(409);
+
+      expect(res.body.message).toBe(CHANGED);
+      const row = await ctx.prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
+      expect(row.status).toBe('PENDING');
+      await review(world.manager, tx.id, action, await seen(world.manager, tx.id)).expect(200);
+    },
+  );
+
+  it('treats added or removed proof as a change', async () => {
+    const world = await setupWorld(ctx);
+    const tx = await expenseWithProof(ctx, world);
+    const beforeUpload = await seen(world.manager, tx.id);
+
+    await attachProof(ctx, world.staff, tx.id);
+    await review(world.manager, tx.id, 'approve', beforeUpload).expect(409);
+
+    const beforeRemoval = await seen(world.manager, tx.id);
+    const [proof] = await ctx.prisma.attachment.findMany({ where: { transaction_id: tx.id } });
+    await call(ctx, world.staff, 'delete', `${ATTACHMENTS}/${proof!.id}`).expect(204);
+    await review(world.manager, tx.id, 'approve', beforeRemoval).expect(409);
+
+    await review(world.manager, tx.id, 'approve', await seen(world.manager, tx.id)).expect(200);
+  });
+
+  it('refuses a version that is not a timestamp', async () => {
+    const world = await setupWorld(ctx);
+    const tx = await expenseWithProof(ctx, world);
+
+    const res = await review(world.manager, tx.id, 'approve', 'kemarin').expect(400);
+
+    expect(errorFields(res.body)).toEqual(['expectedUpdatedAt']);
   });
 });

@@ -36,7 +36,7 @@ export const routes: RouteRecordRaw[] = [
   { path: PATHS.root, component: placeholder },
   {
     path: PATHS.dashboard,
-    component: placeholder,
+    component: () => import('@/views/dashboard/DashboardView.vue'),
     meta: { roles: ['SUPER_ADMIN'], title: 'Dashboard' },
   },
   {

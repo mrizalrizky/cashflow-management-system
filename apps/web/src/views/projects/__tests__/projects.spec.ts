@@ -17,6 +17,8 @@ import ProjectsView from '../ProjectsView.vue'
 
 vi.mock('@/api/projects')
 vi.mock('@/api/users')
+// Tab Ringkasan dibuka lebih dulu; isinya diuji di project-summary.spec.ts.
+vi.mock('@/api/reports')
 
 const ANI = { id: 'u-ani', name: 'Ani', email: 'ani@example.com' }
 const ZAKI = { id: 'u-zaki', name: 'Zaki', email: 'zaki@example.com' }
@@ -279,7 +281,7 @@ describe('ProjectDetailView', () => {
     ]) {
       expect(text).toContain(expected)
     }
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Anggota', 'Transaksi'])
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Ringkasan', 'Transaksi', 'Anggota'])
     expect(wrapper.get('[data-testid="back-to-projects"]').attributes('href')).toBe('/proyek')
   })
 

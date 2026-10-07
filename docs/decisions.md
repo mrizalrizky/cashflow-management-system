@@ -99,3 +99,14 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Rute `/projects/:id/summary` dikelola modul laporan** (`ReportsModule`), supaya modul proyek tidak bergantung pada modul transaksi. Aksesnya tetap lewat `ProjectAccessService`: proyek di luar jangkauan dijawab 404.
 - **Index baru `idx_transactions_status_transaction_date`** (status, tanggal transaksi). Pada 10.000 transaksi, query arus kas bulanan memakainya (Bitmap Index Scan). Migrasinya ditulis tangan (`20261007090000_report_indexes`) supaya database pengembangan tidak disentuh; jalankan `npx prisma migrate deploy` (atau `migrate dev`) untuk menerapkannya.
 - **Batas waktu respons:** dashboard dan ringkasan proyek masing-masing di bawah 1.500 ms pada 10.000 transaksi, dijaga oleh `test/report-scale.e2e-spec.ts`.
+
+## Fase 4b
+
+- **Grafik digambar dengan HTML dan CSS biasa, tanpa pustaka grafik.** Tiap angka tetap berupa teks (terbaca pembaca layar dan bisa diuji), dan ukuran batang dihitung dengan `BigInt` (`lib/shares.ts`), jadi nominal tidak pernah menjadi `number`. Konsekuensinya hanya ada grafik batang sederhana.
+- **Web tidak menghitung ulang angka laporan.** Total, saldo, selisih dan persentase ditampilkan apa adanya dari API; yang dihitung di web hanya proporsi untuk menggambar.
+- **Tiga komponen dipakai bersama** oleh dashboard dan ringkasan proyek: `StatCard`, `BarList`, `MoneyText`. Nominal negatif selalu bertanda minus dan berwarna merah.
+- **Periode dashboard:** pilihan cepat "12 bulan terakhir" (bawaan, tanpa mengirim tanggal), "Bulan ini", "Tahun ini", ditambah dua tanggal. Tanggal yang tidak dipilih diserahkan ke bawaan API dan yang tampil adalah periode yang benar-benar dipakai. Keberatan API atas periode muncul di bawah tanggal yang disebutnya; angka terakhir yang berhasil dimuat tetap tampil.
+- **Jumlah "menunggu ditinjau" di dashboard** membuka daftar transaksi pada status itu (`/transaksi?status=PENDING`). Daftar transaksi membaca status dari alamat sekali saat dibuka.
+- **Tab halaman proyek:** Ringkasan (dibuka lebih dulu), Transaksi, Anggota. Tab yang tidak aktif tidak dipasang, jadi ringkasan dimuat ulang tiap kali dibuka.
+- **Kontrak yang dibayar lebih** ditampilkan apa adanya: persentase di atas 100, batang kemajuan penuh, dan sisa negatif berwarna merah dengan keterangan.
+- **Test browser menyiapkan datanya sendiri lewat API** (`e2e/api.ts`), dan data dashboard diletakkan pada bulan yang tidak dipakai file lain supaya angkanya tidak bergantung pada urutan file.

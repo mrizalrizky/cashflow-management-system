@@ -57,3 +57,18 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Halaman yang berkas kodenya gagal diambil** (tab lama setelah aplikasi diperbarui) dimuat ulang satu kali; bila masih gagal, ditampilkan pesan dengan tombol coba lagi.
 - **Test browser memakai hasil build produksi** (`vite preview`), bukan server pengembangan.
 - **Alamat proyek dengan id yang salah ketik** ditampilkan sebagai "Proyek tidak ditemukan", sama seperti proyek yang bukan miliknya.
+
+## Fase 3a
+
+- **Siapa boleh apa ditentukan di satu tempat:** `transaction-policy.ts` (fungsi murni). API mengirim hasilnya sebagai `permissions` di tiap transaksi, jadi web tidak mengulang aturannya.
+- **Transaksi di luar jangkauan dijawab 404**, sama seperti yang tidak ada: koordinator hanya melihat transaksi proyek yang ditugaskan kepadanya, staf hanya miliknya sendiri. Transaksi tanpa proyek (overhead) hanya terlihat oleh pembuatnya dan admin.
+- **Semua transaksi baru berstatus `PENDING`**, termasuk yang dicatat admin; tidak ada persetujuan otomatis. Yang dicatat koordinator atau admin hanya bisa disetujui admin.
+- **Mengubah transaksi `REJECTED` berarti mengajukannya lagi** (`PENDING`, alasan penolakan dikosongkan, audit `RESUBMIT`).
+- **Tidak ada yang dihapus.** Membatalkan transaksi `PENDING` (`CANCEL`) dan membatalkan yang sudah `APPROVED` (`VOID`, admin saja) sama-sama menjadikannya `VOID` dengan alasan.
+- **Pengeluaran wajib punya bukti sebelum disetujui**; pemasukan tidak. Bukti tidak bisa ditambah atau dihapus setelah transaksi disetujui.
+- **Persetujuan tidak pernah ditolak karena saldo akan minus.** Jawaban persetujuan menyertakan saldo akun sesudahnya (`accountBalance`) hanya untuk admin, supaya web bisa memperingatkan.
+- **Dua tindakan bersamaan, satu yang menang.** Tiap perubahan status mengunci baris transaksinya dan hanya berlaku bila statusnya belum berubah; yang kalah mendapat 409.
+- **Berkas bukti** disimpan lewat `StorageService` (sekarang folder lokal `STORAGE_DIR`), maksimal 10 MB dan 10 berkas per transaksi. Jenisnya (JPEG, PNG, WebP, PDF) ditentukan dari isi berkas, bukan dari nama atau jenis yang dikirim browser, dan selalu dikirim sebagai unduhan.
+- **Transfer antar akun** adalah dua transaksi `APPROVED` (kategori sistem Transfer Keluar dan Transfer Masuk) dengan `transfer_group_id` yang sama, tanpa proyek, hanya untuk admin. Satu sisi tidak bisa diubah sendiri; membatalkan salah satu membatalkan keduanya. Daftar transaksi bisa menyembunyikannya dengan `includeTransfers=false`.
+- **Tanggal transaksi tidak boleh di masa depan** (waktu Jakarta), dan nominal maksimal 13 digit.
+- **Untuk Fase 5:** cadangan harus mencakup folder `STORAGE_DIR`, bukan hanya database.

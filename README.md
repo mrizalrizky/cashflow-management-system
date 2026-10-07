@@ -25,6 +25,12 @@ npm run dev:web     # http://localhost:5173
 
 Seed aman dijalankan berulang. Admin pertama hanya dibuat bila belum ada SUPER_ADMIN, dan wajib ganti password saat login pertama.
 
+## Berkas bukti transaksi
+
+Bukti transaksi (foto atau PDF nota) disimpan sebagai berkas di folder `STORAGE_DIR` (`apps/api/.env`, bawaan `./storage`), bukan di database. Database hanya menyimpan nama dan lokasi berkasnya.
+
+Karena itu **cadangkan folder `STORAGE_DIR` bersama database**, dan pulihkan keduanya dari waktu yang sama. Database tanpa foldernya berarti bukti tidak bisa dibuka; folder tanpa databasenya berarti berkas tanpa pemilik.
+
 ## Dokumentasi API
 
 Saat API berjalan di luar produksi, daftar rute bisa dibuka di http://localhost:3000/api/docs.

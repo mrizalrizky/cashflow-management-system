@@ -35,6 +35,11 @@ export class CreateProjectDto {
   @IsMoneyString()
   contractValue?: string;
 
+  /** Nilai kontrak berikut PPN; '0' berarti belum diisi. */
+  @IsOptionalNotNull()
+  @IsMoneyString()
+  contractValueWithPpn?: string;
+
   @IsOptional()
   @IsCalendarDate()
   startDate?: string | null;
@@ -62,6 +67,11 @@ export class UpdateProjectDto {
   @IsOptionalNotNull()
   @IsMoneyString()
   contractValue?: string;
+
+  /** Nilai kontrak berikut PPN; '0' berarti belum diisi. */
+  @IsOptionalNotNull()
+  @IsMoneyString()
+  contractValueWithPpn?: string;
 
   @IsOptionalNotNull()
   @IsIn(PROJECT_STATUSES)

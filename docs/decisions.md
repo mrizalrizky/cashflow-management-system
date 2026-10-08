@@ -154,3 +154,11 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **`DATABASE_URL` produksi memakai alamat langsung Neon** (bukan pooled), dan proyek Neon dibuat dengan PostgreSQL 17, sama dengan klien cadangan.
 - **`deploy/dc`** membungkus perintah Compose produksi, menggantikan alias shell yang hilang tiap sesi baru.
 - **Dua jaringan Docker:** `edge` (tunnel dan Caddy) dan `app` (Caddy, API, cadangan). Tunnel tidak bisa menjangkau API tanpa lewat Caddy. Log container dibatasi 5 berkas x 10 MB.
+
+## Setelah MVP: nilai kontrak + PPN
+
+- **Proyek punya dua nilai kontrak terpisah:** `contract_value` (sebelum PPN) dan `contract_value_with_ppn`. Permintaan klien. Keduanya diisi dengan tangan sesuai kontrak; tarif PPN tidak disimpan dan tidak dihitung aplikasi.
+- **Sisa belum diterima dan persentase diterima diukur terhadap nilai kontrak + PPN**, karena klien membayar berikut PPN. Nilai 0 berarti belum diisi: persentasenya kosong, sama seperti proyek tanpa nilai kontrak sebelumnya.
+- **Nilai kontrak + PPN tidak boleh lebih kecil dari nilai kontrak** (kecuali 0), dicek terhadap nilai akhir saat hanya salah satunya diubah.
+- **Proyek yang sudah ada** diberi nilai kontrak + PPN sama dengan nilai kontraknya oleh migrasi, supaya ringkasannya tidak berubah; admin menyesuaikannya.
+- **Pembayaran per termin tidak dimodelkan.** Tiap termin dicatat sebagai transaksi pemasukan proyek dan dijumlahkan ringkasan. Jadwal termin (jumlah per termin, jatuh tempo) adalah fitur terpisah yang belum diminta.

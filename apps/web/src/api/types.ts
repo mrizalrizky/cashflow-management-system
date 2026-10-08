@@ -41,7 +41,7 @@ export type TxType = 'IN' | 'OUT'
 export type ProjectStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
 export type TxStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID'
 
-/** Nominal (`openingBalance`, `balance`, `contractValue`) selalu string digit. */
+/** Nominal (`openingBalance`, `balance`, `contractValue`, `contractValueWithPpn`) selalu string digit. */
 export interface Account {
   id: string
   name: string
@@ -73,6 +73,8 @@ export interface Project {
   name: string
   clientName: string
   contractValue: string
+  /** Nilai kontrak berikut PPN; `'0'` berarti belum diisi. */
+  contractValueWithPpn: string
   status: ProjectStatus
   startDate: string | null
   endDate: string | null
@@ -193,10 +195,12 @@ export interface CompanyDashboard {
 export interface ProjectSummary {
   projectId: string
   contractValue: string
+  /** Dasar `outstanding` dan `receivedPercent`; `'0'` berarti belum diisi. */
+  contractValueWithPpn: string
   received: string
-  /** Nilai kontrak dikurangi yang diterima; negatif bila yang diterima melebihi kontrak. */
+  /** Nilai kontrak + PPN dikurangi yang diterima; negatif bila yang diterima melebihinya. */
   outstanding: string
-  /** Dua desimal; null bila nilai kontrak 0. */
+  /** Dua desimal; null bila nilai kontrak + PPN belum diisi. */
   receivedPercent: number | null
   cost: string
   /** Yang diterima dikurangi biaya. */

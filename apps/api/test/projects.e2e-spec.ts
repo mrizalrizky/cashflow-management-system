@@ -9,6 +9,7 @@ const NEW_PROJECT = {
   name: 'Rumah Pak Budi',
   clientName: 'Budi Santoso',
   contractValue: '850000000',
+  contractValueWithPpn: '943500000',
   startDate: '2026-10-01',
   endDate: '2027-03-31',
   notes: 'Dua lantai',
@@ -30,6 +31,7 @@ describe('POST /projects', () => {
       name: 'Rumah Pak Budi',
       clientName: 'Budi Santoso',
       contractValue: '850000000',
+      contractValueWithPpn: '943500000',
       status: 'ACTIVE',
       startDate: '2026-10-01',
       endDate: '2027-03-31',
@@ -40,7 +42,11 @@ describe('POST /projects', () => {
     });
     const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { entity_type: 'project' } });
     expect(row).toMatchObject({ action: 'CREATE', user_id: admin.user.id, entity_id: res.body.id });
-    expect(row.after).toMatchObject({ code: `PRJ-${YEAR}-001`, contract_value: '850000000' });
+    expect(row.after).toMatchObject({
+      code: `PRJ-${YEAR}-001`,
+      contract_value: '850000000',
+      contract_value_with_ppn: '943500000',
+    });
   });
 
   it('needs only a name and a client, defaulting the rest', async () => {
@@ -50,10 +56,22 @@ describe('POST /projects', () => {
       .expect(201);
     expect(res.body).toMatchObject({
       contractValue: '0',
+      contractValueWithPpn: '0',
       startDate: null,
       endDate: null,
       notes: null,
     });
+  });
+
+  it('accepts a contract value whose value with PPN is not filled in yet, or equal to it', async () => {
+    const admin = await asAdmin(ctx);
+
+    for (const contractValueWithPpn of ['0', '850000000']) {
+      const res = await call(ctx, admin, 'post', PROJECTS)
+        .send({ ...NEW_PROJECT, contractValueWithPpn })
+        .expect(201);
+      expect(res.body.contractValueWithPpn).toBe(contractValueWithPpn);
+    }
   });
 
   it('numbers projects consecutively', async () => {
@@ -105,6 +123,9 @@ describe('POST /projects', () => {
     ['a negative contract value', { contractValue: '-1' }, 'contractValue'],
     ['a decimal contract value', { contractValue: '1000.5' }, 'contractValue'],
     ['a numeric contract value', { contractValue: 1000 }, 'contractValue'],
+    ['a negative value with PPN', { contractValueWithPpn: '-1' }, 'contractValueWithPpn'],
+    ['a numeric value with PPN', { contractValueWithPpn: 1000 }, 'contractValueWithPpn'],
+    ['a value with PPN below the contract value', { contractValueWithPpn: '849999999' }, 'contractValueWithPpn'],
     ['a start date that does not exist', { startDate: '2026-02-30' }, 'startDate'],
     ['an end date before the start date', { endDate: '2026-09-30' }, 'endDate'],
     ['a code chosen by the client', { code: 'PRJ-2026-777' }, 'code'],
@@ -131,7 +152,13 @@ describe('PATCH /projects/:id', () => {
     const project = await createViaApi(admin);
 
     const res = await call(ctx, admin, 'patch', `${PROJECTS}/${project.id}`)
-      .send({ name: 'Rumah Bu Ani', clientName: 'Ani', contractValue: '900000000', status: 'COMPLETED' })
+      .send({
+        name: 'Rumah Bu Ani',
+        clientName: 'Ani',
+        contractValue: '900000000',
+        contractValueWithPpn: '999000000',
+        status: 'COMPLETED',
+      })
       .expect(200);
 
     expect(res.body).toMatchObject({
@@ -139,11 +166,18 @@ describe('PATCH /projects/:id', () => {
       name: 'Rumah Bu Ani',
       clientName: 'Ani',
       contractValue: '900000000',
+      contractValueWithPpn: '999000000',
       status: 'COMPLETED',
     });
     const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE' } });
     expect(row.before).toMatchObject({ name: 'Rumah Pak Budi', status: 'ACTIVE' });
-    expect(row.after).toMatchObject({ name: 'Rumah Bu Ani', status: 'COMPLETED', contract_value: '900000000' });
+    expect(row.before).toMatchObject({ contract_value_with_ppn: '943500000' });
+    expect(row.after).toMatchObject({
+      name: 'Rumah Bu Ani',
+      status: 'COMPLETED',
+      contract_value: '900000000',
+      contract_value_with_ppn: '999000000',
+    });
   });
 
   it('lets the status move in any direction', async () => {
@@ -165,9 +199,31 @@ describe('PATCH /projects/:id', () => {
       .expect(200);
     expect(res.body).toMatchObject({ startDate: null, endDate: null, notes: null });
 
-    for (const body of [{ name: null }, { clientName: null }, { contractValue: null }, { status: null }]) {
+    for (const body of [
+      { name: null },
+      { clientName: null },
+      { contractValue: null },
+      { contractValueWithPpn: null },
+      { status: null },
+    ]) {
       await call(ctx, admin, 'patch', `${PROJECTS}/${project.id}`).send(body).expect(400);
     }
+  });
+
+  it('checks the value with PPN against the stored contract value when only one of them changes', async () => {
+    const admin = await asAdmin(ctx);
+    const project = await createViaApi(admin);
+    const patch = (body: object) => call(ctx, admin, 'patch', `${PROJECTS}/${project.id}`).send(body);
+
+    // Tersimpan: kontrak 850.000.000, dengan PPN 943.500.000.
+    const tooLow = await patch({ contractValueWithPpn: '800000000' }).expect(400);
+    expect(errorFields(tooLow.body)).toContain('contractValueWithPpn');
+    const tooHigh = await patch({ contractValue: '950000000' }).expect(400);
+    expect(errorFields(tooHigh.body)).toContain('contractValueWithPpn');
+
+    await patch({ contractValue: '943500000' }).expect(200);
+    const cleared = await patch({ contractValueWithPpn: '0' }).expect(200);
+    expect(cleared.body).toMatchObject({ contractValue: '943500000', contractValueWithPpn: '0' });
   });
 
   it('checks the date range against the stored dates when only one date changes', async () => {

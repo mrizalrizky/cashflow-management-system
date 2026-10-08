@@ -115,6 +115,43 @@ describe('GET /projects/:id/summary', () => {
     expect((await summary(ctx, world.admin, project.id)).receivedPercent).toBe(33.33);
   });
 
+  it('measures what is left and the percentage against the contract value with PPN', async () => {
+    const world = await setup();
+    const project = await createProject(ctx.prisma, {
+      contractValue: 100_000_000n,
+      contractValueWithPpn: 111_000_000n,
+    });
+    // Termin pertama, dibayar klien berikut PPN-nya.
+    await createTransaction(ctx.prisma, {
+      type: 'IN',
+      amount: 33_300_000n,
+      accountId: world.bank.id,
+      categoryId: world.income.id,
+      createdById: world.recorder.id,
+      projectId: project.id,
+    });
+
+    expect(await summary(ctx, world.admin, project.id)).toMatchObject({
+      contractValue: '100000000',
+      contractValueWithPpn: '111000000',
+      received: '33300000',
+      outstanding: '77700000',
+      receivedPercent: 30,
+    });
+  });
+
+  it('has no percentage while the value with PPN is not filled in, even with a contract value', async () => {
+    const admin = await asAdmin(ctx);
+    const project = await createProject(ctx.prisma, { contractValue: 100_000_000n, contractValueWithPpn: 0n });
+
+    expect(await summary(ctx, admin, project.id)).toMatchObject({
+      contractValue: '100000000',
+      contractValueWithPpn: '0',
+      outstanding: '0',
+      receivedPercent: null,
+    });
+  });
+
   it('reports zeros for a project without transactions, and no percentage without a contract value', async () => {
     const admin = await asAdmin(ctx);
     const quiet = await createProject(ctx.prisma, { contractValue: 50_000_000n });
@@ -123,6 +160,7 @@ describe('GET /projects/:id/summary', () => {
     expect(await summary(ctx, admin, quiet.id)).toEqual({
       projectId: quiet.id,
       contractValue: '50000000',
+      contractValueWithPpn: '50000000',
       received: '0',
       outstanding: '50000000',
       receivedPercent: 0,
@@ -133,6 +171,7 @@ describe('GET /projects/:id/summary', () => {
     });
     expect(await summary(ctx, admin, noContract.id)).toMatchObject({
       contractValue: '0',
+      contractValueWithPpn: '0',
       outstanding: '0',
       receivedPercent: null,
     });

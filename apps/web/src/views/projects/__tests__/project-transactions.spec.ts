@@ -25,6 +25,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     ...RUMAH,
     clientName: 'Budi Santoso',
     contractValue: '850000000',
+    contractValueWithPpn: '943500000',
     status: 'ACTIVE',
     startDate: null,
     endDate: null,

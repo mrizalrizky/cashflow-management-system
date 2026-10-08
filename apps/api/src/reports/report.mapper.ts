@@ -36,11 +36,13 @@ export interface CompanyDashboardResponse {
 export interface ProjectSummaryResponse {
   projectId: string;
   contractValue: string;
+  /** Nilai kontrak berikut PPN: dasar `outstanding` dan `receivedPercent`. '0' berarti belum diisi. */
+  contractValueWithPpn: string;
   /** Pemasukan proyek yang sudah disetujui. */
   received: string;
-  /** Nilai kontrak dikurangi yang diterima; negatif bila yang diterima melebihi kontrak. */
+  /** Nilai kontrak + PPN dikurangi yang diterima; negatif bila yang diterima melebihinya. */
   outstanding: string;
-  /** Persentase kontrak yang sudah diterima, dua desimal; null bila nilai kontrak 0. */
+  /** Persentase nilai kontrak + PPN yang sudah diterima, dua desimal; null bila nilai itu 0. */
   receivedPercent: number | null;
   /** Pengeluaran proyek yang sudah disetujui. */
   cost: string;
@@ -60,6 +62,7 @@ function percentOf(part: bigint, whole: bigint): number | null {
 export function toProjectSummary(data: {
   projectId: string;
   contractValue: bigint;
+  contractValueWithPpn: bigint;
   totals: TypeTotals;
   costByCategory: CategoryTotal[];
   pendingCount: number;
@@ -68,9 +71,11 @@ export function toProjectSummary(data: {
   return {
     projectId: data.projectId,
     contractValue: fromMoney(data.contractValue),
+    contractValueWithPpn: fromMoney(data.contractValueWithPpn),
     received: fromMoney(received),
-    outstanding: fromMoney(data.contractValue - received),
-    receivedPercent: percentOf(received, data.contractValue),
+    // Klien membayar berikut PPN, jadi yang diterima dibandingkan dengan nilai berikut PPN.
+    outstanding: fromMoney(data.contractValueWithPpn - received),
+    receivedPercent: percentOf(received, data.contractValueWithPpn),
     cost: fromMoney(cost),
     cashDifference: fromMoney(received - cost),
     costByCategory: toCategoryAmounts(data.costByCategory),

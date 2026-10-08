@@ -97,17 +97,19 @@ model Category {
 }
 
 model Project {
-  id             String        @id @default(uuid())
-  code           String        @unique(map: "uq_projects_code") // mis. PRJ-2026-001
-  name           String
-  client_name    String
-  contract_value BigInt        @default(0)
-  status         ProjectStatus @default(ACTIVE)
-  start_date     DateTime?     @db.Date
-  end_date       DateTime?     @db.Date
-  notes          String?
-  created_at     DateTime      @default(now())
-  updated_at     DateTime      @updatedAt
+  id                      String        @id @default(uuid())
+  code                    String        @unique(map: "uq_projects_code") // mis. PRJ-2026-001
+  name                    String
+  client_name             String
+  contract_value          BigInt        @default(0)
+  // Nilai kontrak berikut PPN, diisi dengan tangan; 0 berarti belum diisi.
+  contract_value_with_ppn BigInt        @default(0)
+  status                  ProjectStatus @default(ACTIVE)
+  start_date              DateTime?     @db.Date
+  end_date                DateTime?     @db.Date
+  notes                   String?
+  created_at              DateTime      @default(now())
+  updated_at              DateTime      @updatedAt
 
   members      ProjectMember[]
   transactions Transaction[]

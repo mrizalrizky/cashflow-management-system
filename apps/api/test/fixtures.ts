@@ -175,7 +175,15 @@ export function createCategory(
 
 export function createProject(
   prisma: PrismaClient,
-  overrides: Partial<{ code: string; name: string; clientName: string; status: ProjectStatus; contractValue: bigint }> = {},
+  overrides: Partial<{
+    code: string;
+    name: string;
+    clientName: string;
+    status: ProjectStatus;
+    contractValue: bigint;
+    /** Bawaannya sama dengan `contractValue`: kontrak tanpa PPN. */
+    contractValueWithPpn: bigint;
+  }> = {},
 ): Promise<Project> {
   sequence += 1;
   return prisma.project.create({
@@ -185,6 +193,7 @@ export function createProject(
       client_name: overrides.clientName ?? `Klien ${sequence}`,
       status: overrides.status ?? 'ACTIVE',
       contract_value: overrides.contractValue ?? 0n,
+      contract_value_with_ppn: overrides.contractValueWithPpn ?? overrides.contractValue ?? 0n,
     },
   });
 }

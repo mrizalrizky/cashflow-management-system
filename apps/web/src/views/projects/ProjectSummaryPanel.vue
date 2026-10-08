@@ -27,15 +27,18 @@ watch(
 )
 
 const percent = computed(() => summary.value?.receivedPercent ?? null)
-/** `33.33` ditulis `33,33`; tanpa nilai kontrak tidak ada persentase untuk ditampilkan. */
+/**
+ * Yang diterima diukur terhadap nilai kontrak + PPN, karena klien membayar berikut PPN.
+ * `33.33` ditulis `33,33`; selama nilai itu belum diisi tidak ada persentase untuk ditampilkan.
+ */
 const receivedHint = computed(() =>
   percent.value === null
-    ? 'Nilai kontrak belum diisi'
-    : `${String(percent.value).replace('.', ',')}% dari kontrak`,
+    ? 'Nilai kontrak + PPN belum diisi'
+    : `${String(percent.value).replace('.', ',')}% dari nilai kontrak + PPN`,
 )
 /** Batang kemajuan berhenti di 100% walau yang diterima melebihi kontrak. */
 const progress = computed(() => Math.min(percent.value ?? 0, 100))
-// Tanpa nilai kontrak, sisa yang negatif bukan berarti kontraknya dibayar lebih.
+// Tanpa nilai kontrak + PPN, sisa yang negatif bukan berarti kontraknya dibayar lebih.
 const overpaid = computed(
   () => percent.value !== null && (summary.value?.outstanding.startsWith('-') ?? false),
 )
@@ -59,6 +62,12 @@ const costs = computed(() =>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <StatCard label="Nilai kontrak" :amount="summary.contractValue" data-testid="summary-contract" />
       <StatCard
+        label="Nilai kontrak + PPN"
+        :amount="summary.contractValueWithPpn"
+        :hint="percent === null ? 'Belum diisi' : undefined"
+        data-testid="summary-contract-ppn"
+      />
+      <StatCard
         label="Diterima"
         :amount="summary.received"
         tone="income"
@@ -77,7 +86,7 @@ const costs = computed(() =>
       <StatCard
         label="Sisa belum diterima"
         :amount="summary.outstanding"
-        :hint="overpaid ? 'Diterima melebihi nilai kontrak' : undefined"
+        :hint="overpaid ? 'Diterima melebihi nilai kontrak + PPN' : undefined"
         data-testid="summary-outstanding"
       />
       <StatCard label="Biaya" :amount="summary.cost" tone="expense" data-testid="summary-cost" />

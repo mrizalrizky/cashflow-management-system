@@ -10,6 +10,7 @@ export interface CreateProjectInput {
   name: string
   clientName: string
   contractValue?: string
+  contractValueWithPpn?: string
   startDate?: string | null
   endDate?: string | null
   notes?: string | null

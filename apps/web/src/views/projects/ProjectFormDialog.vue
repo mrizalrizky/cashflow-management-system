@@ -11,6 +11,7 @@ import TextField from '@/components/TextField.vue'
 import { useEntityDialog } from '@/composables/useEntityDialog'
 import { omit } from '@/lib/changes'
 import { PROJECT_STATUS_OPTIONS } from '@/lib/labels'
+import { isMoneyString } from '@/lib/money'
 import { collectErrors, money, required } from '@/lib/validation'
 
 const props = defineProps<{
@@ -24,6 +25,7 @@ interface Form {
   name: string
   clientName: string
   contractValue: string
+  contractValueWithPpn: string
   status: ProjectStatus
   startDate: string | null
   endDate: string | null
@@ -31,6 +33,14 @@ interface Form {
 }
 
 type Input = Required<UpdateProjectInput>
+
+const WITH_PPN_TOO_LOW = 'Nilai kontrak + PPN tidak boleh lebih kecil dari nilai kontrak'
+
+/** Nilai berikut PPN boleh belum diisi (kosong atau 0), tetapi tidak lebih kecil dari kontraknya. */
+function belowContractValue(withPpn: unknown, contractValue: string): boolean {
+  if (!isMoneyString(withPpn) || !isMoneyString(contractValue)) return false
+  return BigInt(withPpn) !== 0n && BigInt(withPpn) < BigInt(contractValue)
+}
 
 const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntityDialog<
   Project,
@@ -43,6 +53,7 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     name: '',
     clientName: '',
     contractValue: '',
+    contractValueWithPpn: '',
     status: 'ACTIVE',
     startDate: null,
     endDate: null,
@@ -52,6 +63,7 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     name: project.name,
     clientName: project.clientName,
     contractValue: project.contractValue,
+    contractValueWithPpn: project.contractValueWithPpn,
     status: project.status,
     startDate: project.startDate,
     endDate: project.endDate,
@@ -61,6 +73,7 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     name: values.name.trim(),
     clientName: values.clientName.trim(),
     contractValue: values.contractValue || '0',
+    contractValueWithPpn: values.contractValueWithPpn || '0',
     status: values.status,
     startDate: values.startDate,
     endDate: values.endDate,
@@ -71,6 +84,10 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
       name: [required('Nama proyek')],
       clientName: [required('Nama klien')],
       contractValue: [money('Nilai kontrak', { required: false })],
+      contractValueWithPpn: [
+        money('Nilai kontrak + PPN', { required: false }),
+        (withPpn) => (belowContractValue(withPpn, values.contractValue) ? WITH_PPN_TOO_LOW : null),
+      ],
       // Tanggal kalender `YYYY-MM-DD` bisa dibandingkan langsung sebagai teks.
       endDate: [
         (end) =>
@@ -119,7 +136,24 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
         :invalid="field.invalid"
         :aria-describedby="field.describedBy"
       />
-      <small class="text-surface-500">Kosong berarti 0.</small>
+      <small class="text-surface-500">Sebelum PPN. Kosong berarti 0.</small>
+    </FormField>
+
+    <FormField
+      id="project-contract-ppn"
+      v-slot="field"
+      label="Nilai kontrak + PPN (Rp)"
+      :error="fieldErrors.contractValueWithPpn"
+    >
+      <MoneyInput
+        :id="field.id"
+        v-model="form.contractValueWithPpn"
+        :invalid="field.invalid"
+        :aria-describedby="field.describedBy"
+      />
+      <small class="text-surface-500">
+        Dasar sisa tagihan dan persentase diterima. Kosong berarti belum diisi.
+      </small>
     </FormField>
 
     <SelectField

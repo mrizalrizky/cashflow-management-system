@@ -109,7 +109,7 @@ describe('describeValue', () => {
     expect(describeValue('description', '<script>alert(1)</script>')).toBe('<script>alert(1)</script>')
   })
 
-  it.each(['amount', 'opening_balance', 'contract_value'])('shows %s as rupiah', (field) => {
+  it.each(['amount', 'opening_balance', 'contract_value', 'contract_value_with_ppn'])('shows %s as rupiah', (field) => {
     expect(describeValue(field, '1250000')).toBe('Rp 1.250.000')
     expect(describeValue(field, '9007199254740993')).toBe('Rp 9.007.199.254.740.993')
     expect(describeValue(field, 'bukan angka')).toBe('bukan angka')

@@ -3,7 +3,7 @@ import { formatCalendarDate, formatDateTime } from './format'
 import { formatRupiah, isMoneyString } from './money'
 
 /** Field snapshot audit yang berisi nominal rupiah (string digit). */
-const MONEY_FIELDS = new Set(['amount', 'opening_balance', 'contract_value'])
+const MONEY_FIELDS = new Set(['amount', 'opening_balance', 'contract_value', 'contract_value_with_ppn'])
 /** Teks terpanjang yang diizinkan API adalah 500 karakter; batas ini hanya menahan nilai yang tidak wajar. */
 const MAX_LENGTH = 2000
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T/

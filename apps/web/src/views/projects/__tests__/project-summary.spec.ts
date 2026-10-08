@@ -30,6 +30,7 @@ function makeSummary(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
   return {
     projectId: RUMAH.id,
     contractValue: '100000000',
+    contractValueWithPpn: '100000000',
     received: '30000000',
     outstanding: '70000000',
     receivedPercent: 30,
@@ -49,6 +50,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     ...RUMAH,
     clientName: 'Budi Santoso',
     contractValue: '100000000',
+    contractValueWithPpn: '100000000',
     status: 'ACTIVE',
     startDate: null,
     endDate: null,
@@ -89,11 +91,34 @@ describe('ProjectSummaryPanel', () => {
     expect(getSummary).toHaveBeenCalledExactlyOnceWith(RUMAH.id)
     expect(stat(wrapper, 'contract').text()).toContain('Rp 100.000.000')
     expect(stat(wrapper, 'received').text()).toContain('Rp 30.000.000')
-    expect(stat(wrapper, 'received').text()).toContain('30% dari kontrak')
+    expect(stat(wrapper, 'received').text()).toContain('30% dari nilai kontrak + PPN')
     expect(progressWidth(wrapper)).toBe('30%')
     expect(stat(wrapper, 'outstanding').text()).toContain('Rp 70.000.000')
     expect(stat(wrapper, 'cost').text()).toContain('Rp 37.000.000')
     expect(wrapper.text()).toContain('1 transaksi menunggu ditinjau')
+  })
+
+  it('shows the contract value and the value with PPN as separate figures', async () => {
+    const wrapper = await mountPanel(
+      makeSummary({ contractValueWithPpn: '111000000', outstanding: '81000000', receivedPercent: 27.02 }),
+    )
+
+    expect(stat(wrapper, 'contract').text()).toContain('Nilai kontrak')
+    expect(stat(wrapper, 'contract').text()).toContain('Rp 100.000.000')
+    expect(stat(wrapper, 'contract-ppn').text()).toContain('Nilai kontrak + PPN')
+    expect(stat(wrapper, 'contract-ppn').text()).toContain('Rp 111.000.000')
+    expect(stat(wrapper, 'received').text()).toContain('27,02% dari nilai kontrak + PPN')
+    expect(stat(wrapper, 'outstanding').text()).toContain('Rp 81.000.000')
+  })
+
+  it('says the value with PPN is not filled in, even when the contract value is', async () => {
+    const wrapper = await mountPanel(
+      makeSummary({ contractValueWithPpn: '0', outstanding: '-30000000', receivedPercent: null }),
+    )
+
+    expect(stat(wrapper, 'contract-ppn').text()).toContain('Belum diisi')
+    expect(stat(wrapper, 'received').text()).toContain('Nilai kontrak + PPN belum diisi')
+    expect(stat(wrapper, 'outstanding').text()).not.toContain('melebihi')
   })
 
   it('shows a negative cash difference in red with its minus sign', async () => {
@@ -120,27 +145,27 @@ describe('ProjectSummaryPanel', () => {
       makeSummary({ received: '25000000', contractValue: '20000000', outstanding: '-5000000', receivedPercent: 125 }),
     )
 
-    expect(stat(wrapper, 'received').text()).toContain('125% dari kontrak')
+    expect(stat(wrapper, 'received').text()).toContain('125% dari nilai kontrak + PPN')
     expect(progressWidth(wrapper)).toBe('100%')
     const outstanding = stat(wrapper, 'outstanding')
     expect(outstanding.text()).toContain('-Rp 5.000.000')
-    expect(outstanding.text()).toContain('Diterima melebihi nilai kontrak')
+    expect(outstanding.text()).toContain('Diterima melebihi nilai kontrak + PPN')
     expect(outstanding.find('.text-red-600').exists()).toBe(true)
   })
 
   it('writes a fractional percentage the Indonesian way', async () => {
     const wrapper = await mountPanel(makeSummary({ receivedPercent: 33.33 }))
 
-    expect(stat(wrapper, 'received').text()).toContain('33,33% dari kontrak')
+    expect(stat(wrapper, 'received').text()).toContain('33,33% dari nilai kontrak + PPN')
     expect(progressWidth(wrapper)).toBe('33.33%')
   })
 
   it('shows a dash and no progress bar when there is no contract value', async () => {
     const wrapper = await mountPanel(
-      makeSummary({ contractValue: '0', outstanding: '-30000000', receivedPercent: null }),
+      makeSummary({ contractValue: '0', contractValueWithPpn: '0', outstanding: '-30000000', receivedPercent: null }),
     )
 
-    expect(stat(wrapper, 'received').text()).toContain('Nilai kontrak belum diisi')
+    expect(stat(wrapper, 'received').text()).toContain('Nilai kontrak + PPN belum diisi')
     expect(progressWidth(wrapper)).toBeNull()
     // Tanpa nilai kontrak, yang diterima bukan "melebihi kontrak".
     expect(stat(wrapper, 'outstanding').text()).not.toContain('melebihi')
@@ -161,7 +186,7 @@ describe('ProjectSummaryPanel', () => {
     )
 
     expect(stat(wrapper, 'received').text()).toContain('Rp 0')
-    expect(stat(wrapper, 'received').text()).toContain('0% dari kontrak')
+    expect(stat(wrapper, 'received').text()).toContain('0% dari nilai kontrak + PPN')
     expect(progressWidth(wrapper)).toBeNull()
     expect(stat(wrapper, 'difference').text()).toContain('Rp 0')
     expect(wrapper.text()).toContain('Belum ada biaya yang disetujui')
@@ -239,7 +264,7 @@ describe('ProjectDetailView: Ringkasan tab', () => {
 
     expect(getSummary).toHaveBeenCalledExactlyOnceWith(RUMAH.id)
     expect(stat(wrapper, 'contract').text()).toContain('Rp 200.000.000')
-    expect(stat(wrapper, 'received').text()).toContain('15% dari kontrak')
+    expect(stat(wrapper, 'received').text()).toContain('15% dari nilai kontrak + PPN')
   })
 
   it('asks for the summary again after a transaction was recorded', async () => {

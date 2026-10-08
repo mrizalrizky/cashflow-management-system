@@ -14,6 +14,7 @@ import { ProjectAccessService, projectNotFound } from './project-access.service.
 import { PROJECT_INCLUDE, ProjectWithMembers } from './project.mapper.js';
 
 const ENTITY = 'project';
+const NOT_FILLED = 0n;
 const CODE_DIGITS = 3;
 
 function toWhere(query: ListProjectsQueryDto): Prisma.ProjectWhereInput {
@@ -24,6 +25,18 @@ function toWhere(query: ListProjectsQueryDto): Prisma.ProjectWhereInput {
     where.OR = [{ code: text }, { name: text }, { client_name: text }];
   }
   return where;
+}
+
+/** Nilai berikut PPN boleh belum diisi (0), tetapi tidak pernah lebih kecil dari nilai kontraknya. */
+function assertContractValues(contractValue: bigint, withPpn: bigint): void {
+  if (withPpn !== NOT_FILLED && withPpn < contractValue) {
+    throw validationFailed([
+      {
+        field: 'contractValueWithPpn',
+        messages: ['Nilai kontrak + PPN tidak boleh lebih kecil dari nilai kontrak'],
+      },
+    ]);
+  }
 }
 
 /** `undefined` berarti tidak diubah, `null` berarti dikosongkan. */
@@ -82,6 +95,9 @@ export class ProjectsService {
     const start_date = toNullableDate(dto.startDate) ?? null;
     const end_date = toNullableDate(dto.endDate) ?? null;
     assertDateRange(start_date, end_date);
+    const contract_value = toMoney(dto.contractValue ?? '0');
+    const contract_value_with_ppn = toMoney(dto.contractValueWithPpn ?? '0');
+    assertContractValues(contract_value, contract_value_with_ppn);
 
     return this.prisma.$transaction(async (tx) => {
       const project = await tx.project.create({
@@ -89,7 +105,8 @@ export class ProjectsService {
           code: await this.nextCode(tx),
           name: dto.name,
           client_name: dto.clientName,
-          contract_value: toMoney(dto.contractValue ?? '0'),
+          contract_value,
+          contract_value_with_ppn,
           start_date,
           end_date,
           notes: dto.notes || null,
@@ -126,12 +143,22 @@ export class ProjectsService {
         end_date === undefined ? before.end_date : end_date,
       );
 
+      // Sama seperti tanggal: nilai yang tidak dikirim memakai nilai tersimpan.
+      const contract_value =
+        dto.contractValue === undefined ? before.contract_value : toMoney(dto.contractValue);
+      const contract_value_with_ppn =
+        dto.contractValueWithPpn === undefined
+          ? before.contract_value_with_ppn
+          : toMoney(dto.contractValueWithPpn);
+      assertContractValues(contract_value, contract_value_with_ppn);
+
       const project = await tx.project.update({
         where: { id },
         data: {
           name: dto.name,
           client_name: dto.clientName,
-          contract_value: dto.contractValue === undefined ? undefined : toMoney(dto.contractValue),
+          contract_value,
+          contract_value_with_ppn,
           status: dto.status,
           start_date,
           end_date,

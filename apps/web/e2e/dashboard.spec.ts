@@ -41,6 +41,7 @@ async function prepare(request: APIRequestContext): Promise<void> {
     name: 'Ruko Dasbor',
     clientName: 'Klien Dasbor',
     contractValue: '40000000',
+    contractValueWithPpn: '44400000',
   })
   const coordinatorId = await id('/users', {
     name: COORDINATOR.name,
@@ -179,9 +180,10 @@ test('the dashboard and a project summary show the figures computed by hand', as
     await expect(page.getByRole('tab', { name: 'Ringkasan' })).toHaveAttribute('aria-selected', 'true')
 
     await expect(page.getByTestId('summary-contract')).toContainText('Rp 40.000.000')
+    await expect(page.getByTestId('summary-contract-ppn')).toContainText('Rp 44.400.000')
     await expect(page.getByTestId('summary-received')).toContainText('Rp 10.000.000')
-    await expect(page.getByTestId('summary-received')).toContainText('25% dari kontrak')
-    await expect(page.getByTestId('summary-outstanding')).toContainText('Rp 30.000.000')
+    await expect(page.getByTestId('summary-received')).toContainText('22,52% dari nilai kontrak + PPN')
+    await expect(page.getByTestId('summary-outstanding')).toContainText('Rp 34.400.000')
     await expect(page.getByTestId('summary-cost')).toContainText('Rp 4.000.000')
     await expect(page.getByTestId('summary-difference')).toContainText('Rp 6.000.000')
     await expect(page.getByText('1 transaksi menunggu ditinjau')).toBeVisible()

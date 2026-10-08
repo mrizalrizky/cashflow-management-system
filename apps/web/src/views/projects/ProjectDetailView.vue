@@ -62,6 +62,11 @@ const details = computed(() =>
     ? [
         { id: 'client', label: 'Klien', value: project.value.clientName },
         { id: 'contract', label: 'Nilai kontrak', value: formatRupiah(project.value.contractValue) },
+        {
+          id: 'contract-ppn',
+          label: 'Nilai kontrak + PPN',
+          value: formatRupiah(project.value.contractValueWithPpn),
+        },
         { id: 'start', label: 'Tanggal mulai', value: formatCalendarDate(project.value.startDate) },
         { id: 'end', label: 'Tanggal selesai', value: formatCalendarDate(project.value.endDate) },
         { id: 'notes', label: 'Catatan', value: project.value.notes || '-' },

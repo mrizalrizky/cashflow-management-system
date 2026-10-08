@@ -63,6 +63,7 @@ export const EXPECTED = {
   recent: ['trx-14', 'trx-13', 'trx-12', 'trx-11', 'trx-10', 'trx-9', 'trx-8', 'trx-7', 'trx-6', 'trx-5'],
   projectA: {
     contractValue: '100000000',
+    contractValueWithPpn: '100000000',
     received: '30000000',
     outstanding: '70000000',
     receivedPercent: 30,
@@ -76,6 +77,7 @@ export const EXPECTED = {
   },
   projectB: {
     contractValue: '20000000',
+    contractValueWithPpn: '20000000',
     received: '25000000',
     outstanding: '-5000000',
     receivedPercent: 125,

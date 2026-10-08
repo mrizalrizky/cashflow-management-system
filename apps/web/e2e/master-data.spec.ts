@@ -71,12 +71,14 @@ test('master data, projects and what a project manager can see', async ({ page }
     await dialog.getByLabel('Nama proyek').fill('Rumah Uji')
     await dialog.getByLabel('Nama klien').fill('Klien Uji')
     await dialog.getByLabel('Nilai kontrak (Rp)').fill('850000000')
+    await dialog.getByLabel('Nilai kontrak + PPN (Rp)').fill('943500000')
     await dialog.getByRole('button', { name: 'Simpan' }).click()
 
     await expect(dialog).toBeHidden()
     const row = page.getByRole('row').filter({ hasText: 'Rumah Uji' })
     await expect(row).toContainText(/PRJ-\d{4}-\d{3}/)
     await expect(row).toContainText('Rp 850.000.000')
+    await expect(row).toContainText('Rp 943.500.000')
   })
 
   await test.step('then assigns the project manager to it', async () => {

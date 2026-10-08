@@ -88,6 +88,11 @@ onMounted(list.reload)
     <Column header="Nilai kontrak" class="text-right">
       <template #body="{ data }: { data: Project }">{{ formatRupiah(data.contractValue) }}</template>
     </Column>
+    <Column header="Nilai kontrak + PPN" class="text-right">
+      <template #body="{ data }: { data: Project }">
+        {{ formatRupiah(data.contractValueWithPpn) }}
+      </template>
+    </Column>
     <Column header="Status">
       <template #body="{ data }: { data: Project }"><ProjectStatusTag :status="data.status" /></template>
     </Column>

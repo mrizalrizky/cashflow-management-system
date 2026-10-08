@@ -24,6 +24,8 @@ export interface ProjectResponse {
   name: string;
   clientName: string;
   contractValue: string;
+  /** Nilai kontrak berikut PPN; '0' berarti belum diisi. */
+  contractValueWithPpn: string;
   status: ProjectStatus;
   startDate: string | null;
   endDate: string | null;
@@ -47,6 +49,7 @@ export function toProjectResponse(project: ProjectWithMembers): ProjectResponse 
     name: project.name,
     clientName: project.client_name,
     contractValue: fromMoney(project.contract_value),
+    contractValueWithPpn: fromMoney(project.contract_value_with_ppn),
     status: project.status,
     startDate: project.start_date ? formatCalendarDate(project.start_date) : null,
     endDate: project.end_date ? formatCalendarDate(project.end_date) : null,

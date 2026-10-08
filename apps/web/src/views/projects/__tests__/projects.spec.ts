@@ -30,6 +30,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     name: 'Rumah Pak Budi',
     clientName: 'Budi Santoso',
     contractValue: '850000000',
+    contractValueWithPpn: '943500000',
     status: 'ACTIVE',
     startDate: '2026-10-01',
     endDate: '2027-03-31',
@@ -59,6 +60,7 @@ const KAFE = makeProject({
   name: 'Interior Kafe',
   clientName: 'PT Kopi',
   contractValue: '0',
+  contractValueWithPpn: '0',
   status: 'COMPLETED',
   startDate: null,
   endDate: null,
@@ -91,7 +93,7 @@ describe('ProjectsView', () => {
     vi.useRealTimers()
   })
 
-  it('lists projects with code, client, contract value, status and coordinators', async () => {
+  it('lists projects with code, client, both contract values, status and coordinators', async () => {
     signInAs('SUPER_ADMIN')
     const { wrapper } = await mountList()
 
@@ -101,6 +103,10 @@ describe('ProjectsView', () => {
     expect(rows[0]).toContain('Rumah Pak Budi')
     expect(rows[0]).toContain('Budi Santoso')
     expect(rows[0]).toContain('Rp 850.000.000')
+    expect(rows[0]).toContain('Rp 943.500.000')
+    expect(wrapper.findAll('thead th').map((th) => th.text())).toEqual(
+      expect.arrayContaining(['Nilai kontrak', 'Nilai kontrak + PPN']),
+    )
     expect(rows[0]).toContain('Aktif')
     expect(rows[0]).toContain('Ani')
     expect(rows[1]).toContain('Selesai')
@@ -192,6 +198,7 @@ describe('ProjectFormDialog', () => {
     await fill(wrapper, '#project-name', 'Rumah Pak Budi')
     await fill(wrapper, '#project-client', 'Budi Santoso')
     await fill(wrapper, '#project-contract', '850.000.000')
+    await fill(wrapper, '#project-contract-ppn', '943.500.000')
     await pickDate(wrapper, 0, '2026-10-01')
     await submitForm(wrapper)
 
@@ -199,11 +206,53 @@ describe('ProjectFormDialog', () => {
       name: 'Rumah Pak Budi',
       clientName: 'Budi Santoso',
       contractValue: '850000000',
+      contractValueWithPpn: '943500000',
       startDate: '2026-10-01',
       endDate: null,
       notes: null,
     })
     expect(wrapper.emitted('saved')?.[0]).toEqual([RUMAH])
+  })
+
+  it('labels the two contract values separately and sends blank ones as 0', async () => {
+    vi.mocked(projectsApi.createProject).mockResolvedValue(KAFE)
+    const { wrapper } = await mountForm()
+    expect(wrapper.get('label[for="project-contract"]').text()).toBe('Nilai kontrak (Rp)')
+    expect(wrapper.get('label[for="project-contract-ppn"]').text()).toBe('Nilai kontrak + PPN (Rp)')
+
+    await fill(wrapper, '#project-name', 'Interior Kafe')
+    await fill(wrapper, '#project-client', 'PT Kopi')
+    await submitForm(wrapper)
+
+    expect(projectsApi.createProject).toHaveBeenCalledWith(
+      expect.objectContaining({ contractValue: '0', contractValueWithPpn: '0' }),
+    )
+  })
+
+  it('catches a value with PPN below the contract value in the browser', async () => {
+    const { wrapper } = await mountForm()
+
+    await fill(wrapper, '#project-name', 'Rumah')
+    await fill(wrapper, '#project-client', 'Budi')
+    await fill(wrapper, '#project-contract', '850.000.000')
+    await fill(wrapper, '#project-contract-ppn', '800.000.000')
+    await submitForm(wrapper)
+
+    expect(wrapper.get('#project-contract-ppn-error').text()).toBe(
+      'Nilai kontrak + PPN tidak boleh lebih kecil dari nilai kontrak',
+    )
+    expect(projectsApi.createProject).not.toHaveBeenCalled()
+  })
+
+  it('sends only the value with PPN when that is all that changed', async () => {
+    vi.mocked(projectsApi.updateProject).mockResolvedValue(RUMAH)
+    const { wrapper } = await mountForm(RUMAH)
+    expect((wrapper.get('#project-contract-ppn').element as HTMLInputElement).value).toBe('943.500.000')
+
+    await fill(wrapper, '#project-contract-ppn', '952.000.000')
+    await submitForm(wrapper)
+
+    expect(projectsApi.updateProject).toHaveBeenCalledWith('p-rumah', { contractValueWithPpn: '952000000' })
   })
 
   it('catches an end date before the start date in the browser', async () => {
@@ -274,6 +323,7 @@ describe('ProjectDetailView', () => {
       'Rumah Pak Budi',
       'Budi Santoso',
       'Rp 850.000.000',
+      'Rp 943.500.000',
       'Aktif',
       '01 Okt 2026',
       '31 Mar 2027',
@@ -281,6 +331,7 @@ describe('ProjectDetailView', () => {
     ]) {
       expect(text).toContain(expected)
     }
+    expect(wrapper.get('[data-testid="project-contract-ppn"]').text()).toBe('Rp 943.500.000')
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Ringkasan', 'Transaksi', 'Anggota'])
     expect(wrapper.get('[data-testid="back-to-projects"]').attributes('href')).toBe('/proyek')
   })

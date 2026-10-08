@@ -29,6 +29,7 @@ export class ProjectSummaryService {
     return toProjectSummary({
       projectId,
       contractValue: project.contract_value,
+      contractValueWithPpn: project.contract_value_with_ppn,
       totals,
       costByCategory,
       pendingCount,

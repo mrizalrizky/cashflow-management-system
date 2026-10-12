@@ -2,7 +2,6 @@ import {
   IsBoolean,
   IsIn,
   IsISO8601,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -40,11 +39,6 @@ export class CreateTransactionDto {
 
   @IsUUID()
   categoryId: string;
-
-  /** Tidak dikirim atau null berarti overhead perusahaan. */
-  @IsOptional()
-  @IsUUID()
-  projectId?: string | null;
 }
 
 export class UpdateTransactionDto {
@@ -71,11 +65,6 @@ export class UpdateTransactionDto {
   @IsOptionalNotNull()
   @IsUUID()
   categoryId?: string;
-
-  /** null memindahkan transaksi ke overhead; tidak dikirim berarti tidak diubah. */
-  @IsOptional()
-  @IsUUID()
-  projectId?: string | null;
 }
 
 /** Alasan untuk menolak, membatalkan, atau melakukan void. */
@@ -141,16 +130,6 @@ export class TransactionFiltersDto {
   @IsOptionalNotNull()
   @IsUUID()
   categoryId?: string;
-
-  @IsOptionalNotNull()
-  @IsUUID()
-  projectId?: string;
-
-  /** true: hanya transaksi tanpa proyek. */
-  @IsOptionalNotNull()
-  @ToBoolean()
-  @IsBoolean()
-  overhead?: boolean;
 
   /** false: sembunyikan sisi transfer antar akun. */
   @IsOptionalNotNull()

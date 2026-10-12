@@ -63,15 +63,6 @@ const categories = computed(() =>
     amount,
   })),
 )
-const scopes = computed(() => {
-  const scope = dashboard.value?.expenseByScope
-  if (!scope) return []
-  return [
-    { id: 'overhead', name: 'Overhead (tanpa proyek)', amount: scope.overhead },
-    { id: 'project', name: 'Proyek', amount: scope.project },
-  ]
-})
-
 onMounted(reload)
 </script>
 
@@ -152,20 +143,14 @@ onMounted(reload)
         <MonthlyCashflowChart :months="dashboard.monthly" />
       </section>
 
-      <div class="grid gap-6 lg:grid-cols-2">
-        <section class="rounded-xl border border-surface-200 bg-surface-0 p-4">
-          <h2 class="mb-3 text-lg font-semibold">Pengeluaran per kategori</h2>
-          <BarList
-            :items="categories"
-            tone="expense"
-            empty-text="Belum ada pengeluaran pada periode ini"
-          />
-        </section>
-        <section class="rounded-xl border border-surface-200 bg-surface-0 p-4">
-          <h2 class="mb-3 text-lg font-semibold">Overhead dan proyek</h2>
-          <BarList :items="scopes" tone="expense" empty-text="Belum ada pengeluaran pada periode ini" />
-        </section>
-      </div>
+      <section class="rounded-xl border border-surface-200 bg-surface-0 p-4">
+        <h2 class="mb-3 text-lg font-semibold">Pengeluaran per kategori</h2>
+        <BarList
+          :items="categories"
+          tone="expense"
+          empty-text="Belum ada pengeluaran pada periode ini"
+        />
+      </section>
 
       <div class="grid gap-6 lg:grid-cols-2">
         <section class="rounded-xl border border-surface-200 bg-surface-0 p-4">

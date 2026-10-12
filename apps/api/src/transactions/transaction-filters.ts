@@ -1,6 +1,5 @@
 import { parseCalendarDate } from '../common/calendar-date.js';
 import { containsText } from '../common/search.js';
-import { validationFailed } from '../common/validation.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import type { TransactionFiltersDto } from './dto/transaction.dto.js';
 
@@ -10,12 +9,6 @@ import type { TransactionFiltersDto } from './dto/transaction.dto.js';
  * boleh dilihat pengguna) ditambahkan pemanggilnya; filter hanya bisa mempersempit.
  */
 export function toTransactionWhere(query: TransactionFiltersDto): Prisma.TransactionWhereInput {
-  if (query.projectId && query.overhead) {
-    throw validationFailed([
-      { field: 'overhead', messages: ['Tidak bisa digabung dengan filter proyek'] },
-    ]);
-  }
-
   const where: Prisma.TransactionWhereInput = {};
   if (query.dateFrom || query.dateTo) {
     where.transaction_date = {
@@ -27,8 +20,6 @@ export function toTransactionWhere(query: TransactionFiltersDto): Prisma.Transac
   if (query.status) where.status = query.status;
   if (query.accountId) where.account_id = query.accountId;
   if (query.categoryId) where.category_id = query.categoryId;
-  if (query.projectId) where.project_id = query.projectId;
-  if (query.overhead) where.project_id = null;
   if (query.includeTransfers === false) where.transfer_group_id = null;
   if (query.search) where.description = containsText(query.search);
   return where;

@@ -18,20 +18,9 @@ const NOTHING: Prisma.TransactionWhereInput = { id: { in: [] } };
  */
 @Injectable()
 export class TransactionAccessService {
-  /** Pelaku beserta proyek yang ditugaskan kepadanya, dimuat sekali per request. */
-  async actorFor(db: Db, user: AuthUser): Promise<PolicyActor> {
-    const assignments =
-      user.role === 'PROJECT_MANAGER'
-        ? await db.projectMember.findMany({
-            where: { user_id: user.id },
-            select: { project_id: true },
-          })
-        : [];
-    return {
-      id: user.id,
-      role: user.role,
-      assignedProjectIds: new Set(assignments.map((assignment) => assignment.project_id)),
-    };
+  /** Pelaku sebuah request. */
+  actorFor(_db: Db, user: AuthUser): Promise<PolicyActor> {
+    return Promise.resolve({ id: user.id, role: user.role });
   }
 
   scope(actor: PolicyActor): Prisma.TransactionWhereInput {
@@ -39,8 +28,6 @@ export class TransactionAccessService {
       case 'SUPER_ADMIN':
         return {};
       case 'PROJECT_MANAGER':
-        // Semua transaksi pada proyeknya, siapa pun pembuatnya; tidak termasuk overhead.
-        return { project_id: { in: [...actor.assignedProjectIds] } };
       case 'STAFF':
         return { created_by_id: actor.id };
       default:

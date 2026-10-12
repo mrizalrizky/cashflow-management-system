@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { TransactionResponse } from '../src/transactions/transaction.mapper.js';
 import { E2eContext, setupE2e } from './e2e-context.js';
-import { assign, call, createAccount, createCategory, TestSession } from './fixtures.js';
+import { call, createAccount, createCategory, TestSession } from './fixtures.js';
 import { TRANSACTIONS } from './routes.js';
 import {
   expenseBody,
@@ -21,55 +21,27 @@ function descriptions(rows: TransactionResponse[]): string[] {
   return rows.map((row) => row.description).sort();
 }
 
-/** Satu transaksi per kombinasi pembuat dan tempat, dengan deskripsi yang menamai keduanya. */
+/** Transaksi beberapa pembuat, dengan deskripsi yang menamai pembuatnya. */
 async function seedTransactions(ctx: E2eContext, world: World) {
-  const onA = { projectId: world.projectA.id };
-  const onB = { projectId: world.projectB.id };
   return {
-    staffOnA: await record(ctx, world.staff, expenseBody(world, { ...onA, description: 'staf di A' })),
-    staffOnB: await record(ctx, world.staff, expenseBody(world, { ...onB, description: 'staf di B' })),
-    staffOverhead: await record(ctx, world.staff, expenseBody(world, { description: 'staf overhead' })),
-    otherOnA: await record(ctx, world.otherStaff, expenseBody(world, { ...onA, description: 'staf lain di A' })),
-    managerOnA: await record(ctx, world.manager, expenseBody(world, { ...onA, description: 'koordinator di A' })),
-    adminOnB: await record(ctx, world.admin, incomeBody(world, { ...onB, description: 'admin di B' })),
+    staffFirst: await record(ctx, world.staff, expenseBody(world, { description: 'staf satu' })),
+    staffSecond: await record(ctx, world.staff, expenseBody(world, { description: 'staf dua' })),
+    other: await record(ctx, world.otherStaff, expenseBody(world, { description: 'staf lain' })),
+    manager: await record(ctx, world.manager, expenseBody(world, { description: 'koordinator' })),
+    admin: await record(ctx, world.admin, incomeBody(world, { description: 'admin' })),
   };
 }
 
 describe('GET /transactions: who sees what', () => {
   const ctx = setupE2e();
 
-  it('shows an admin everything, a project manager their projects, and staff their own', async () => {
+  it('shows an admin everything, and everyone else their own', async () => {
     const world = await setupWorld(ctx);
     await seedTransactions(ctx, world);
 
-    expect(descriptions(await list(ctx, world.admin))).toHaveLength(6);
-    expect(descriptions(await list(ctx, world.manager))).toEqual([
-      'koordinator di A',
-      'staf di A',
-      'staf lain di A',
-    ]);
-    expect(descriptions(await list(ctx, world.staff))).toEqual([
-      'staf di A',
-      'staf di B',
-      'staf overhead',
-    ]);
-  });
-
-  it('hides a project manager’s own transaction once they are removed from its project', async () => {
-    const world = await setupWorld(ctx);
-    await assign(ctx.prisma, world.projectB.id, world.manager.user.id);
-    const own = await record(
-      ctx,
-      world.manager,
-      expenseBody(world, { projectId: world.projectB.id, description: 'koordinator di B' }),
-    );
-
-    await ctx.prisma.projectMember.delete({
-      where: { project_id_user_id: { project_id: world.projectB.id, user_id: world.manager.user.id } },
-    });
-
-    expect(descriptions(await list(ctx, world.manager))).toEqual([]);
-    await call(ctx, world.manager, 'get', transactionUrl(own.id)).expect(404);
+    expect(descriptions(await list(ctx, world.admin))).toHaveLength(5);
+    expect(descriptions(await list(ctx, world.manager))).toEqual(['koordinator']);
+    expect(descriptions(await list(ctx, world.staff))).toEqual(['staf dua', 'staf satu']);
   });
 
   it('answers a transaction outside the caller’s scope exactly like one that does not exist', async () => {
@@ -80,18 +52,17 @@ describe('GET /transactions: who sees what', () => {
     expect(missing.body).toEqual({ statusCode: 404, message: 'Transaksi tidak ditemukan' });
 
     for (const [session, hidden] of [
-      [world.manager, seeded.staffOnB],
-      [world.manager, seeded.staffOverhead],
-      [world.staff, seeded.otherOnA],
-      [world.otherStaff, seeded.staffOnA],
+      [world.manager, seeded.staffFirst],
+      [world.staff, seeded.other],
+      [world.otherStaff, seeded.staffFirst],
     ] as const) {
       const res = await call(ctx, session, 'get', transactionUrl(hidden.id)).expect(404);
       expect(res.body).toEqual(missing.body);
     }
 
-    await call(ctx, world.manager, 'get', transactionUrl(seeded.staffOnA.id)).expect(200);
-    await call(ctx, world.staff, 'get', transactionUrl(seeded.staffOnA.id)).expect(200);
-    await call(ctx, world.admin, 'get', transactionUrl(seeded.staffOverhead.id)).expect(200);
+    await call(ctx, world.manager, 'get', transactionUrl(seeded.manager.id)).expect(200);
+    await call(ctx, world.staff, 'get', transactionUrl(seeded.staffFirst.id)).expect(200);
+    await call(ctx, world.admin, 'get', transactionUrl(seeded.staffSecond.id)).expect(200);
     await call(ctx, world.staff, 'get', transactionUrl('bukan-uuid')).expect(400);
   });
 
@@ -99,28 +70,25 @@ describe('GET /transactions: who sees what', () => {
     const world = await setupWorld(ctx);
     await seedTransactions(ctx, world);
 
-    expect(await list(ctx, world.manager, `projectId=${world.projectB.id}`)).toEqual([]);
-    expect(await list(ctx, world.manager, 'overhead=true')).toEqual([]);
-    expect(await list(ctx, world.manager, 'search=overhead')).toEqual([]);
-    expect(descriptions(await list(ctx, world.staff, 'search=staf'))).toEqual([
-      'staf di A',
-      'staf di B',
-      'staf overhead',
-    ]);
+    expect(await list(ctx, world.manager, 'search=staf')).toEqual([]);
+    expect(descriptions(await list(ctx, world.staff, 'search=staf'))).toEqual(['staf dua', 'staf satu']);
     expect(await list(ctx, world.staff, 'search=lain')).toEqual([]);
-    expect(await list(ctx, world.staff, `accountId=${world.account.id}`)).toHaveLength(3);
+    expect(await list(ctx, world.staff, `accountId=${world.account.id}`)).toHaveLength(2);
   });
 
   it('tells each caller what they may do with each row', async () => {
     const world = await setupWorld(ctx);
     await seedTransactions(ctx, world);
 
-    const forManager = Object.fromEntries(
-      (await list(ctx, world.manager)).map((row) => [row.description, row.permissions]),
+    const forAdmin = Object.fromEntries(
+      (await list(ctx, world.admin)).map((row) => [row.description, row.permissions]),
+    );
+    const forStaff = Object.fromEntries(
+      (await list(ctx, world.staff)).map((row) => [row.description, row.permissions]),
     );
 
-    expect(forManager['staf di A']).toMatchObject({ canReview: true, canEdit: false });
-    expect(forManager['koordinator di A']).toMatchObject({ canReview: false, canEdit: true });
+    expect(forAdmin['staf satu']).toMatchObject({ canReview: true });
+    expect(forStaff['staf satu']).toMatchObject({ canReview: false, canEdit: true });
   });
 
   it('shows no balance or other account detail to anyone', async () => {
@@ -138,14 +106,13 @@ describe('GET /transactions: who sees what', () => {
 describe('GET /transactions: filters, order and paging', () => {
   const ctx = setupE2e();
 
-  it('filters by date range, type, status, account, category, project, overhead and text', async () => {
+  it('filters by date range, type, status, account, category and text', async () => {
     const world = await setupWorld(ctx);
     const otherAccount = await createAccount(ctx.prisma, { name: 'Bank Lain' });
     const otherCategory = await createCategory(ctx.prisma, { name: 'Upah Uji', type: 'OUT' });
-    const on = (projectId: string) => ({ projectId });
 
-    await record(ctx, world.admin, expenseBody(world, { ...on(world.projectA.id), transactionDate: '2026-09-01', description: 'semen 100% asli' }));
-    await record(ctx, world.admin, expenseBody(world, { ...on(world.projectB.id), transactionDate: '2026-09-15', description: 'upah tukang', categoryId: otherCategory.id }));
+    await record(ctx, world.admin, expenseBody(world, { transactionDate: '2026-09-01', description: 'semen 100% asli' }));
+    await record(ctx, world.admin, expenseBody(world, { transactionDate: '2026-09-15', description: 'upah tukang', categoryId: otherCategory.id }));
     await record(ctx, world.admin, incomeBody(world, { transactionDate: '2026-09-30', description: 'pendapatan lain', accountId: otherAccount.id }));
     await ctx.prisma.transaction.updateMany({ where: { description: 'upah tukang' }, data: { status: 'APPROVED' } });
 
@@ -158,20 +125,18 @@ describe('GET /transactions: filters, order and paging', () => {
     expect(await found('status=APPROVED')).toEqual(['upah tukang']);
     expect(await found(`accountId=${otherAccount.id}`)).toEqual(['pendapatan lain']);
     expect(await found(`categoryId=${otherCategory.id}`)).toEqual(['upah tukang']);
-    expect(await found(`projectId=${world.projectA.id}`)).toEqual(['semen 100% asli']);
-    expect(await found('overhead=true')).toEqual(['pendapatan lain']);
     expect(await found('search=TUKANG')).toEqual(['upah tukang']);
     expect(await found('search=100%25')).toEqual(['semen 100% asli']);
     expect(await found('search=%25%25')).toEqual([]);
   });
 
   it.each([
-    'overhead=true&projectId=00000000-0000-4000-8000-000000000000',
+    'projectId=00000000-0000-4000-8000-000000000000',
     'dateFrom=2026-13-01',
     'status=DONE',
     'type=TRANSFER',
     'accountId=bukan-uuid',
-    'overhead=mungkin',
+    'overhead=true',
   ])('rejects the query %s', async (query) => {
     const world = await setupWorld(ctx);
     await call(ctx, world.admin, 'get', `${TRANSACTIONS}?${query}`).expect(400);

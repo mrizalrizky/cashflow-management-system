@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as accounts from '../accounts'
 import * as categories from '../categories'
 import * as http from '../http'
-import * as projects from '../projects'
 import * as users from '../users'
 
 vi.mock('../http')
@@ -46,27 +45,6 @@ describe('master data API modules', () => {
       'updateCategory',
       () => categories.updateCategory('c1', { name: 'Bahan' }),
       ['/categories/c1', { method: 'PATCH', body: { name: 'Bahan' } }],
-    ],
-    [
-      'listProjects',
-      () => projects.listProjects({ page: 1, pageSize: 20, search: 'rumah', status: 'ACTIVE' }),
-      ['/projects', { query: { page: 1, pageSize: 20, search: 'rumah', status: 'ACTIVE' } }],
-    ],
-    ['getProject', () => projects.getProject('p1'), ['/projects/p1']],
-    [
-      'createProject',
-      () => projects.createProject({ name: 'Rumah', clientName: 'Budi', contractValue: '850000000' }),
-      ['/projects', { method: 'POST', body: { name: 'Rumah', clientName: 'Budi', contractValue: '850000000' } }],
-    ],
-    [
-      'updateProject',
-      () => projects.updateProject('p1', { status: 'COMPLETED', endDate: null }),
-      ['/projects/p1', { method: 'PATCH', body: { status: 'COMPLETED', endDate: null } }],
-    ],
-    [
-      'setProjectMembers',
-      () => projects.setProjectMembers('p1', ['u1', 'u2']),
-      ['/projects/p1/members', { method: 'PUT', body: { userIds: ['u1', 'u2'] } }],
     ],
   ])('%s calls the right route', async (_name, call, expected) => {
     await call()

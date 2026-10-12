@@ -29,8 +29,8 @@ beforeEach(() => {
 
 describe('AppLayout', () => {
   it.each<[Role, string, string[]]>([
-    ['SUPER_ADMIN', '/dashboard', ['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna', 'Audit log']],
-    ['PROJECT_MANAGER', '/proyek', ['Proyek Saya', 'Transaksi']],
+    ['SUPER_ADMIN', '/dashboard', ['Dashboard', 'Transaksi', 'Master data', 'Pengguna', 'Audit log']],
+    ['PROJECT_MANAGER', '/transaksi', ['Transaksi']],
     ['STAFF', '/transaksi', ['Transaksi']],
   ])('shows %s exactly their menu', async (role, path, labels) => {
     const { wrapper } = await mountLayout(role, path)
@@ -47,7 +47,7 @@ describe('AppLayout', () => {
   })
 
   it('shows who is logged in and in which role', async () => {
-    const { wrapper } = await mountLayout('PROJECT_MANAGER', '/proyek')
+    const { wrapper } = await mountLayout('PROJECT_MANAGER', '/transaksi')
 
     const header = wrapper.get('header').text()
     expect(header).toContain('Siti Rahma')
@@ -88,12 +88,11 @@ describe('AppLayout', () => {
     expect(drawerLinks.map((link) => link.textContent?.trim())).toEqual([
       'Dashboard',
       'Transaksi',
-      'Proyek',
       'Master data',
       'Pengguna',
       'Audit log',
     ])
-    drawerLinks[4]!.click()
+    drawerLinks[3]!.click()
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/pengguna')

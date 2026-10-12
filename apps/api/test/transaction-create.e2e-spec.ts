@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { todayInJakarta } from '../src/common/calendar-date.js';
 import { api, setupE2e } from './e2e-context.js';
-import { call, createAccount, createCategory, createProject, errorFields } from './fixtures.js';
+import { call, createAccount, createCategory, errorFields } from './fixtures.js';
 import { TRANSACTIONS } from './routes.js';
 import { expenseBody, incomeBody, record, setupWorld } from './transaction-fixtures.js';
 
@@ -14,11 +14,19 @@ function tomorrowInJakarta(): string {
 describe('POST /transactions', () => {
   const ctx = setupE2e();
 
+  it('refuses a projectId as an unknown field', async () => {
+    const world = await setupWorld(ctx);
+    const res = await call(ctx, world.admin, 'post', TRANSACTIONS)
+      .send({ ...expenseBody(world), projectId: randomUUID() })
+      .expect(400);
+    expect(errorFields(res.body)).toContain('projectId');
+  });
+
   it('records a pending transaction and returns it with its relations and permissions', async () => {
     const world = await setupWorld(ctx);
 
     const res = await call(ctx, world.staff, 'post', TRANSACTIONS)
-      .send(expenseBody(world, { projectId: world.projectA.id, description: '  Beli semen  ' }))
+      .send(expenseBody(world, { description: '  Beli semen  ' }))
       .expect(201);
 
     expect(res.body).toEqual({
@@ -30,7 +38,6 @@ describe('POST /transactions', () => {
       status: 'PENDING',
       account: { id: world.account.id, name: 'Kas Uji' },
       category: { id: world.expense.id, name: 'Material Uji' },
-      project: { id: world.projectA.id, code: 'PRJ-A', name: 'Proyek A' },
       isTransfer: false,
       transferGroupId: null,
       createdBy: { id: world.staff.user.id, name: 'Staf Satu' },
@@ -50,51 +57,13 @@ describe('POST /transactions', () => {
     expect(row.after).toMatchObject({ amount: '150000', status: 'PENDING' });
   });
 
-  it('keeps even an admin transaction pending, and treats a missing or null project as overhead', async () => {
+  it('keeps even an admin transaction pending', async () => {
     const world = await setupWorld(ctx);
 
-    const omitted = await record(ctx, world.admin, incomeBody(world));
-    const explicit = await record(ctx, world.staff, expenseBody(world, { projectId: null }));
+    const own = await record(ctx, world.admin, incomeBody(world));
 
-    expect(omitted).toMatchObject({ status: 'PENDING', project: null });
-    expect(omitted.permissions.canReview).toBe(true);
-    expect(explicit.project).toBeNull();
-  });
-
-  it('lets a project manager record only for an assigned project', async () => {
-    const world = await setupWorld(ctx);
-
-    await record(ctx, world.manager, expenseBody(world, { projectId: world.projectA.id }));
-
-    const foreign = await call(ctx, world.manager, 'post', TRANSACTIONS)
-      .send(expenseBody(world, { projectId: world.projectB.id }))
-      .expect(404);
-    expect(foreign.body).toEqual({ statusCode: 404, message: 'Proyek tidak ditemukan' });
-
-    await call(ctx, world.manager, 'post', TRANSACTIONS).send(expenseBody(world)).expect(403);
-    expect(await ctx.prisma.transaction.count()).toBe(1);
-  });
-
-  it.each(['COMPLETED', 'CANCELLED'] as const)(
-    'accepts a %s project only from an admin',
-    async (status) => {
-      const world = await setupWorld(ctx);
-      const closed = await createProject(ctx.prisma, { status });
-
-      const res = await call(ctx, world.staff, 'post', TRANSACTIONS)
-        .send(expenseBody(world, { projectId: closed.id }))
-        .expect(400);
-      expect(errorFields(res.body)).toEqual(['projectId']);
-
-      await record(ctx, world.admin, expenseBody(world, { projectId: closed.id }));
-    },
-  );
-
-  it('answers 404 for a project that does not exist', async () => {
-    const world = await setupWorld(ctx);
-    await call(ctx, world.staff, 'post', TRANSACTIONS)
-      .send(expenseBody(world, { projectId: randomUUID() }))
-      .expect(404);
+    expect(own.status).toBe('PENDING');
+    expect(own.permissions.canReview).toBe(true);
   });
 
   it.each([

@@ -9,14 +9,10 @@ import type { Role, TxStatus } from '../generated/prisma/client.js';
 export interface PolicyActor {
   id: string;
   role: Role;
-  /** Proyek yang ditugaskan kepadanya; hanya berarti untuk PROJECT_MANAGER. */
-  assignedProjectIds: ReadonlySet<string>;
 }
 
 export interface PolicySubject {
   status: TxStatus;
-  /** null = overhead perusahaan. */
-  projectId: string | null;
   createdById: string;
   /** Peran pembuatnya saat ini. */
   creatorRole: Role;
@@ -61,20 +57,6 @@ function ownerPermissions(tx: PolicySubject): TransactionPermissions {
   };
 }
 
-/**
- * Koordinator meninjau transaksi di proyeknya yang dibuat orang lain. Transaksi overhead
- * dan transaksi buatan sesama koordinator hanya ditinjau SUPER_ADMIN.
- */
-function managerCanReview(actor: PolicyActor, tx: PolicySubject): boolean {
-  return (
-    tx.status === 'PENDING' &&
-    tx.projectId !== null &&
-    actor.assignedProjectIds.has(tx.projectId) &&
-    tx.createdById !== actor.id &&
-    tx.creatorRole !== 'PROJECT_MANAGER'
-  );
-}
-
 export function permissionsFor(actor: PolicyActor, tx: PolicySubject): TransactionPermissions {
   const isAdmin = actor.role === 'SUPER_ADMIN';
 
@@ -92,7 +74,7 @@ export function permissionsFor(actor: PolicyActor, tx: PolicySubject): Transacti
         canVoid: tx.status === 'APPROVED',
       };
     case 'PROJECT_MANAGER':
-      return isOwner ? ownerPermissions(tx) : { ...NOTHING, canReview: managerCanReview(actor, tx) };
+      return isOwner ? ownerPermissions(tx) : NOTHING;
     case 'STAFF':
       return isOwner ? ownerPermissions(tx) : NOTHING;
     default:
@@ -100,15 +82,3 @@ export function permissionsFor(actor: PolicyActor, tx: PolicySubject): Transacti
   }
 }
 
-/** Boleh mencatat transaksi untuk proyek ini (atau overhead bila null), saat membuat atau memindahkan. */
-export function canRecordFor(actor: PolicyActor, projectId: string | null): boolean {
-  switch (actor.role) {
-    case 'SUPER_ADMIN':
-    case 'STAFF':
-      return true;
-    case 'PROJECT_MANAGER':
-      return projectId !== null && actor.assignedProjectIds.has(projectId);
-    default:
-      return false;
-  }
-}

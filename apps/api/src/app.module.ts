@@ -10,7 +10,6 @@ import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { validateEnv } from './config/env.validation.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
-import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
@@ -27,7 +26,6 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     AccountsModule,
     CategoriesModule,
-    ProjectsModule,
     TransactionsModule,
     AttachmentsModule,
     ReportsModule,

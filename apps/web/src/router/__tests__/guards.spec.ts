@@ -36,7 +36,7 @@ describe('resolveNavigation', () => {
 
   it.each<[Role, string]>([
     ['SUPER_ADMIN', '/dashboard'],
-    ['PROJECT_MANAGER', '/proyek'],
+    ['PROJECT_MANAGER', '/transaksi'],
     ['STAFF', '/transaksi'],
   ])('sends a logged-in %s away from login and from / to %s', (role, landing) => {
     expect(navigate(user(role), '/login')).toEqual({ path: landing })
@@ -58,7 +58,7 @@ describe('resolveNavigation', () => {
 
   it.each<[Role, true | { path: string }]>([
     ['STAFF', { path: '/transaksi' }],
-    ['PROJECT_MANAGER', { path: '/proyek' }],
+    ['PROJECT_MANAGER', { path: '/transaksi' }],
     ['SUPER_ADMIN', true],
   ])('handles %s opening the user management page', (role, expected) => {
     expect(navigate(user(role), '/pengguna')).toEqual(expected)
@@ -75,25 +75,10 @@ describe('resolveNavigation', () => {
   )
 })
 
-describe('project detail page', () => {
-  it.each<[Role, true | { path: string }]>([
-    ['STAFF', { path: '/transaksi' }],
-    ['PROJECT_MANAGER', true],
-    ['SUPER_ADMIN', true],
-  ])('handles %s opening one', (role, expected) => {
-    const route = routes.find((r) => r.path === '/proyek/:id')!
-    const result = resolveNavigation({
-      user: user(role),
-      to: { path: '/proyek/abc', fullPath: '/proyek/abc', meta: route.meta ?? {} },
-    })
-    expect(result).toEqual(expected)
-  })
-})
-
 describe('master data page', () => {
   it.each<[Role, true | { path: string }]>([
     ['STAFF', { path: '/transaksi' }],
-    ['PROJECT_MANAGER', { path: '/proyek' }],
+    ['PROJECT_MANAGER', { path: '/transaksi' }],
     ['SUPER_ADMIN', true],
   ])('handles %s opening it', (role, expected) => {
     expect(navigate(user(role), '/master-data')).toEqual(expected)
@@ -102,8 +87,8 @@ describe('master data page', () => {
 
 describe('menuFor', () => {
   it.each<[Role, string[]]>([
-    ['SUPER_ADMIN', ['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna', 'Audit log']],
-    ['PROJECT_MANAGER', ['Proyek Saya', 'Transaksi']],
+    ['SUPER_ADMIN', ['Dashboard', 'Transaksi', 'Master data', 'Pengguna', 'Audit log']],
+    ['PROJECT_MANAGER', ['Transaksi']],
     ['STAFF', ['Transaksi']],
   ])('lists the pages for %s', (role, labels) => {
     expect(menuFor(role).map((item) => item.label)).toEqual(labels)

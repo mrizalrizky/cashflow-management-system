@@ -8,7 +8,7 @@ import type { Readable } from 'node:stream';
 import { StorageService } from '../src/storage/storage.service.js';
 import { TransactionAccessService } from '../src/transactions/transaction-access.service.js';
 import { api, E2eContext, setupE2e } from './e2e-context.js';
-import { assign, call, loginAs, TestSession } from './fixtures.js';
+import { call, TestSession } from './fixtures.js';
 import { ATTACHMENTS } from './routes.js';
 import { expenseBody, record, setupWorld, transactionUrl, World } from './transaction-fixtures.js';
 
@@ -35,9 +35,9 @@ async function setStatus(ctx: E2eContext, id: string, status: 'APPROVED' | 'VOID
   await ctx.prisma.transaction.update({ where: { id }, data: { status } });
 }
 
-/** Transaksi staf di proyek A dengan satu bukti. */
+/** Transaksi staf dengan satu bukti. */
 async function withProof(ctx: E2eContext, world: World) {
-  const tx = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
+  const tx = await record(ctx, world.staff, expenseBody(world));
   const res = await upload(ctx, world.staff, tx.id).expect(201);
   return { tx, attachment: res.body as { id: string; fileName: string } };
 }
@@ -131,9 +131,9 @@ describe('POST /transactions/:id/attachments', () => {
 
   it('is only for those who may edit the transaction, while it can still be edited', async () => {
     const world = await setupWorld(ctx);
-    const tx = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
+    const tx = await record(ctx, world.staff, expenseBody(world));
 
-    await upload(ctx, world.manager, tx.id).expect(403);
+    await upload(ctx, world.manager, tx.id).expect(404);
     await upload(ctx, world.otherStaff, tx.id).expect(404);
     await api(ctx).post(transactionUrl(tx.id, 'attachments')).attach('file', PDF.content, PDF.filename).expect(401);
     await upload(ctx, world.admin, tx.id).expect(201);
@@ -175,13 +175,11 @@ describe('GET /attachments/:id/download', () => {
   it('is available to everyone who may see the transaction, and to nobody else', async () => {
     const world = await setupWorld(ctx);
     const { attachment } = await withProof(ctx, world);
-    const outsider = await loginAs(ctx, { role: 'PROJECT_MANAGER' });
-    await assign(ctx.prisma, world.projectB.id, outsider.user.id);
 
-    for (const session of [world.staff, world.manager, world.admin]) {
+    for (const session of [world.staff, world.admin]) {
       await call(ctx, session, 'get', downloadUrl(attachment.id)).expect(200);
     }
-    for (const session of [world.otherStaff, outsider]) {
+    for (const session of [world.otherStaff, world.manager]) {
       const res = await call(ctx, session, 'get', downloadUrl(attachment.id)).expect(404);
       expect(res.body).toEqual({ statusCode: 404, message: 'Bukti tidak ditemukan' });
     }
@@ -213,7 +211,7 @@ describe('DELETE /attachments/:id', () => {
     const first = await withProof(ctx, world);
     const second = await withProof(ctx, world);
 
-    await call(ctx, world.manager, 'delete', `${ATTACHMENTS}/${first.attachment.id}`).expect(403);
+    await call(ctx, world.manager, 'delete', `${ATTACHMENTS}/${first.attachment.id}`).expect(404);
     await call(ctx, world.otherStaff, 'delete', `${ATTACHMENTS}/${first.attachment.id}`).expect(404);
     await call(ctx, world.admin, 'delete', `${ATTACHMENTS}/${first.attachment.id}`).expect(204);
     await call(ctx, world.staff, 'delete', `${ATTACHMENTS}/${second.attachment.id}`).expect(204);

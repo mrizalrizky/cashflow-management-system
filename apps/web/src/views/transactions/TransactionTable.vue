@@ -9,7 +9,6 @@ import PagedTable from '@/components/PagedTable.vue'
 import SignedAmount from '@/components/SignedAmount.vue'
 import TransactionStatusTag from '@/components/TransactionStatusTag.vue'
 import { usePagedList } from '@/composables/usePagedList'
-import { projectLabel } from '@/composables/useTransactionOptions'
 import { formatCalendarDate } from '@/lib/format'
 import { transactionPath } from '@/router/paths'
 
@@ -22,23 +21,20 @@ const NO_FILTERS: Record<keyof TransactionFilters, undefined> = {
   status: undefined,
   accountId: undefined,
   categoryId: undefined,
-  projectId: undefined,
-  overhead: undefined,
   includeTransfers: undefined,
 }
 
 /**
  * Tabel transaksi berhalaman. `filters` adalah pilihan pengguna; `scope` adalah batas tetap
- * dari halaman pemakainya (mis. satu proyek) dan tidak dianggap sebagai filter.
+ * dari halaman pemakainya dan tidak dianggap sebagai filter.
  */
 const props = withDefaults(
   defineProps<{
     filters?: TransactionFilters
     scope?: TransactionFilters
-    showProject?: boolean
     showCreator?: boolean
   }>(),
-  { filters: () => ({}), scope: () => ({}), showProject: true, showCreator: true },
+  { filters: () => ({}), scope: () => ({}), showCreator: true },
 )
 
 const list = usePagedList<Transaction, TransactionFilters>(
@@ -82,19 +78,13 @@ defineExpose({ reload: list.reload })
           {{ data.description }}
         </RouterLink>
         <p class="text-sm text-surface-500">{{ data.category.name }}</p>
+        <Tag v-if="data.isTransfer" severity="info" value="Transfer" class="mt-1" />
         <Tag
           v-if="data.permissions.canReview"
           severity="warn"
           value="Perlu ditinjau"
           class="mt-1"
         />
-      </template>
-    </Column>
-    <Column v-if="showProject" header="Proyek">
-      <template #body="{ data }: { data: Transaction }">
-        <Tag v-if="data.isTransfer" severity="info" value="Transfer" />
-        <template v-else-if="data.project">{{ projectLabel(data.project) }}</template>
-        <span v-else class="text-surface-500">Overhead</span>
       </template>
     </Column>
     <Column header="Akun" class="hidden md:table-cell">

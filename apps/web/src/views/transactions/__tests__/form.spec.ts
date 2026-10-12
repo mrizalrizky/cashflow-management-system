@@ -7,7 +7,6 @@ import * as accountsApi from '@/api/accounts'
 import * as attachmentsApi from '@/api/attachments'
 import * as categoriesApi from '@/api/categories'
 import { ApiError } from '@/api/http'
-import * as projectsApi from '@/api/projects'
 import * as transactionsApi from '@/api/transactions'
 import type { Role, Transaction } from '@/api/types'
 import DateField from '@/components/DateField.vue'
@@ -17,12 +16,10 @@ import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
 import { signInAs } from '@/test/session'
 import {
   BANK,
-  KAFE,
   KAS,
   makeAttachment,
   makeTransaction,
   MATERIAL,
-  RUMAH,
   TERMIN,
   TRANSFER_KELUAR,
   UPAH,
@@ -32,7 +29,6 @@ import TransactionFormDialog from '../TransactionFormDialog.vue'
 vi.mock('@/api/transactions')
 vi.mock('@/api/attachments')
 vi.mock('@/api/accounts')
-vi.mock('@/api/projects')
 vi.mock('@/api/categories')
 vi.mock('@/lib/calendar', () => ({ todayInJakarta: () => '2026-10-07' }))
 
@@ -72,12 +68,11 @@ async function pickProof(wrapper: VueWrapper, files: File[]): Promise<void> {
   await flushPromises()
 }
 
-/** Mengisi pengeluaran yang sah di proyek Rumah; tipe dan tanggal memakai bawaannya. */
+/** Mengisi pengeluaran yang sah; tipe dan tanggal memakai bawaannya. */
 async function fillExpense(wrapper: VueWrapper): Promise<void> {
   await fill(wrapper, '#tx-amount', '150000')
   await choose(wrapper, 'tx-account', KAS.id)
   await choose(wrapper, 'tx-category', MATERIAL.id)
-  await choose(wrapper, 'tx-project', RUMAH.id)
   await fill(wrapper, '#tx-description', ' Beli semen ')
 }
 
@@ -94,13 +89,17 @@ beforeEach(() => {
   freshPinia()
   document.body.innerHTML = ''
   vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS, BANK])
-  vi.mocked(projectsApi.listProjectOptions).mockResolvedValue([RUMAH, KAFE])
   vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL, UPAH, TERMIN, TRANSFER_KELUAR])
   vi.mocked(transactionsApi.createTransaction).mockResolvedValue(CREATED)
   vi.mocked(attachmentsApi.uploadAttachment).mockResolvedValue(makeAttachment())
 })
 
 describe('TransactionFormDialog: recording', () => {
+  it('has no project field', async () => {
+    const { wrapper } = await mountForm('SUPER_ADMIN')
+    expect(() => select(wrapper, 'tx-project')).toThrow('Tidak ada pilihan tx-project')
+  })
+
   it('starts as an expense dated today, and asks for everything else', async () => {
     const { wrapper } = await mountForm('STAFF')
     expect(wrapper.text()).toContain('Catat transaksi')
@@ -112,7 +111,6 @@ describe('TransactionFormDialog: recording', () => {
     expect(errorOf(wrapper, 'tx-amount')).toBe('Jumlah wajib diisi')
     expect(errorOf(wrapper, 'tx-account')).toBe('Akun wajib dipilih')
     expect(errorOf(wrapper, 'tx-category')).toBe('Kategori wajib dipilih')
-    expect(errorOf(wrapper, 'tx-project')).toBe('Proyek wajib dipilih')
     expect(errorOf(wrapper, 'tx-description')).toBe('Keterangan wajib diisi')
     expect(transactionsApi.createTransaction).not.toHaveBeenCalled()
   })
@@ -148,18 +146,6 @@ describe('TransactionFormDialog: recording', () => {
     expect(select(wrapper, 'tx-category').props('modelValue')).toBeNull()
   })
 
-  it('lets staff and admins choose overhead, but not a project manager', async () => {
-    const staff = await mountForm('STAFF')
-    expect(optionLabels(staff.wrapper, 'tx-project')[0]).toBe('Tanpa proyek (overhead)')
-
-    freshPinia()
-    const manager = await mountForm('PROJECT_MANAGER')
-    expect(optionLabels(manager.wrapper, 'tx-project')).toEqual([
-      'PRJ-2026-001 · Rumah Pak Budi',
-      'PRJ-2026-002 · Interior Kafe',
-    ])
-  })
-
   it('creates the transaction, uploads its proof, closes and reports', async () => {
     const { wrapper } = await mountForm('STAFF')
     await fillExpense(wrapper)
@@ -174,27 +160,12 @@ describe('TransactionFormDialog: recording', () => {
       description: 'Beli semen',
       accountId: KAS.id,
       categoryId: MATERIAL.id,
-      projectId: RUMAH.id,
     })
     expect(attachmentsApi.uploadAttachment).toHaveBeenCalledExactlyOnceWith('t-baru', NOTA)
     expect(transactionsApi.approveTransaction).not.toHaveBeenCalled()
     expect(onVisible).toHaveBeenLastCalledWith(false)
     expect(onSaved).toHaveBeenCalledExactlyOnceWith(CREATED)
     expect(document.body.textContent).toContain('Transaksi dicatat')
-  })
-
-  it('sends overhead as a null project', async () => {
-    const { wrapper } = await mountForm('STAFF')
-    await fillExpense(wrapper)
-    await choose(wrapper, 'tx-type', 'IN')
-    await choose(wrapper, 'tx-category', TERMIN.id)
-    await choose(wrapper, 'tx-project', 'overhead')
-
-    await submitForm(wrapper)
-
-    expect(transactionsApi.createTransaction).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ type: 'IN', categoryId: TERMIN.id, projectId: null }),
-    )
   })
 
   it('sends nothing more while a save is in flight', async () => {
@@ -334,16 +305,6 @@ describe('TransactionFormDialog: recording', () => {
     expect(attachmentsApi.uploadAttachment).not.toHaveBeenCalled()
   })
 
-  it('shows a project that is out of reach under the project field', async () => {
-    vi.mocked(transactionsApi.createTransaction).mockRejectedValue(new ApiError(404, 'Proyek tidak ditemukan'))
-    const { wrapper } = await mountForm('PROJECT_MANAGER')
-    await fillExpense(wrapper)
-    await pickProof(wrapper, [NOTA])
-
-    await submitForm(wrapper)
-
-    expect(errorOf(wrapper, 'tx-project')).toBe('Proyek tidak ditemukan')
-  })
 })
 
 describe('TransactionFormDialog: approving at once', () => {
@@ -448,7 +409,6 @@ describe('TransactionFormDialog: editing', () => {
     expect(wrapper.findComponent(DateField).props('modelValue')).toBe('2026-10-01')
     expect(select(wrapper, 'tx-account').props('modelValue')).toBe(KAS.id)
     expect(select(wrapper, 'tx-category').props('modelValue')).toBe(MATERIAL.id)
-    expect(select(wrapper, 'tx-project').props('modelValue')).toBe(RUMAH.id)
     expect((wrapper.get('#tx-description').element as HTMLTextAreaElement).value).toBe('Beli semen')
     expect(wrapper.findComponent(ProofPicker).exists()).toBe(false)
     expect(wrapper.findComponent(Checkbox).exists()).toBe(false)
@@ -460,12 +420,10 @@ describe('TransactionFormDialog: editing', () => {
     const { wrapper } = await mountForm('STAFF', PENDING)
 
     await fill(wrapper, '#tx-amount', '90000')
-    await choose(wrapper, 'tx-project', 'overhead')
     await submitForm(wrapper)
 
     expect(transactionsApi.updateTransaction).toHaveBeenCalledExactlyOnceWith('t-semen', {
       amount: '90000',
-      projectId: null,
     })
     expect(onSaved).toHaveBeenCalledExactlyOnceWith(saved)
     expect(document.body.textContent).toContain('Transaksi disimpan')
@@ -481,18 +439,16 @@ describe('TransactionFormDialog: editing', () => {
     expect(onSaved).not.toHaveBeenCalled()
   })
 
-  it('still offers an account, category or project that has since been closed', async () => {
+  it('still offers an account or category that has since been closed', async () => {
     const old = makeTransaction({
       account: { id: 'a-lama', name: 'Kas Lama' },
       category: { id: 'c-lama', name: 'Bahan Lama' },
-      project: { id: 'p-lama', code: 'PRJ-2025-009', name: 'Ruko' },
       permissions: { canEdit: true },
     })
     const { wrapper } = await mountForm('STAFF', old)
 
     expect(optionLabels(wrapper, 'tx-account')).toContain('Kas Lama')
     expect(optionLabels(wrapper, 'tx-category')).toContain('Bahan Lama')
-    expect(optionLabels(wrapper, 'tx-project')).toContain('PRJ-2025-009 · Ruko')
   })
 
   it('resubmits a rejected transaction even when nothing was changed, showing why it was rejected', async () => {

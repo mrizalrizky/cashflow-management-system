@@ -25,6 +25,11 @@ export default defineConfig({
     include: ['**/*.e2e-spec.ts'],
     globalSetup: ['./test/global-setup.ts'],
     fileParallelism: false,
+    // Database test bisa berada jauh (mis. Neon): tiap permintaan butuh ratusan milidetik.
+    // Test yang kehabisan waktu meninggalkan permintaan yang masih berjalan saat test berikutnya
+    // mengosongkan tabel, jadi batasnya dibuat longgar.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     env: testEnv,
   },
 });

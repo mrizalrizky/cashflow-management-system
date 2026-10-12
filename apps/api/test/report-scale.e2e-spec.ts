@@ -1,8 +1,8 @@
 import type { Prisma, TxStatus } from '../src/generated/prisma/client.js';
-import type { CompanyDashboardResponse, ProjectSummaryResponse } from '../src/reports/report.mapper.js';
+import type { CompanyDashboardResponse } from '../src/reports/report.mapper.js';
 import { E2eContext, setupE2e } from './e2e-context.js';
-import { asAdmin, call, createAccount, createCategory, createProject, TestSession } from './fixtures.js';
-import { DASHBOARD, PROJECTS } from './routes.js';
+import { asAdmin, call, createAccount, createCategory, TestSession } from './fixtures.js';
+import { DASHBOARD } from './routes.js';
 
 const ROWS = 10_000;
 const MAX_RESPONSE_MS = 1_500;
@@ -42,11 +42,8 @@ async function seedMany(ctx: E2eContext, admin: TestSession & { user: { id: stri
     await createCategory(ctx.prisma, { type: 'OUT' }),
     await createCategory(ctx.prisma, { type: 'OUT' }),
   ];
-  const projectA = await createProject(ctx.prisma, { contractValue: 10_000_000_000n });
-  const projects = [projectA.id, (await createProject(ctx.prisma)).id, null];
 
   const total: Sums = { income: 0n, expense: 0n };
-  const ofProjectA: Sums = { income: 0n, expense: 0n };
   const byMonth = new Map<string, Sums>();
   const rows: Prisma.TransactionCreateManyInput[] = [];
 
@@ -55,7 +52,6 @@ async function seedMany(ctx: E2eContext, admin: TestSession & { user: { id: stri
     const amount = BigInt(1_000 + ((i * 37) % 500_000));
     const status = STATUSES[i % STATUSES.length]!;
     const date = new Date(FIRST_DAY + (i % DAYS) * 86_400_000);
-    const projectId = projects[i % projects.length]!;
     rows.push({
       type,
       amount,
@@ -64,13 +60,11 @@ async function seedMany(ctx: E2eContext, admin: TestSession & { user: { id: stri
       description: `dummy ${i}`,
       account_id: accounts[i % accounts.length]!.id,
       category_id: type === 'IN' ? income.id : expenses[i % expenses.length]!.id,
-      project_id: projectId,
       created_by_id: admin.user.id,
     });
     if (status !== 'APPROVED') continue;
 
     add(total, type, amount);
-    if (projectId === projectA.id) add(ofProjectA, type, amount);
     const month = date.toISOString().slice(0, 7);
     if (!byMonth.has(month)) byMonth.set(month, { income: 0n, expense: 0n });
     add(byMonth.get(month)!, type, amount);
@@ -79,7 +73,7 @@ async function seedMany(ctx: E2eContext, admin: TestSession & { user: { id: stri
   for (let start = 0; start < rows.length; start += 2_000) {
     await ctx.prisma.transaction.createMany({ data: rows.slice(start, start + 2_000) });
   }
-  return { projectA, total, ofProjectA, byMonth };
+  return { total, byMonth };
 }
 
 async function timed<T>(run: () => Promise<{ body: T }>): Promise<{ body: T; ms: number }> {
@@ -97,9 +91,6 @@ describe('reports on 10,000 transactions', () => {
 
     const dashboard = await timed<CompanyDashboardResponse>(() =>
       call(ctx, admin, 'get', `${DASHBOARD}?${PERIOD}`).expect(200),
-    );
-    const summary = await timed<ProjectSummaryResponse>(() =>
-      call(ctx, admin, 'get', `${PROJECTS}/${expected.projectA.id}/summary`).expect(200),
     );
 
     expect(dashboard.body.totals).toEqual({
@@ -119,10 +110,6 @@ describe('reports on 10,000 transactions', () => {
     expect(dashboard.body.recentTransactions).toHaveLength(10);
     expect(dashboard.body.pendingCount).toBe(ROWS / 10);
 
-    expect(summary.body.received).toBe(expected.ofProjectA.income.toString());
-    expect(summary.body.cost).toBe(expected.ofProjectA.expense.toString());
-
     expect(dashboard.ms).toBeLessThan(MAX_RESPONSE_MS);
-    expect(summary.ms).toBeLessThan(MAX_RESPONSE_MS);
   }, 60_000);
 });

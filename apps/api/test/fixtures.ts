@@ -5,8 +5,6 @@ import type {
   AccountType,
   Category,
   PrismaClient,
-  Project,
-  ProjectStatus,
   Role,
   Transaction,
   TxStatus,
@@ -173,36 +171,6 @@ export function createCategory(
   });
 }
 
-export function createProject(
-  prisma: PrismaClient,
-  overrides: Partial<{
-    code: string;
-    name: string;
-    clientName: string;
-    status: ProjectStatus;
-    contractValue: bigint;
-    /** Bawaannya sama dengan `contractValue`: kontrak tanpa PPN. */
-    contractValueWithPpn: bigint;
-  }> = {},
-): Promise<Project> {
-  sequence += 1;
-  return prisma.project.create({
-    data: {
-      code: overrides.code ?? `PRJ-TEST-${String(sequence).padStart(4, '0')}`,
-      name: overrides.name ?? `Proyek ${sequence}`,
-      client_name: overrides.clientName ?? `Klien ${sequence}`,
-      status: overrides.status ?? 'ACTIVE',
-      contract_value: overrides.contractValue ?? 0n,
-      contract_value_with_ppn: overrides.contractValueWithPpn ?? overrides.contractValue ?? 0n,
-    },
-  });
-}
-
-/** Menugaskan seorang koordinator ke sebuah proyek, langsung di database. */
-export async function assign(prisma: PrismaClient, projectId: string, userId: string): Promise<void> {
-  await prisma.projectMember.create({ data: { project_id: projectId, user_id: userId } });
-}
-
 /** Transaksi yang ditulis langsung ke database, untuk menguji perhitungan saldo dan ringkasan. */
 export function createTransaction(
   prisma: PrismaClient,
@@ -213,7 +181,6 @@ export function createTransaction(
     type: TxType;
     amount: bigint;
     status?: TxStatus;
-    projectId?: string;
     /** Tanggal transaksi `YYYY-MM-DD`. */
     date?: string;
     description?: string;
@@ -232,7 +199,6 @@ export function createTransaction(
       account_id: input.accountId,
       category_id: input.categoryId,
       created_by_id: input.createdById,
-      project_id: input.projectId,
       created_at: input.createdAt,
       transfer_group_id: input.transferGroupId,
     },

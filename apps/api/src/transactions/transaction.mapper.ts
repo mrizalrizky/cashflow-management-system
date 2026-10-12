@@ -14,7 +14,6 @@ const PERSON = { select: { id: true, name: true } } as const;
 export const TRANSACTION_INCLUDE = {
   account: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
-  project: { select: { id: true, code: true, name: true } },
   // Peran pembuat dibutuhkan aturan peninjauan.
   created_by: { select: { id: true, name: true, role: true } },
   reviewed_by: PERSON,
@@ -48,7 +47,6 @@ export interface TransactionResponse {
   status: TxStatus;
   account: Named;
   category: Named;
-  project: (Named & { code: string }) | null;
   isTransfer: boolean;
   transferGroupId: string | null;
   createdBy: Named;
@@ -85,7 +83,6 @@ export function toAuditSnapshot(tx: TransactionWithRelations): Record<string, un
     status: tx.status,
     account_id: tx.account_id,
     category_id: tx.category_id,
-    project_id: tx.project_id,
     transfer_group_id: tx.transfer_group_id,
     reviewed_by_id: tx.reviewed_by_id,
     reject_reason: tx.reject_reason,
@@ -99,7 +96,6 @@ export function toAuditSnapshot(tx: TransactionWithRelations): Record<string, un
 export function toPolicySubject(tx: TransactionWithRelations): PolicySubject {
   return {
     status: tx.status,
-    projectId: tx.project_id,
     createdById: tx.created_by_id,
     creatorRole: tx.created_by.role,
     isTransfer: tx.transfer_group_id !== null,
@@ -119,7 +115,6 @@ export function toTransactionResponse(
     status: tx.status,
     account: tx.account,
     category: tx.category,
-    project: tx.project,
     isTransfer: tx.transfer_group_id !== null,
     transferGroupId: tx.transfer_group_id,
     createdBy: { id: tx.created_by.id, name: tx.created_by.name },

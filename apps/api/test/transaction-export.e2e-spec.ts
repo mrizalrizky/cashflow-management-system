@@ -17,8 +17,6 @@ const HEADER = [
   'Keterangan',
   'Akun',
   'Kategori',
-  'Kode Proyek',
-  'Proyek',
   'Status',
   'Transfer',
   'Dicatat oleh',
@@ -82,15 +80,15 @@ async function listed(ctx: E2eContext, session: TestSession, query = ''): Promis
   return { total: res.body.meta.total, names: res.body.data.map((t: { description: string }) => t.description) };
 }
 
-/** Transaksi dengan keterangan yang berbeda-beda, di berbagai proyek, status, tipe dan tanggal. */
+/** Transaksi dengan keterangan yang berbeda-beda, dari berbagai pembuat, status, tipe dan tanggal. */
 async function seedVariety(ctx: E2eContext, world: World): Promise<void> {
   const second = await createAccount(ctx.prisma, { name: 'Bank Uji' });
-  await record(ctx, world.staff, expenseBody(world, { description: 'staf A semen', projectId: world.projectA.id }));
-  await record(ctx, world.staff, expenseBody(world, { description: 'staf B besi', projectId: world.projectB.id, transactionDate: '2026-09-15' }));
+  await record(ctx, world.staff, expenseBody(world, { description: 'staf semen' }));
+  await record(ctx, world.staff, expenseBody(world, { description: 'staf besi', transactionDate: '2026-09-15' }));
   await record(ctx, world.staff, expenseBody(world, { description: 'staf overhead listrik', accountId: second.id }));
-  await record(ctx, world.otherStaff, expenseBody(world, { description: 'staf lain A pasir', projectId: world.projectA.id, transactionDate: '2026-09-20' }));
-  await record(ctx, world.manager, incomeBody(world, { description: 'koordinator A termin', projectId: world.projectA.id }));
-  const approved = await record(ctx, world.admin, incomeBody(world, { description: 'admin B termin', projectId: world.projectB.id }));
+  await record(ctx, world.otherStaff, expenseBody(world, { description: 'staf lain pasir', transactionDate: '2026-09-20' }));
+  await record(ctx, world.manager, incomeBody(world, { description: 'koordinator termin' }));
+  const approved = await record(ctx, world.admin, incomeBody(world, { description: 'admin termin' }));
   await call(ctx, world.admin, 'post', transactionUrl(approved.id, 'approve')).expect(200);
   const group = randomUUID();
   for (const type of ['OUT', 'IN'] as const) {
@@ -133,43 +131,39 @@ describe('GET /transactions/export', () => {
 
   it('writes one row per transaction with everything needed to read it on its own', async () => {
     const world = await setupWorld(ctx);
-    const tx = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
+    const tx = await record(ctx, world.staff, expenseBody(world));
     await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'attachments'))
       .attach('file', SAMPLE_FILES.pdf, 'nota.pdf')
       .expect(201);
-    await call(ctx, world.manager, 'post', transactionUrl(tx.id, 'reject')).send({ reason: 'Nota buram' }).expect(200);
+    await call(ctx, world.admin, 'post', transactionUrl(tx.id, 'reject')).send({ reason: 'Nota buram' }).expect(200);
     await record(ctx, world.admin, incomeBody(world, { transactionDate: '2026-09-30' }));
 
     const { rows } = await download(ctx, world.admin);
 
     expect(rows).toHaveLength(2);
-    expect(rows[0]!.slice(0, 15)).toEqual([
+    expect(rows[0]!.slice(0, 13)).toEqual([
       '2026-10-01',
       'Keluar',
       '150000',
       'Beli semen',
       'Kas Uji',
       'Material Uji',
-      'PRJ-A',
-      'Proyek A',
       'Ditolak',
       'Tidak',
       'Staf Satu',
-      'Koordinator A',
+      'Admin',
       'Nota buram',
       '',
       '1',
     ]);
-    expect(rows[0]![15]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
-    expect(rows[1]!.slice(0, 12)).toEqual([
+    expect(rows[0]![13]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+    expect(rows[1]!.slice(0, 10)).toEqual([
       '2026-09-30',
       'Masuk',
       '500000',
       'Termin pertama',
       'Kas Uji',
       'Termin Uji',
-      '',
-      '',
       'Menunggu',
       'Tidak',
       'Admin',
@@ -201,7 +195,6 @@ describe('GET /transactions/export', () => {
     '?type=IN',
     '?dateFrom=2026-09-01&dateTo=2026-09-30',
     '?search=termin',
-    '?overhead=true',
     '?includeTransfers=false',
     '?type=OUT&status=PENDING&includeTransfers=false',
   ])('gives each role exactly the rows, in the order, of their list for %j', async (query) => {
@@ -217,11 +210,11 @@ describe('GET /transactions/export', () => {
     }
   });
 
-  it('follows the project and account filters the same way', async () => {
+  it('follows the account and category filters the same way', async () => {
     const world = await setupWorld(ctx);
     await seedVariety(ctx, world);
 
-    for (const query of [`?projectId=${world.projectA.id}`, `?accountId=${world.account.id}`, `?categoryId=${world.income.id}`]) {
+    for (const query of [`?accountId=${world.account.id}`, `?categoryId=${world.income.id}`]) {
       for (const session of [world.admin, world.manager, world.staff]) {
         expect(await exported(ctx, session, query)).toEqual((await listed(ctx, session, query)).names);
       }
@@ -232,16 +225,11 @@ describe('GET /transactions/export', () => {
     const world = await setupWorld(ctx);
     await seedVariety(ctx, world);
 
-    // Koordinator proyek A: tidak ada proyek B, overhead, atau transfer.
-    const manager = await exported(ctx, world.manager);
-    expect(manager.sort()).toEqual(['koordinator A termin', 'staf A semen', 'staf lain A pasir']);
-    expect(await exported(ctx, world.manager, `?projectId=${world.projectB.id}`)).toEqual([]);
-    expect(await exported(ctx, world.manager, '?overhead=true')).toEqual([]);
+    // Selain admin: hanya miliknya sendiri, tanpa transfer.
+    expect(await exported(ctx, world.manager)).toEqual(['koordinator termin']);
     expect(await exported(ctx, world.manager, '?search=besi')).toEqual([]);
-
-    // Staf: hanya miliknya sendiri, walau memfilter proyek tempat orang lain mencatat.
-    expect((await exported(ctx, world.otherStaff)).sort()).toEqual(['staf lain A pasir']);
-    expect(await exported(ctx, world.otherStaff, `?projectId=${world.projectA.id}&search=semen`)).toEqual([]);
+    expect((await exported(ctx, world.otherStaff)).sort()).toEqual(['staf lain pasir']);
+    expect(await exported(ctx, world.otherStaff, '?search=semen')).toEqual([]);
     expect(await exported(ctx, world.staff, '?includeTransfers=true&search=transfer')).toEqual([]);
   });
 
@@ -329,8 +317,7 @@ describe('GET /transactions/export', () => {
 
   it.each([
     ['an unknown status', '?status=LUNAS', 'status'],
-    ['a project id that is not an id', '?projectId=abc', 'projectId'],
-    ['a project together with overhead', `?projectId=${randomUUID()}&overhead=true`, 'overhead'],
+    ['a project filter, which no longer exists', `?projectId=${randomUUID()}`, 'projectId'],
     ['paging, which an export does not have', '?page=2', 'page'],
     ['a page size', '?pageSize=10', 'pageSize'],
   ])('refuses %s without writing an audit entry', async (_label, query, field) => {

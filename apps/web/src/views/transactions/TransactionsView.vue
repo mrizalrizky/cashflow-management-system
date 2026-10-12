@@ -18,9 +18,8 @@ import TransactionTable from './TransactionTable.vue'
 import TransferDialog from './TransferDialog.vue'
 
 const { isAdmin, role } = storeToRefs(useSessionStore())
-// Staf hanya melihat transaksinya sendiri; koordinator tidak pernah melihat overhead.
+// Staf hanya melihat transaksinya sendiri.
 const isStaff = computed(() => role.value === 'STAFF')
-const seesOverhead = computed(() => role.value !== 'PROJECT_MANAGER')
 
 const options = useTransactionOptions()
 /**
@@ -91,7 +90,6 @@ function reloadTable(): void {
   <TransactionFilters
     v-model="filters"
     :options="options"
-    :allow-overhead="seesOverhead"
     :transfer-switch="isAdmin"
   />
 

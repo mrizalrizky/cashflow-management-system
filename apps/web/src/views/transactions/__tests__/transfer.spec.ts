@@ -4,7 +4,6 @@ import Select from 'primevue/select'
 import * as accountsApi from '@/api/accounts'
 import * as categoriesApi from '@/api/categories'
 import { ApiError } from '@/api/http'
-import * as projectsApi from '@/api/projects'
 import * as transactionsApi from '@/api/transactions'
 import type { Role, Transaction } from '@/api/types'
 import DateField from '@/components/DateField.vue'
@@ -17,7 +16,6 @@ import TransferDialog from '../TransferDialog.vue'
 
 vi.mock('@/api/transactions')
 vi.mock('@/api/accounts')
-vi.mock('@/api/projects')
 vi.mock('@/api/categories')
 vi.mock('@/lib/calendar', () => ({ todayInJakarta: () => '2026-10-07' }))
 
@@ -65,7 +63,6 @@ beforeEach(() => {
   freshPinia()
   document.body.innerHTML = ''
   vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS, BANK, TABUNGAN])
-  vi.mocked(projectsApi.listProjectOptions).mockResolvedValue([])
   vi.mocked(categoriesApi.listCategories).mockResolvedValue([])
   vi.mocked(transactionsApi.createTransfer).mockResolvedValue(LEGS)
 })

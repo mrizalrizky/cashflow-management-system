@@ -1,6 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 import type { Role } from '@/api/types'
-import { PATHS, PROJECT_DETAIL_ROUTE, TRANSACTION_DETAIL_ROUTE } from './paths'
+import { PATHS, TRANSACTION_DETAIL_ROUTE } from './paths'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -18,8 +18,6 @@ declare module 'vue-router' {
 
 // Halaman yang dibangun pada fase berikutnya memakai tampilan sementara yang sama.
 const placeholder = () => import('@/views/PlaceholderView.vue')
-
-const PROJECT_ROLES: Role[] = ['SUPER_ADMIN', 'PROJECT_MANAGER']
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -48,16 +46,6 @@ export const routes: RouteRecordRaw[] = [
     path: TRANSACTION_DETAIL_ROUTE,
     component: () => import('@/views/transactions/TransactionDetailView.vue'),
     meta: { title: 'Transaksi' },
-  },
-  {
-    path: PATHS.projects,
-    component: () => import('@/views/projects/ProjectsView.vue'),
-    meta: { roles: PROJECT_ROLES, title: 'Proyek' },
-  },
-  {
-    path: PROJECT_DETAIL_ROUTE,
-    component: () => import('@/views/projects/ProjectDetailView.vue'),
-    meta: { roles: PROJECT_ROLES, title: 'Proyek' },
   },
   {
     path: PATHS.masterData,

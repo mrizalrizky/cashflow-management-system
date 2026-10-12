@@ -1,13 +1,11 @@
-import type { Account, Category, Project } from '../src/generated/prisma/client.js';
+import type { Account, Category } from '../src/generated/prisma/client.js';
 import type { TransactionResponse } from '../src/transactions/transaction.mapper.js';
 import type { E2eContext } from './e2e-context.js';
 import {
   asAdmin,
-  assign,
   call,
   createAccount,
   createCategory,
-  createProject,
   loginAs,
   TestSession,
 } from './fixtures.js';
@@ -31,26 +29,20 @@ export async function setupLedger(ctx: E2eContext): Promise<Ledger> {
 }
 
 export interface World extends Ledger {
-  projectA: Project;
-  projectB: Project;
   admin: UserSession;
-  /** Koordinator yang ditugaskan ke proyek A saja. */
   manager: UserSession;
   staff: UserSession;
   otherStaff: UserSession;
 }
 
-/** Dunia kecil yang dipakai sebagian besar test transaksi: dua proyek dan satu orang per peran. */
+/** Dunia kecil yang dipakai sebagian besar test transaksi: satu orang per peran. */
 export async function setupWorld(ctx: E2eContext): Promise<World> {
   const ledger = await setupLedger(ctx);
-  const projectA = await createProject(ctx.prisma, { code: 'PRJ-A', name: 'Proyek A' });
-  const projectB = await createProject(ctx.prisma, { code: 'PRJ-B', name: 'Proyek B' });
   const admin = await asAdmin(ctx);
   const manager = await loginAs(ctx, { role: 'PROJECT_MANAGER', name: 'Koordinator A' });
   const staff = await loginAs(ctx, { role: 'STAFF', name: 'Staf Satu' });
   const otherStaff = await loginAs(ctx, { role: 'STAFF', name: 'Staf Dua' });
-  await assign(ctx.prisma, projectA.id, manager.user.id);
-  return { ...ledger, projectA, projectB, admin, manager, staff, otherStaff };
+  return { ...ledger, admin, manager, staff, otherStaff };
 }
 
 export interface TransactionBody {
@@ -60,7 +52,6 @@ export interface TransactionBody {
   description: string;
   accountId: string;
   categoryId: string;
-  projectId?: string | null;
 }
 
 /** Isi permintaan untuk sebuah pengeluaran yang sah; timpa bagian yang sedang diuji. */

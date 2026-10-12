@@ -38,7 +38,6 @@ export interface SessionResponse {
 
 export type AccountType = 'CASH' | 'BANK'
 export type TxType = 'IN' | 'OUT'
-export type ProjectStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
 export type TxStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID'
 
 /** Nominal (`openingBalance`, `balance`, `contractValue`, `contractValueWithPpn`) selalu string digit. */
@@ -60,42 +59,11 @@ export interface Category {
   isActive: boolean
 }
 
-export interface ProjectMember {
-  id: string
-  name: string
-  email: string
-}
-
-/** Tanggal proyek adalah tanggal kalender `YYYY-MM-DD`. */
-export interface Project {
-  id: string
-  code: string
-  name: string
-  clientName: string
-  contractValue: string
-  /** Nilai kontrak berikut PPN; `'0'` berarti belum diisi. */
-  contractValueWithPpn: string
-  status: ProjectStatus
-  startDate: string | null
-  endDate: string | null
-  notes: string | null
-  members: ProjectMember[]
-  createdAt: string
-  updatedAt: string
-}
-
 /** Pilihan akun untuk input transaksi; sengaja tanpa saldo. */
 export interface AccountOption {
   id: string
   name: string
   type: AccountType
-}
-
-/** Proyek aktif yang boleh dipilih pengguna saat mencatat transaksi. */
-export interface ProjectOption {
-  id: string
-  code: string
-  name: string
 }
 
 export interface NamedRef {
@@ -132,8 +100,6 @@ export interface Transaction {
   status: TxStatus
   account: NamedRef
   category: NamedRef
-  /** `null` berarti overhead perusahaan. */
-  project: (NamedRef & { code: string }) | null
   isTransfer: boolean
   transferGroupId: string | null
   createdBy: NamedRef
@@ -185,27 +151,8 @@ export interface CompanyDashboard {
   /** Satu entri per bulan (`YYYY-MM`) dalam periode, berurutan. */
   monthly: (Cashflow & { month: string })[]
   expenseByCategory: CategoryAmount[]
-  expenseByScope: { overhead: string; project: string }
   recentTransactions: Transaction[]
   /** Transaksi yang menunggu ditinjau, tanpa melihat periode. */
-  pendingCount: number
-}
-
-/** Ringkasan sepanjang umur proyek; hanya transaksi yang disetujui yang dihitung. */
-export interface ProjectSummary {
-  projectId: string
-  contractValue: string
-  /** Dasar `outstanding` dan `receivedPercent`; `'0'` berarti belum diisi. */
-  contractValueWithPpn: string
-  received: string
-  /** Nilai kontrak + PPN dikurangi yang diterima; negatif bila yang diterima melebihinya. */
-  outstanding: string
-  /** Dua desimal; null bila nilai kontrak + PPN belum diisi. */
-  receivedPercent: number | null
-  cost: string
-  /** Yang diterima dikurangi biaya. */
-  cashDifference: string
-  costByCategory: CategoryAmount[]
   pendingCount: number
 }
 

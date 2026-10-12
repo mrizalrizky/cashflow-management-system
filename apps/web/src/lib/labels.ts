@@ -1,4 +1,4 @@
-import type { AccountType, ProjectStatus, Role, TxStatus, TxType } from '@/api/types'
+import type { AccountType, Role, TxStatus, TxType } from '@/api/types'
 import { hasOwn } from './changes'
 
 export interface Option<T> {
@@ -29,21 +29,6 @@ export const ACCOUNT_TYPE_OPTIONS: Option<AccountType>[] = accountTypes.options
 const txTypes = labelSet<TxType>({ IN: 'Pemasukan', OUT: 'Pengeluaran' })
 export const txTypeLabel = txTypes.label
 export const TX_TYPE_OPTIONS: Option<TxType>[] = txTypes.options
-
-const projectStatuses = labelSet<ProjectStatus>({
-  ACTIVE: 'Aktif',
-  COMPLETED: 'Selesai',
-  CANCELLED: 'Dibatalkan',
-})
-export const projectStatusLabel = projectStatuses.label
-export const PROJECT_STATUS_OPTIONS: Option<ProjectStatus>[] = projectStatuses.options
-
-/** Warna tag PrimeVue untuk tiap status proyek. */
-export const PROJECT_STATUS_SEVERITY: Record<ProjectStatus, 'success' | 'info' | 'secondary'> = {
-  ACTIVE: 'success',
-  COMPLETED: 'info',
-  CANCELLED: 'secondary',
-}
 
 const txStatuses = labelSet<TxStatus>({
   PENDING: 'Menunggu',
@@ -105,7 +90,6 @@ const auditEntities = openLabelSet({
   transaction: 'Transaksi',
   account: 'Akun',
   category: 'Kategori',
-  project: 'Proyek',
   user: 'Pengguna',
 })
 export const auditEntityLabel = auditEntities.label

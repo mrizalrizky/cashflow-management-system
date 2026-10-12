@@ -53,7 +53,7 @@ describe('LoginView', () => {
 
   it.each<[Role, string]>([
     ['SUPER_ADMIN', '/dashboard'],
-    ['PROJECT_MANAGER', '/proyek'],
+    ['PROJECT_MANAGER', '/transaksi'],
     ['STAFF', '/transaksi'],
   ])('logs a %s in and opens %s', async (role, landing) => {
     vi.mocked(authApi.login).mockResolvedValue(sessionFor(user(role)))
@@ -177,7 +177,7 @@ describe('ChangePasswordView', () => {
     await submitForm(wrapper)
 
     expect(authApi.changePassword).toHaveBeenCalledWith('password-lama-1', 'password-baru-1')
-    expect(router.currentRoute.value.fullPath).toBe('/proyek')
+    expect(router.currentRoute.value.fullPath).toBe('/transaksi')
   })
 
   it('shows a server field error under the field it belongs to', async () => {

@@ -27,60 +27,9 @@ export interface CompanyDashboardResponse {
   totals: CashflowResponse;
   monthly: (CashflowResponse & { month: string })[];
   expenseByCategory: CategoryAmountResponse[];
-  expenseByScope: { overhead: string; project: string };
   recentTransactions: TransactionResponse[];
   /** Transaksi yang menunggu ditinjau, tanpa melihat periode. */
   pendingCount: number;
-}
-
-export interface ProjectSummaryResponse {
-  projectId: string;
-  contractValue: string;
-  /** Nilai kontrak berikut PPN: dasar `outstanding` dan `receivedPercent`. '0' berarti belum diisi. */
-  contractValueWithPpn: string;
-  /** Pemasukan proyek yang sudah disetujui. */
-  received: string;
-  /** Nilai kontrak + PPN dikurangi yang diterima; negatif bila yang diterima melebihinya. */
-  outstanding: string;
-  /** Persentase nilai kontrak + PPN yang sudah diterima, dua desimal; null bila nilai itu 0. */
-  receivedPercent: number | null;
-  /** Pengeluaran proyek yang sudah disetujui. */
-  cost: string;
-  /** Yang diterima dikurangi biaya. */
-  cashDifference: string;
-  costByCategory: CategoryAmountResponse[];
-  /** Transaksi proyek ini yang menunggu ditinjau. */
-  pendingCount: number;
-}
-
-/** Persentase dihitung dengan bilangan bulat (per sepuluh ribu) dan dibulatkan ke bawah. */
-function percentOf(part: bigint, whole: bigint): number | null {
-  if (whole === 0n) return null;
-  return Number((part * 10_000n) / whole) / 100;
-}
-
-export function toProjectSummary(data: {
-  projectId: string;
-  contractValue: bigint;
-  contractValueWithPpn: bigint;
-  totals: TypeTotals;
-  costByCategory: CategoryTotal[];
-  pendingCount: number;
-}): ProjectSummaryResponse {
-  const { income: received, expense: cost } = data.totals;
-  return {
-    projectId: data.projectId,
-    contractValue: fromMoney(data.contractValue),
-    contractValueWithPpn: fromMoney(data.contractValueWithPpn),
-    received: fromMoney(received),
-    // Klien membayar berikut PPN, jadi yang diterima dibandingkan dengan nilai berikut PPN.
-    outstanding: fromMoney(data.contractValueWithPpn - received),
-    receivedPercent: percentOf(received, data.contractValueWithPpn),
-    cost: fromMoney(cost),
-    cashDifference: fromMoney(received - cost),
-    costByCategory: toCategoryAmounts(data.costByCategory),
-    pendingCount: data.pendingCount,
-  };
 }
 
 export function toCashflow(totals: TypeTotals): CashflowResponse {
@@ -105,7 +54,6 @@ export function toCompanyDashboard(data: {
   totals: TypeTotals;
   monthly: MonthTotals[];
   expenseByCategory: CategoryTotal[];
-  expenseByScope: { overhead: bigint; project: bigint };
   recentTransactions: TransactionResponse[];
   pendingCount: number;
 }): CompanyDashboardResponse {
@@ -122,10 +70,6 @@ export function toCompanyDashboard(data: {
     totals: toCashflow(data.totals),
     monthly: data.monthly.map((month) => ({ month: month.month, ...toCashflow(month) })),
     expenseByCategory: toCategoryAmounts(data.expenseByCategory),
-    expenseByScope: {
-      overhead: fromMoney(data.expenseByScope.overhead),
-      project: fromMoney(data.expenseByScope.project),
-    },
     recentTransactions: data.recentTransactions,
     pendingCount: data.pendingCount,
   };

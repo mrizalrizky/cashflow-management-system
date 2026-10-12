@@ -1,5 +1,5 @@
 import { E2eContext, setupE2e } from './e2e-context.js';
-import { assign, call, createAccount, createCategory, createProject, errorFields } from './fixtures.js';
+import { call, createAccount, createCategory, errorFields } from './fixtures.js';
 import { expenseBody, record, setupWorld, transactionUrl, World } from './transaction-fixtures.js';
 
 /** Menandai transaksi sebagai ditolak langsung di database, seperti hasil peninjauan. */
@@ -24,7 +24,7 @@ describe('PATCH /transactions/:id', () => {
 
   it('lets the creator change every field of a pending transaction, recording before and after', async () => {
     const world = await setupWorld(ctx);
-    const tx = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
+    const tx = await record(ctx, world.staff, expenseBody(world));
 
     const res = await call(ctx, world.staff, 'patch', transactionUrl(tx.id))
       .send({
@@ -33,7 +33,6 @@ describe('PATCH /transactions/:id', () => {
         transactionDate: '2026-09-15',
         description: 'Termin kedua',
         categoryId: world.income.id,
-        projectId: world.projectB.id,
       })
       .expect(200);
 
@@ -44,12 +43,11 @@ describe('PATCH /transactions/:id', () => {
       description: 'Termin kedua',
       status: 'PENDING',
       category: { id: world.income.id },
-      project: { id: world.projectB.id },
     });
     const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE' } });
     expect(row).toMatchObject({ user_id: world.staff.user.id, entity_id: tx.id });
-    expect(row.before).toMatchObject({ amount: '150000', type: 'OUT', project_id: world.projectA.id });
-    expect(row.after).toMatchObject({ amount: '275000', type: 'IN', project_id: world.projectB.id });
+    expect(row.before).toMatchObject({ amount: '150000', type: 'OUT' });
+    expect(row.after).toMatchObject({ amount: '275000', type: 'IN' });
   });
 
   it('applies the same rules as creation to the result', async () => {
@@ -100,31 +98,12 @@ describe('PATCH /transactions/:id', () => {
     expect([row.account_id, row.category_id]).toEqual([world.account.id, world.expense.id]);
   });
 
-  it('lets an admin edit anyone’s pending transaction, but not a project manager', async () => {
+  it('lets an admin edit anyone’s pending transaction, but nobody else', async () => {
     const world = await setupWorld(ctx);
-    const tx = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
+    const tx = await record(ctx, world.staff, expenseBody(world));
 
     await call(ctx, world.admin, 'patch', transactionUrl(tx.id)).send({ amount: '1' }).expect(200);
-    const res = await call(ctx, world.manager, 'patch', transactionUrl(tx.id)).send({ amount: '2' }).expect(403);
-    expect(res.body.message).toBe('Anda tidak boleh mengubah transaksi ini');
     await call(ctx, world.otherStaff, 'patch', transactionUrl(tx.id)).send({ amount: '3' }).expect(404);
-  });
-
-  it('lets a transaction move only to a project the user may record for', async () => {
-    const world = await setupWorld(ctx);
-    const projectC = await createProject(ctx.prisma, { code: 'PRJ-C' });
-    const closed = await createProject(ctx.prisma, { status: 'COMPLETED' });
-    await assign(ctx.prisma, world.projectB.id, world.manager.user.id);
-    const managers = await record(ctx, world.manager, expenseBody(world, { projectId: world.projectA.id }));
-    const staffs = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
-
-    await call(ctx, world.manager, 'patch', transactionUrl(managers.id)).send({ projectId: world.projectB.id }).expect(200);
-    await call(ctx, world.manager, 'patch', transactionUrl(managers.id)).send({ projectId: projectC.id }).expect(404);
-    await call(ctx, world.manager, 'patch', transactionUrl(managers.id)).send({ projectId: null }).expect(403);
-
-    const res = await call(ctx, world.staff, 'patch', transactionUrl(staffs.id)).send({ projectId: closed.id }).expect(400);
-    expect(errorFields(res.body)).toEqual(['projectId']);
-    await call(ctx, world.staff, 'patch', transactionUrl(staffs.id)).send({ projectId: null }).expect(200);
   });
 
   it.each(['APPROVED', 'VOID'] as const)('refuses to edit a %s transaction, even for an admin', async (status) => {
@@ -192,12 +171,11 @@ describe('POST /transactions/:id/cancel', () => {
     expect(await ctx.prisma.transaction.count()).toBe(1);
   });
 
-  it('is allowed for an admin, but not for a project manager on someone else’s transaction', async () => {
+  it('is allowed for an admin, but not for someone else on another person’s transaction', async () => {
     const world = await setupWorld(ctx);
-    const first = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
-    const second = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
+    const first = await record(ctx, world.staff, expenseBody(world));
+    const second = await record(ctx, world.staff, expenseBody(world));
 
-    await call(ctx, world.manager, 'post', transactionUrl(first.id, 'cancel')).send(reason).expect(403);
     await call(ctx, world.otherStaff, 'post', transactionUrl(first.id, 'cancel')).send(reason).expect(404);
     await call(ctx, world.admin, 'post', transactionUrl(second.id, 'cancel')).send(reason).expect(200);
   });

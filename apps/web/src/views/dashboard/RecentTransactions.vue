@@ -4,7 +4,6 @@ import Tag from 'primevue/tag'
 import type { Transaction } from '@/api/types'
 import SignedAmount from '@/components/SignedAmount.vue'
 import TransactionStatusTag from '@/components/TransactionStatusTag.vue'
-import { projectLabel } from '@/composables/useTransactionOptions'
 import { formatCalendarDate } from '@/lib/format'
 import { transactionPath } from '@/router/paths'
 
@@ -28,10 +27,8 @@ defineProps<{ transactions: Transaction[] }>()
           >{{ transaction.description }}</RouterLink
         >
         <p class="text-sm text-surface-500">
-          {{ formatCalendarDate(transaction.transactionDate) }} ·
-          <Tag v-if="transaction.isTransfer" severity="info" value="Transfer" />
-          <template v-else-if="transaction.project">{{ projectLabel(transaction.project) }}</template>
-          <template v-else>Overhead</template>
+          {{ formatCalendarDate(transaction.transactionDate) }}
+          <Tag v-if="transaction.isTransfer" severity="info" value="Transfer" class="ml-1" />
         </p>
       </div>
       <div class="flex items-center gap-3">

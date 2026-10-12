@@ -28,12 +28,18 @@ function named(items: { name: string; amount: string }[]) {
 
 /** Bagian dashboard yang hanya boleh dipengaruhi transaksi yang disetujui dan bukan transfer. */
 function figures(body: CompanyDashboardResponse) {
-  const { totals, monthly, expenseByCategory, expenseByScope } = body;
-  return { totals, monthly, expenseByCategory, expenseByScope };
+  const { totals, monthly, expenseByCategory } = body;
+  return { totals, monthly, expenseByCategory };
 }
 
 describe('GET /dashboard/company', () => {
   const ctx = setupE2e();
+
+  it('no longer splits spending into overhead and projects', async () => {
+    const admin = await asAdmin(ctx);
+    const res = await call(ctx, admin, 'get', DASHBOARD).expect(200);
+    expect(res.body).not.toHaveProperty('expenseByScope');
+  });
 
   it('is for the admin only', async () => {
     await expectAccess(ctx, { method: 'get', path: DASHBOARD }, adminOnly());
@@ -51,7 +57,6 @@ describe('GET /dashboard/company', () => {
     expect(body.monthly).toEqual(EXPECTED.monthly);
     expect(named(body.expenseByCategory)).toEqual(EXPECTED.expenseByCategory);
     expect(body.expenseByCategory[0]!.categoryId).toEqual(expect.any(String));
-    expect(body.expenseByScope).toEqual(EXPECTED.expenseByScope);
     expect(body.pendingCount).toBe(EXPECTED.pendingCount);
   });
 
@@ -172,7 +177,6 @@ describe('GET /dashboard/company', () => {
     expect(body.totals).toEqual({ income: '0', expense: '0', net: '0' });
     expect(body.monthly.every((m) => m.income === '0' && m.expense === '0' && m.net === '0')).toBe(true);
     expect(body.expenseByCategory).toEqual([]);
-    expect(body.expenseByScope).toEqual({ overhead: '0', project: '0' });
     expect(body.recentTransactions).toEqual([]);
     expect(body.pendingCount).toBe(0);
   });

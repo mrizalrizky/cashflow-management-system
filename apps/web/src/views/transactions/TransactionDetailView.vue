@@ -19,14 +19,13 @@ import { useNotify } from '@/composables/useNotify'
 import { describeFailedUploads, useProofUpload } from '@/composables/useProofUpload'
 import { TRANSFER_VOID_NOTE, useTransactionActions } from '@/composables/useTransactionActions'
 import {
-  projectLabel,
   useTransactionOptions,
   type TransactionOptions,
 } from '@/composables/useTransactionOptions'
 import { formatCalendarDate, formatDate } from '@/lib/format'
 import { txTypeLabel } from '@/lib/labels'
 import { MAX_PROOFS } from '@/lib/proof-files'
-import { PATHS, projectPath } from '@/router/paths'
+import { PATHS } from '@/router/paths'
 import { useSessionStore } from '@/stores/session'
 import TransactionFormDialog from './TransactionFormDialog.vue'
 
@@ -34,7 +33,7 @@ import TransactionFormDialog from './TransactionFormDialog.vue'
 const NOT_FOUND_STATUSES = [400, 404]
 
 const route = useRoute()
-const { role, isAdmin } = storeToRefs(useSessionStore())
+const { isAdmin } = storeToRefs(useSessionStore())
 const notify = useNotify()
 
 const transactionId = computed(() => String(route.params.id))
@@ -68,9 +67,6 @@ const actions = useTransactionActions({
     return error.value ? null : transaction.value
   },
 })
-
-/** Halaman proyek hanya bisa dibuka admin dan koordinator. */
-const canOpenProject = computed(() => role.value !== 'STAFF')
 
 function byWhom(person: { name: string }, at: string | null): string {
   return `${person.name} · ${formatDate(at)}`
@@ -225,20 +221,9 @@ function openForm(): void {
           />
         </dd>
       </div>
-      <div class="min-w-0">
-        <dt class="text-sm text-surface-500">Proyek</dt>
-        <dd class="font-medium break-words" data-testid="tx-project">
-          <template v-if="transaction.isTransfer">Transfer antar akun</template>
-          <template v-else-if="!transaction.project">Overhead</template>
-          <RouterLink
-            v-else-if="canOpenProject"
-            :to="projectPath(transaction.project.id)"
-            class="text-primary-700 hover:underline"
-          >
-            {{ projectLabel(transaction.project) }}
-          </RouterLink>
-          <template v-else>{{ projectLabel(transaction.project) }}</template>
-        </dd>
+      <div v-if="transaction.isTransfer" class="min-w-0">
+        <dt class="text-sm text-surface-500">Jenis</dt>
+        <dd class="font-medium" data-testid="tx-transfer">Transfer antar akun</dd>
       </div>
       <div v-for="fact in facts" :key="fact.id" class="min-w-0">
         <dt class="text-sm text-surface-500">{{ fact.label }}</dt>

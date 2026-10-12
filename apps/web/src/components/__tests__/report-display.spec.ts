@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as http from '@/api/http'
-import { getCompanyDashboard, getProjectSummary } from '@/api/reports'
+import { getCompanyDashboard } from '@/api/reports'
 import { mountView } from '@/test/mount'
 import BarList from '../BarList.vue'
 import MoneyText from '../MoneyText.vue'
@@ -28,12 +28,6 @@ describe('report API module', () => {
       ['/dashboard/company', { query: { from: '2026-10-01', to: '2026-10-07' } }],
       ['/dashboard/company', { query: { to: '2026-10-07' } }],
     ])
-  })
-
-  it('asks for the summary of one project', async () => {
-    await getProjectSummary('p1')
-
-    expect(request).toHaveBeenCalledExactlyOnceWith('/projects/p1/summary')
   })
 })
 

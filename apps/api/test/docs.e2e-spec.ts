@@ -19,8 +19,6 @@ describe('API documentation', () => {
         '/api/v1/accounts',
         '/api/v1/accounts/options',
         '/api/v1/categories',
-        '/api/v1/projects',
-        '/api/v1/projects/{id}/members',
       ]),
     );
     expect(res.body.components.securitySchemes.bearer).toMatchObject({

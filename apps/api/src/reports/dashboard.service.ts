@@ -33,13 +33,12 @@ export class DashboardService {
     const period = resolvePeriod(query, todayInJakarta());
     const filter = { period, excludeTransfers: true };
 
-    const [accounts, totals, monthly, expenseByCategory, expenseByScope, recent, pendingCount] =
+    const [accounts, totals, monthly, expenseByCategory, recent, pendingCount] =
       await Promise.all([
         this.accountsWithBalance(),
         this.report.totals(this.prisma, filter),
         this.report.monthly(this.prisma, period),
         this.report.expenseByCategory(this.prisma, filter),
-        this.report.expenseByScope(this.prisma, period),
         this.recentTransactions(user),
         this.prisma.transaction.count({ where: { status: 'PENDING' } }),
       ]);
@@ -50,7 +49,6 @@ export class DashboardService {
       totals,
       monthly,
       expenseByCategory,
-      expenseByScope,
       recentTransactions: recent,
       pendingCount,
     });

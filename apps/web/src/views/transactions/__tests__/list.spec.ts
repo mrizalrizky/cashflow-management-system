@@ -7,7 +7,6 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import * as accountsApi from '@/api/accounts'
 import * as categoriesApi from '@/api/categories'
 import { ApiError, type DownloadedFile } from '@/api/http'
-import * as projectsApi from '@/api/projects'
 import * as transactionsApi from '@/api/transactions'
 import type { Role, Transaction } from '@/api/types'
 import DateField from '@/components/DateField.vue'
@@ -17,12 +16,10 @@ import { fill, freshPinia, mountView } from '@/test/mount'
 import { signInAs } from '@/test/session'
 import {
   BANK,
-  KAFE,
   KAS,
   makeTransaction,
   MATERIAL,
   pageOf,
-  RUMAH,
   TERMIN,
   TRANSFER_KELUAR,
   UPAH,
@@ -33,7 +30,6 @@ import TransactionTable from '../TransactionTable.vue'
 
 vi.mock('@/api/transactions')
 vi.mock('@/api/accounts')
-vi.mock('@/api/projects')
 vi.mock('@/api/categories')
 vi.mock('@/lib/download')
 
@@ -48,12 +44,11 @@ const TERMIN_MASUK = makeTransaction({
   account: BANK,
   createdBy: { id: 'u-admin', name: 'Dewi' },
 })
-const LISTRIK = makeTransaction({ id: 't-listrik', description: 'Listrik kantor', project: null })
+const LISTRIK = makeTransaction({ id: 't-listrik', description: 'Listrik kantor' })
 const TRANSFER = makeTransaction({
   id: 't-transfer',
   description: 'Isi kas kecil',
   status: 'APPROVED',
-  project: null,
   isTransfer: true,
   transferGroupId: 'g1',
   category: TRANSFER_KELUAR,
@@ -61,7 +56,6 @@ const TRANSFER = makeTransaction({
 
 function stubOptions(): void {
   vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS, BANK])
-  vi.mocked(projectsApi.listProjectOptions).mockResolvedValue([RUMAH, KAFE])
   vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL, UPAH, TERMIN, TRANSFER_KELUAR])
 }
 
@@ -114,30 +108,27 @@ describe('TransactionsView', () => {
     return mountView(TransactionsView, { path, withOverlays: true })
   }
 
-  it('lists transactions with date, description, category, project, account, amount, status and creator', async () => {
+  it('lists transactions with date, description, category, account, amount, status and creator', async () => {
     const { wrapper } = await mountList('SUPER_ADMIN')
 
     const rows = wrapper.findAll('tbody tr').map((row) => row.text())
     expect(rows[0]).toContain('01 Okt 2026')
     expect(rows[0]).toContain('Beli semen')
     expect(rows[0]).toContain('Material')
-    expect(rows[0]).toContain('PRJ-2026-001')
-    expect(rows[0]).toContain('Rumah Pak Budi')
     expect(rows[0]).toContain('Kas Kecil')
     expect(rows[0]).toContain('-Rp 150.000')
     expect(rows[0]).toContain('Menunggu')
     expect(rows[0]).toContain('Sari')
     expect(rows[1]).toContain('+Rp 5.000.000')
     expect(rows[1]).toContain('Disetujui')
-    expect(rows[2]).toContain('Overhead')
+    expect(rows[2]).toContain('Listrik kantor')
   })
 
-  it('marks a transfer leg as a transfer instead of naming a project', async () => {
+  it('marks a transfer leg as a transfer', async () => {
     const { wrapper } = await mountList('SUPER_ADMIN', [TRANSFER])
 
     const row = wrapper.get('tbody tr').text()
     expect(row).toContain('Transfer')
-    expect(row).not.toContain('Overhead')
   })
 
   it('links each row to its detail page', async () => {
@@ -165,7 +156,7 @@ describe('TransactionsView', () => {
     expect(amounts.map((a) => a.text())).toEqual(['-Rp 150.000'])
   })
 
-  it('filters by type, status, account, category and project, starting again from page 1', async () => {
+  it('filters by type, status, account and category, starting again from page 1', async () => {
     const { wrapper } = await mountList('SUPER_ADMIN')
     wrapper.findComponent(DataTable).vm.$emit('page', { page: 2, rows: 50 })
     await flushPromises()
@@ -177,15 +168,12 @@ describe('TransactionsView', () => {
     await choose(wrapper, 'Tipe', 'OUT')
     await choose(wrapper, 'Akun', KAS.id)
     await choose(wrapper, 'Kategori', MATERIAL.id)
-    await choose(wrapper, 'Proyek', RUMAH.id)
     expect(lastListParams()).toMatchObject({
       status: 'PENDING',
       type: 'OUT',
       accountId: KAS.id,
       categoryId: MATERIAL.id,
-      projectId: RUMAH.id,
     })
-    expect(lastListParams().overhead).toBeUndefined()
   })
 
   it('offers only the categories of the chosen type, never system ones, and drops a category that no longer fits', async () => {
@@ -198,17 +186,6 @@ describe('TransactionsView', () => {
     expect(optionLabels(wrapper, 'Kategori')).toEqual(['Termin Klien'])
     expect(lastListParams()).toMatchObject({ type: 'IN' })
     expect(lastListParams().categoryId).toBeUndefined()
-  })
-
-  it('filters overhead as transactions without a project', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
-    expect(optionLabels(wrapper, 'Proyek')[0]).toBe('Overhead (tanpa proyek)')
-
-    await choose(wrapper, 'Proyek', RUMAH.id)
-    await choose(wrapper, 'Proyek', 'overhead')
-
-    expect(lastListParams()).toMatchObject({ overhead: true })
-    expect(lastListParams().projectId).toBeUndefined()
   })
 
   it('searches after a pause', async () => {
@@ -335,14 +312,14 @@ describe('TransactionsView', () => {
     expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
   })
 
-  it('offers a project manager no transfer controls and no overhead filter', async () => {
+  it('offers a project manager no transfer controls and no project filter', async () => {
     const { wrapper } = await mountList('PROJECT_MANAGER')
 
     expect(wrapper.get('h1').text()).toBe('Transaksi')
     expect(wrapper.find('[data-testid="add-transaction"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="add-transfer"]').exists()).toBe(false)
     expect(wrapper.findComponent(ToggleSwitch).exists()).toBe(false)
-    expect(optionLabels(wrapper, 'Proyek')).toEqual(['PRJ-2026-001 · Rumah Pak Budi', 'PRJ-2026-002 · Interior Kafe'])
+    expect(wrapper.findAll('label').map((l) => l.text())).not.toContain('Proyek')
   })
 
   it('shows staff their own transactions, without a creator column or transfer controls', async () => {
@@ -353,7 +330,7 @@ describe('TransactionsView', () => {
     expect(wrapper.findComponent(ToggleSwitch).exists()).toBe(false)
     const headers = wrapper.findAll('thead th').map((th) => th.text())
     expect(headers).not.toContain('Dicatat oleh')
-    expect(headers).toContain('Proyek')
+    expect(headers).not.toContain('Proyek')
   })
 
   it('offers a reload when the filter choices cannot be loaded, and still lists transactions', async () => {
@@ -414,7 +391,7 @@ describe('TransactionsView: export', () => {
   it('exports with exactly the filters of the list on screen', async () => {
     const { wrapper } = await mountList('SUPER_ADMIN')
     await choose(wrapper, 'Status', 'PENDING')
-    await choose(wrapper, 'Proyek', RUMAH.id)
+    await choose(wrapper, 'Akun', KAS.id)
     wrapper.findComponent(ToggleSwitch).vm.$emit('update:modelValue', false)
     await flushPromises()
 
@@ -422,7 +399,7 @@ describe('TransactionsView: export', () => {
 
     const { page: _page, pageSize: _pageSize, ...listed } = lastListParams()
     const sent = exportFile.mock.calls[0]![0]
-    expect(sent).toMatchObject({ status: 'PENDING', projectId: RUMAH.id, includeTransfers: false })
+    expect(sent).toMatchObject({ status: 'PENDING', accountId: KAS.id, includeTransfers: false })
     expect(sent).not.toHaveProperty('page')
     expect(sent).not.toHaveProperty('pageSize')
     // Yang terisi di permintaan daftar sama dengan yang terisi di permintaan ekspor.
@@ -497,33 +474,31 @@ describe('TransactionTable', () => {
     vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf([]))
 
     const { wrapper } = await mountView(TransactionTable, {
-      props: { scope: { projectId: RUMAH.id }, showProject: false },
+      props: { scope: { accountId: KAS.id } },
     })
 
-    expect(lastListParams()).toMatchObject({ projectId: RUMAH.id, page: 1 })
+    expect(lastListParams()).toMatchObject({ accountId: KAS.id, page: 1 })
     expect(wrapper.text()).toContain('Belum ada transaksi')
-    expect(wrapper.findAll('thead th').map((th) => th.text())).not.toContain('Proyek')
   })
 
   it('loads again when its scope changes', async () => {
     signInAs('PROJECT_MANAGER')
     vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf([SEMEN]))
-    const { wrapper } = await mountView(TransactionTable, { props: { scope: { projectId: RUMAH.id } } })
+    const { wrapper } = await mountView(TransactionTable, { props: { scope: { accountId: KAS.id } } })
 
-    await wrapper.setProps({ scope: { projectId: KAFE.id } })
+    await wrapper.setProps({ scope: { accountId: BANK.id } })
     await flushPromises()
 
-    expect(lastListParams()).toMatchObject({ projectId: KAFE.id })
+    expect(lastListParams()).toMatchObject({ accountId: BANK.id })
   })
 })
 
 describe('useTransactionOptions', () => {
-  it('loads accounts, projects and usable categories once, and narrows categories by type', async () => {
+  it('loads accounts and usable categories once, and narrows categories by type', async () => {
     const options = useTransactionOptions()
     await flushPromises()
 
     expect(options.accounts.value).toEqual([KAS, BANK])
-    expect(options.projects.value).toEqual([RUMAH, KAFE])
     expect(options.categories.value).toEqual([MATERIAL, UPAH, TERMIN])
     expect(options.categoriesFor('OUT')).toEqual([MATERIAL, UPAH])
     expect(options.categoriesFor('IN')).toEqual([TERMIN])
@@ -533,7 +508,7 @@ describe('useTransactionOptions', () => {
   })
 
   it('reports a failed load and can try again', async () => {
-    vi.mocked(projectsApi.listProjectOptions).mockRejectedValueOnce(new ApiError(500, 'Terjadi kesalahan pada server'))
+    vi.mocked(accountsApi.listAccountOptions).mockRejectedValueOnce(new ApiError(500, 'Terjadi kesalahan pada server'))
     const options = useTransactionOptions()
     await flushPromises()
 
@@ -543,6 +518,6 @@ describe('useTransactionOptions', () => {
     await options.reload()
 
     expect(options.error.value).toBeNull()
-    expect(options.projects.value).toEqual([RUMAH, KAFE])
+    expect(options.accounts.value).toEqual([KAS, BANK])
   })
 })

@@ -69,7 +69,6 @@ export class TransactionsService {
   ): Promise<TransactionResponse> {
     return this.prisma.$transaction(async (tx) => {
       const actor = await this.access.actorFor(tx, user);
-      const projectId = dto.projectId ?? null;
       await assertReferencesValid(
         tx,
         actor,
@@ -78,7 +77,6 @@ export class TransactionsService {
           transactionDate: dto.transactionDate,
           accountId: dto.accountId,
           categoryId: dto.categoryId,
-          projectId,
         },
         ALL_REFERENCES,
       );
@@ -91,7 +89,6 @@ export class TransactionsService {
           description: dto.description,
           account_id: dto.accountId,
           category_id: dto.categoryId,
-          project_id: projectId,
           created_by_id: user.id,
         },
       });
@@ -130,7 +127,6 @@ export class TransactionsService {
       });
 
       // Aturan yang sama dengan saat membuat, diterapkan pada hasil akhirnya.
-      const projectId = dto.projectId === undefined ? before.project_id : dto.projectId;
       await assertReferencesValid(
         tx,
         actor,
@@ -139,12 +135,10 @@ export class TransactionsService {
           transactionDate: dto.transactionDate ?? formatCalendarDate(before.transaction_date),
           accountId: dto.accountId ?? before.account_id,
           categoryId: dto.categoryId ?? before.category_id,
-          projectId,
         },
         {
           account: dto.accountId !== undefined && dto.accountId !== before.account_id,
           category: dto.categoryId !== undefined && dto.categoryId !== before.category_id,
-          project: projectId !== before.project_id,
         },
       );
 
@@ -156,7 +150,6 @@ export class TransactionsService {
         description: dto.description,
         account_id: dto.accountId,
         category_id: dto.categoryId,
-        project_id: projectId,
         status: 'PENDING',
         reviewed_by_id: null,
         reviewed_at: null,

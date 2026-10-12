@@ -13,7 +13,7 @@ import {
   type ApprovedTransaction,
   type TransactionInput,
 } from '@/api/transactions'
-import type { ProjectOption, Transaction, TxType } from '@/api/types'
+import type { Transaction, TxType } from '@/api/types'
 import DateField from '@/components/DateField.vue'
 import FormDialog from '@/components/FormDialog.vue'
 import FormField from '@/components/FormField.vue'
@@ -27,7 +27,7 @@ import {
   useProofUpload,
   type FailedUpload,
 } from '@/composables/useProofUpload'
-import { projectLabel, type TransactionOptions } from '@/composables/useTransactionOptions'
+import type { TransactionOptions } from '@/composables/useTransactionOptions'
 import { todayInJakarta } from '@/lib/calendar'
 import { errorMessage } from '@/lib/errors'
 import { TX_TYPE_OPTIONS, type Option } from '@/lib/labels'
@@ -38,7 +38,7 @@ import {
   descriptionRules,
   transactionDateRules,
 } from '@/lib/transaction-rules'
-import { negativeBalanceWarning, OVERHEAD } from '@/lib/transactions'
+import { negativeBalanceWarning } from '@/lib/transactions'
 import { collectErrors } from '@/lib/validation'
 import { transactionPath } from '@/router/paths'
 import { useSessionStore } from '@/stores/session'
@@ -48,13 +48,11 @@ const props = defineProps<{
   /** Transaksi yang diubah; null berarti mencatat transaksi baru. */
   transaction: Transaction | null
   options: TransactionOptions
-  /** Proyek yang sudah terpilih saat mencatat dari halaman sebuah proyek. */
-  presetProject?: ProjectOption
 }>()
 const emit = defineEmits<{ saved: [transaction: Transaction] }>()
 const visible = defineModel<boolean>('visible', { required: true })
 
-const { isAdmin, role } = storeToRefs(useSessionStore())
+const { isAdmin } = storeToRefs(useSessionStore())
 const router = useRouter()
 const notify = useNotify()
 const confirm = useConfirm()
@@ -66,8 +64,6 @@ interface Form {
   transactionDate: string | null
   accountId: string | null
   categoryId: string | null
-  /** Id proyek, `OVERHEAD`, atau null bila belum dipilih. */
-  projectId: string | null
   description: string
   /** Hanya SUPER_ADMIN: setujui begitu tersimpan. */
   approveNow: boolean
@@ -83,7 +79,6 @@ function validate(values: Form, editing: boolean): Record<string, string> {
     transactionDate: transactionDateRules(),
     accountId: [chosen('Akun')],
     categoryId: [chosen('Kategori')],
-    projectId: [chosen('Proyek')],
     description: descriptionRules(),
   })
   if (!editing && values.approveNow && values.type === 'OUT' && files.value.length === 0) {
@@ -153,7 +148,6 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     transactionDate: todayInJakarta(),
     accountId: null,
     categoryId: null,
-    projectId: props.presetProject?.id ?? null,
     description: '',
     approveNow: false,
   }),
@@ -163,7 +157,6 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     transactionDate: transaction.transactionDate,
     accountId: transaction.account.id,
     categoryId: transaction.category.id,
-    projectId: transaction.project?.id ?? OVERHEAD,
     description: transaction.description,
     approveNow: false,
   }),
@@ -174,7 +167,6 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     description: values.description.trim(),
     accountId: values.accountId ?? '',
     categoryId: values.categoryId ?? '',
-    projectId: values.projectId === OVERHEAD ? null : values.projectId,
   }),
   validate,
   create: createWithProof,
@@ -186,8 +178,6 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     else notify.success(isResubmit.value ? 'Transaksi diajukan lagi' : 'Transaksi disimpan')
     emit('saved', saved)
   },
-  // Proyek di luar jangkauan pengguna dijawab API seperti proyek yang tidak ada.
-  fieldForStatus: { 404: 'projectId' },
 })
 
 watch(visible, (open) => {
@@ -241,21 +231,6 @@ const categoryOptions = computed(() =>
     current.value?.type === form.type ? named(current.value.category) : null,
   ),
 )
-const projectOptions = computed(() => {
-  // Proyek transaksi ini, atau proyek halaman asalnya, tetap ditawarkan walau sudah tidak aktif.
-  const project = current.value?.project ?? props.presetProject
-  return [
-    // Koordinator hanya boleh mencatat untuk proyeknya; overhead bukan pilihannya.
-    ...(role.value === 'PROJECT_MANAGER'
-      ? []
-      : [{ value: OVERHEAD, label: 'Tanpa proyek (overhead)' }]),
-    ...withCurrent(
-      props.options.projects.value.map((p) => ({ value: p.id, label: projectLabel(p) })),
-      project ? { value: project.id, label: projectLabel(project) } : null,
-    ),
-  ]
-})
-
 const title = computed(() => {
   if (!editing.value) return 'Catat transaksi'
   return isResubmit.value ? 'Perbaiki dan ajukan lagi' : 'Ubah transaksi'
@@ -317,16 +292,6 @@ const title = computed(() => {
       :options="categoryOptions"
       :error="fieldErrors.categoryId"
     />
-    <SelectField
-      id="tx-project"
-      :loading="options.loading.value"
-      v-model="form.projectId"
-      label="Proyek"
-      placeholder="Pilih proyek"
-      :options="projectOptions"
-      :error="fieldErrors.projectId"
-    />
-
     <FormField
       id="tx-description"
       v-slot="field"

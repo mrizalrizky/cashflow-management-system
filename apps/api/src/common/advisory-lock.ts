@@ -4,8 +4,6 @@ import type { Prisma } from '../generated/prisma/client.js';
 export const LOCKS = {
   /** Perubahan peran dan status aktif user (menjaga SUPER_ADMIN aktif terakhir). */
   userAccess: 7301,
-  /** Pembuatan kode proyek berurutan. */
-  projectCode: 7302,
   /** Pengecekan nama akun kembar sebelum simpan. */
   accountName: 7303,
   /** Pengecekan nama kategori kembar sebelum simpan. */

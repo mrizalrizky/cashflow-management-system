@@ -20,9 +20,9 @@ function keysOf(value: unknown): string[] {
   return Object.entries(value).flatMap(([key, child]) => [key, ...keysOf(child)]);
 }
 
-/** Staf mencatat pengeluaran berbukti di proyek A, lalu admin menyetujuinya. */
+/** Staf mencatat pengeluaran berbukti, lalu admin menyetujuinya. */
 async function approvedExpense(ctx: E2eContext, world: World): Promise<string> {
-  const tx = await record(ctx, world.staff, expenseBody(world, { projectId: world.projectA.id }));
+  const tx = await record(ctx, world.staff, expenseBody(world));
   await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'attachments'))
     .attach('file', SAMPLE_FILES.pdf, 'nota.pdf')
     .expect(201);

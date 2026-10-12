@@ -7,7 +7,6 @@ import { monthsInPeriod, Period } from './report-period.js';
 /** Transaksi mana yang ikut sebuah laporan. Yang dihitung selalu hanya yang APPROVED. */
 export interface ReportFilter {
   period?: Period;
-  projectId?: string;
   /** Laporan perusahaan tidak menghitung transfer antar akun sebagai pemasukan atau pengeluaran. */
   excludeTransfers?: boolean;
 }
@@ -32,7 +31,6 @@ function toWhere(filter: ReportFilter): Prisma.TransactionWhereInput {
   return {
     status: 'APPROVED',
     ...(filter.excludeTransfers ? { transfer_group_id: null } : {}),
-    ...(filter.projectId ? { project_id: filter.projectId } : {}),
     ...(filter.period
       ? {
           transaction_date: {
@@ -45,7 +43,7 @@ function toWhere(filter: ReportFilter): Prisma.TransactionWhereInput {
 }
 
 /**
- * Semua penjumlahan untuk dashboard dan ringkasan proyek. Tiap angka dihitung database
+ * Semua penjumlahan untuk dashboard. Tiap angka dihitung database
  * (`GROUP BY`); tidak ada baris transaksi yang dimuat untuk dijumlahkan di sini.
  */
 @Injectable()
@@ -112,17 +110,4 @@ export class CashflowReportService {
     return [...byMonth.values()];
   }
 
-  /** Pengeluaran perusahaan dipisah antara overhead (tanpa proyek) dan milik proyek. */
-  async expenseByScope(db: Db, period: Period): Promise<{ overhead: bigint; project: bigint }> {
-    const expense = { ...toWhere({ period, excludeTransfers: true }), type: 'OUT' } as const;
-    const sum = async (project_id: null | { not: null }): Promise<bigint> => {
-      const result = await db.transaction.aggregate({
-        where: { ...expense, project_id },
-        _sum: { amount: true },
-      });
-      return result._sum.amount ?? 0n;
-    };
-    const [overhead, project] = await Promise.all([sum(null), sum({ not: null })]);
-    return { overhead, project };
-  }
 }

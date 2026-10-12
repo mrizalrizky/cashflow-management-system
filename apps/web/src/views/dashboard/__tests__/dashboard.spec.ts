@@ -36,11 +36,10 @@ function makeDashboard(overrides: Partial<CompanyDashboard> = {}): CompanyDashbo
       { categoryId: 'c1', name: 'Material', amount: '40000000' },
       { categoryId: 'c2', name: 'Upah', amount: '7000000' },
     ],
-    expenseByScope: { overhead: '4500000', project: '47000000' },
     recentTransactions: [
       makeTransaction(),
-      makeTransaction({ id: 't-listrik', description: 'Listrik kantor', project: null, status: 'APPROVED' }),
-      makeTransaction({ id: 't-pindah', description: 'Isi kas kecil', project: null, isTransfer: true }),
+      makeTransaction({ id: 't-listrik', description: 'Listrik kantor', status: 'APPROVED' }),
+      makeTransaction({ id: 't-pindah', description: 'Isi kas kecil', isTransfer: true }),
     ],
     pendingCount: 3,
     ...overrides,
@@ -53,7 +52,6 @@ const EMPTY = makeDashboard({
   totals: { income: '0', expense: '0', net: '0' },
   monthly: [{ month: '2026-10', income: '0', expense: '0', net: '0' }],
   expenseByCategory: [],
-  expenseByScope: { overhead: '0', project: '0' },
   recentTransactions: [],
   pendingCount: 0,
 })
@@ -167,14 +165,10 @@ describe('DashboardView', () => {
     const { wrapper } = await mountDashboard(dashboard)
 
     expect(wrapper.findComponent(MonthlyCashflowChart).props('months')).toEqual(dashboard.monthly)
-    const [categories, scopes] = wrapper.findAllComponents(BarList)
+    const [categories] = wrapper.findAllComponents(BarList)
     expect(categories!.props('items')).toEqual([
       { id: 'c1', name: 'Material', amount: '40000000' },
       { id: 'c2', name: 'Upah', amount: '7000000' },
-    ])
-    expect(scopes!.props('items')).toEqual([
-      { id: 'overhead', name: 'Overhead (tanpa proyek)', amount: '4500000' },
-      { id: 'project', name: 'Proyek', amount: '47000000' },
     ])
   })
 
@@ -193,7 +187,7 @@ describe('DashboardView', () => {
     expect(wrapper.text()).toContain('Tidak ada transaksi yang menunggu')
   })
 
-  it('lists the recent transactions with links, where they belong, amount and status', async () => {
+  it('lists the recent transactions with links, amount and status', async () => {
     const { wrapper } = await mountDashboard()
 
     const rows = wrapper.findAll('[data-testid="recent-row"]')
@@ -201,11 +195,9 @@ describe('DashboardView', () => {
     expect(rows[0]!.text()).toContain('01 Okt 2026')
     expect(rows[0]!.get('a').text()).toBe('Beli semen')
     expect(rows[0]!.get('a').attributes('href')).toBe('/transaksi/t-semen')
-    expect(rows[0]!.text()).toContain('PRJ-2026-001 · Rumah Pak Budi')
     expect(rows[0]!.text()).toContain('-Rp 150.000')
     expect(rows[0]!.text()).toContain('Menunggu')
     expect(rows[0]!.find('[title="Belum dihitung dalam saldo"]').exists()).toBe(true)
-    expect(rows[1]!.text()).toContain('Overhead')
     expect(rows[1]!.find('[title="Belum dihitung dalam saldo"]').exists()).toBe(false)
     expect(rows[2]!.text()).toContain('Transfer')
   })

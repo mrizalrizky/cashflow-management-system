@@ -10,13 +10,10 @@ export interface TransactionFilters {
   status?: TxStatus | null
   accountId?: string | null
   categoryId?: string | null
-  projectId?: string | null
-  /** Hanya transaksi tanpa proyek. */
-  overhead?: boolean | null
   includeTransfers?: boolean | null
 }
 
-/** `amount` string digit; `transactionDate` tanggal kalender; `projectId` null untuk overhead. */
+/** `amount` string digit; `transactionDate` tanggal kalender. */
 export interface TransactionInput {
   type: TxType
   amount: string
@@ -24,7 +21,6 @@ export interface TransactionInput {
   description: string
   accountId: string
   categoryId: string
-  projectId: string | null
 }
 
 export interface TransferInput {

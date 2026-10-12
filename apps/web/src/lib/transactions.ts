@@ -1,8 +1,6 @@
 import type { ApprovedTransaction } from '@/api/transactions'
 import { formatRupiah } from './money'
 
-/** Nilai pilihan "tanpa proyek" di dropdown proyek (filter dan form). */
-export const OVERHEAD = 'overhead'
 export const AMOUNT_MAX_DIGITS = 13
 export const DESCRIPTION_MAX_LENGTH = 500
 

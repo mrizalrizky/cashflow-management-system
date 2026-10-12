@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import type { Account, Category, Project, TxStatus, TxType, User } from '../src/generated/prisma/client.js';
+import type { Account, Category, TxStatus, TxType, User } from '../src/generated/prisma/client.js';
 import type { E2eContext } from './e2e-context.js';
-import { createAccount, createCategory, createProject, createTransaction, createUser } from './fixtures.js';
+import { createAccount, createCategory, createTransaction, createUser } from './fixtures.js';
 
 /**
  * Buku kecil untuk menguji laporan. Angka yang diharapkan di `EXPECTED` dihitung dengan
@@ -57,38 +57,9 @@ export const EXPECTED = {
     { name: 'Upah', amount: '7000000' },
     { name: 'Sewa Kantor', amount: '4500000' },
   ],
-  expenseByScope: { overhead: '4500000', project: '47000000' },
   pendingCount: 1,
   /** Sepuluh yang terakhir dicatat, terbaru dulu (kedua sisi transfer adalah trx-13 dan trx-14). */
   recent: ['trx-14', 'trx-13', 'trx-12', 'trx-11', 'trx-10', 'trx-9', 'trx-8', 'trx-7', 'trx-6', 'trx-5'],
-  projectA: {
-    contractValue: '100000000',
-    contractValueWithPpn: '100000000',
-    received: '30000000',
-    outstanding: '70000000',
-    receivedPercent: 30,
-    cost: '37000000',
-    cashDifference: '-7000000',
-    costByCategory: [
-      { name: 'Material', amount: '32000000' },
-      { name: 'Upah', amount: '5000000' },
-    ],
-    pendingCount: 1,
-  },
-  projectB: {
-    contractValue: '20000000',
-    contractValueWithPpn: '20000000',
-    received: '25000000',
-    outstanding: '-5000000',
-    receivedPercent: 125,
-    cost: '10000000',
-    cashDifference: '15000000',
-    costByCategory: [
-      { name: 'Material', amount: '8000000' },
-      { name: 'Upah', amount: '2000000' },
-    ],
-    pendingCount: 0,
-  },
 };
 
 export interface ReportLedger {
@@ -98,8 +69,6 @@ export interface ReportLedger {
   wages: Category;
   rent: Category;
   income: Category;
-  projectA: Project;
-  projectB: Project;
   recorder: User;
   /** Id grup transfer Bank -> Kas. */
   transferGroupId: string;
@@ -111,23 +80,22 @@ type Row = [
   category: 'material' | 'wages' | 'rent' | 'income',
   amount: bigint,
   account: 'bank' | 'cash',
-  project: 'projectA' | 'projectB' | null,
   status?: TxStatus,
 ];
 
 const ROWS: Row[] = [
-  ['2026-08-01', 'IN', 'income', 30_000_000n, 'bank', 'projectA'],
-  ['2026-08-15', 'OUT', 'material', 12_000_000n, 'bank', 'projectA'],
-  ['2026-08-31', 'OUT', 'wages', 5_000_000n, 'bank', 'projectA'],
-  ['2026-09-01', 'OUT', 'rent', 3_000_000n, 'bank', null],
-  ['2026-09-10', 'OUT', 'material', 8_000_000n, 'bank', 'projectB'],
-  ['2026-09-30', 'OUT', 'material', 20_000_000n, 'bank', 'projectA'],
-  ['2026-10-01', 'IN', 'income', 25_000_000n, 'bank', 'projectB'],
-  ['2026-10-05', 'OUT', 'wages', 2_000_000n, 'cash', 'projectB'],
-  ['2026-10-06', 'OUT', 'rent', 1_500_000n, 'bank', null],
-  ['2026-09-15', 'OUT', 'material', 7_000_000n, 'bank', 'projectA', 'PENDING'],
-  ['2026-09-16', 'OUT', 'wages', 4_000_000n, 'bank', 'projectA', 'REJECTED'],
-  ['2026-10-02', 'IN', 'income', 9_000_000n, 'bank', 'projectA', 'VOID'],
+  ['2026-08-01', 'IN', 'income', 30_000_000n, 'bank'],
+  ['2026-08-15', 'OUT', 'material', 12_000_000n, 'bank'],
+  ['2026-08-31', 'OUT', 'wages', 5_000_000n, 'bank'],
+  ['2026-09-01', 'OUT', 'rent', 3_000_000n, 'bank'],
+  ['2026-09-10', 'OUT', 'material', 8_000_000n, 'bank'],
+  ['2026-09-30', 'OUT', 'material', 20_000_000n, 'bank'],
+  ['2026-10-01', 'IN', 'income', 25_000_000n, 'bank'],
+  ['2026-10-05', 'OUT', 'wages', 2_000_000n, 'cash'],
+  ['2026-10-06', 'OUT', 'rent', 1_500_000n, 'bank'],
+  ['2026-09-15', 'OUT', 'material', 7_000_000n, 'bank', 'PENDING'],
+  ['2026-09-16', 'OUT', 'wages', 4_000_000n, 'bank', 'REJECTED'],
+  ['2026-10-02', 'IN', 'income', 9_000_000n, 'bank', 'VOID'],
 ];
 
 /** Waktu pencatatan dibuat berurutan, supaya "terbaru" tidak bergantung pada kecepatan mesin. */
@@ -144,13 +112,11 @@ export async function seedReportLedger(ctx: E2eContext): Promise<ReportLedger> {
     wages: await createCategory(prisma, { name: 'Upah', type: 'OUT' }),
     rent: await createCategory(prisma, { name: 'Sewa Kantor', type: 'OUT' }),
     income: await createCategory(prisma, { name: 'Termin', type: 'IN' }),
-    projectA: await createProject(prisma, { code: 'PRJ-A', name: 'Proyek A', contractValue: 100_000_000n }),
-    projectB: await createProject(prisma, { code: 'PRJ-B', name: 'Proyek B', contractValue: 20_000_000n }),
     recorder: await createUser(prisma, { role: 'STAFF', name: 'Pencatat Laporan' }),
     transferGroupId: randomUUID(),
   };
 
-  for (const [index, [date, type, category, amount, account, project, status]] of ROWS.entries()) {
+  for (const [index, [date, type, category, amount, account, status]] of ROWS.entries()) {
     await createTransaction(prisma, {
       type,
       amount,
@@ -159,7 +125,6 @@ export async function seedReportLedger(ctx: E2eContext): Promise<ReportLedger> {
       description: `trx-${index + 1}`,
       accountId: ledger[account].id,
       categoryId: ledger[category].id,
-      projectId: project ? ledger[project].id : undefined,
       createdById: ledger.recorder.id,
       createdAt: recordedAt(index),
     });

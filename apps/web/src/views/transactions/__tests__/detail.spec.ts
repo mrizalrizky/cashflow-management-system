@@ -4,21 +4,19 @@ import * as accountsApi from '@/api/accounts'
 import * as attachmentsApi from '@/api/attachments'
 import * as categoriesApi from '@/api/categories'
 import { ApiError } from '@/api/http'
-import * as projectsApi from '@/api/projects'
 import * as transactionsApi from '@/api/transactions'
 import type { Role, Transaction } from '@/api/types'
 import ProofList from '@/components/ProofList.vue'
 import ProofPicker from '@/components/ProofPicker.vue'
 import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
 import { signInAs } from '@/test/session'
-import { KAS, makeAttachment, makeTransaction, MATERIAL, RUMAH } from '@/test/transactions'
+import { KAS, makeAttachment, makeTransaction, MATERIAL } from '@/test/transactions'
 import TransactionDetailView from '../TransactionDetailView.vue'
 import TransactionFormDialog from '../TransactionFormDialog.vue'
 
 vi.mock('@/api/transactions')
 vi.mock('@/api/attachments')
 vi.mock('@/api/accounts')
-vi.mock('@/api/projects')
 vi.mock('@/api/categories')
 
 const PATH = '/transaksi/t-semen'
@@ -63,7 +61,6 @@ beforeEach(() => {
   freshPinia()
   document.body.innerHTML = ''
   vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS])
-  vi.mocked(projectsApi.listProjectOptions).mockResolvedValue([RUMAH])
   vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL])
 })
 
@@ -78,7 +75,7 @@ describe('TransactionDetailView', () => {
     expect(field(wrapper, 'date')).toBe('01 Okt 2026')
     expect(field(wrapper, 'account')).toBe('Kas Kecil')
     expect(field(wrapper, 'category')).toBe('Material')
-    expect(field(wrapper, 'project')).toBe('PRJ-2026-001 · Rumah Pak Budi')
+    expect(wrapper.find('[data-testid="tx-project"]').exists()).toBe(false)
     expect(field(wrapper, 'created')).toBe('Sari · 01 Okt 2026')
     expect(wrapper.text()).toContain('Menunggu')
     expect(wrapper.find('[data-testid="tx-reviewed"]').exists()).toBe(false)
@@ -106,19 +103,6 @@ describe('TransactionDetailView', () => {
     const second = await mountDetail('SUPER_ADMIN', voided)
     expect(field(second.wrapper, 'voided')).toBe('Dewi · 03 Okt 2026')
     expect(field(second.wrapper, 'void-reason')).toBe('Nota ganda')
-  })
-
-  it('names overhead, and links the project only for those who can open it', async () => {
-    const overhead = await mountDetail('STAFF', makeTransaction({ project: null }))
-    expect(field(overhead.wrapper, 'project')).toBe('Overhead')
-
-    freshPinia()
-    const staff = await mountDetail('STAFF')
-    expect(staff.wrapper.get('[data-testid="tx-project"]').find('a').exists()).toBe(false)
-
-    freshPinia()
-    const manager = await mountDetail('PROJECT_MANAGER')
-    expect(manager.wrapper.get('[data-testid="tx-project"] a').attributes('href')).toBe('/proyek/p-rumah')
   })
 
   it('links an admin, and nobody else, to the history of this transaction', async () => {
@@ -440,14 +424,13 @@ describe('TransactionDetailView: actions', () => {
   it('explains that voiding a transfer leg voids both sides', async () => {
     const leg = makeTransaction({
       status: 'APPROVED',
-      project: null,
       isTransfer: true,
       transferGroupId: 'g1',
       permissions: { canVoid: true },
     })
     const { wrapper } = await mountDetail('SUPER_ADMIN', leg)
     expect(wrapper.text()).toContain('Bagian dari transfer antar akun. Void akan membatalkan kedua sisinya.')
-    expect(field(wrapper, 'project')).toBe('Transfer antar akun')
+    expect(field(wrapper, 'transfer')).toBe('Transfer antar akun')
 
     await click(wrapper, 'void')
 

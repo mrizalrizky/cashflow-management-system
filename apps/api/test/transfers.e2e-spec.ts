@@ -83,7 +83,6 @@ describe('POST /transactions/transfer', () => {
       isTransfer: true,
       account: { id: world.from.id },
       category: { name: 'Transfer Keluar' },
-      project: null,
       description: 'Isi kas kecil',
       transactionDate: '2026-10-01',
       createdBy: { id: world.admin.user.id },
@@ -234,7 +233,7 @@ describe('transfer legs afterwards', () => {
     expect(await ctx.prisma.auditLog.count({ where: { action: 'VOID' } })).toBe(2);
   });
 
-  it('never count as income or expense of a project, and are invisible to other roles', async () => {
+  it('are invisible to other roles', async () => {
     const world = await setupTransferWorld(ctx);
     await transfer(ctx, world);
 
@@ -242,6 +241,5 @@ describe('transfer legs afterwards', () => {
       const res = await call(ctx, session, 'get', TRANSACTIONS).expect(200);
       expect(res.body.data).toEqual([]);
     }
-    expect(await ctx.prisma.transaction.count({ where: { project_id: { not: null } } })).toBe(0);
   });
 });

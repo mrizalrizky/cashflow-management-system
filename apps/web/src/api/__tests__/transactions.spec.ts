@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as accounts from '../accounts'
 import * as attachments from '../attachments'
 import * as http from '../http'
-import * as projects from '../projects'
 import * as transactions from '../transactions'
 
 vi.mock('../http')
@@ -17,7 +16,6 @@ const INPUT = {
   description: 'Beli semen',
   accountId: 'a1',
   categoryId: 'c1',
-  projectId: null,
 } as const
 
 const TRANSFER = {
@@ -37,8 +35,8 @@ describe('transaction API modules', () => {
   it.each<[string, () => Promise<unknown>, Parameters<typeof http.request>]>([
     [
       'listTransactions',
-      () => transactions.listTransactions({ page: 2, pageSize: 20, status: 'PENDING', projectId: null, overhead: true }),
-      ['/transactions', { query: { page: 2, pageSize: 20, status: 'PENDING', projectId: null, overhead: true } }],
+      () => transactions.listTransactions({ page: 2, pageSize: 20, status: 'PENDING', accountId: null }),
+      ['/transactions', { query: { page: 2, pageSize: 20, status: 'PENDING', accountId: null } }],
     ],
     ['getTransaction', () => transactions.getTransaction('t1'), ['/transactions/t1']],
     ['createTransaction', () => transactions.createTransaction(INPUT), ['/transactions', { method: 'POST', body: INPUT }]],
@@ -77,7 +75,6 @@ describe('transaction API modules', () => {
     ],
     ['removeAttachment', () => attachments.removeAttachment('f1'), ['/attachments/f1', { method: 'DELETE' }]],
     ['listAccountOptions', () => accounts.listAccountOptions(), ['/accounts/options']],
-    ['listProjectOptions', () => projects.listProjectOptions(), ['/projects/options']],
   ])('%s calls the right route', async (_name, call, expected) => {
     await call()
     expect(request).toHaveBeenCalledExactlyOnceWith(...expected)

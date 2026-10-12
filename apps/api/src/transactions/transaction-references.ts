@@ -1,9 +1,7 @@
-import { ForbiddenException } from '@nestjs/common';
 import { todayInJakarta } from '../common/calendar-date.js';
 import { FieldError, validationFailed } from '../common/validation.js';
 import type { Prisma, TxType } from '../generated/prisma/client.js';
-import { projectNotFound } from '../projects/project-access.service.js';
-import { canRecordFor, PolicyActor } from './transaction-policy.js';
+import type { PolicyActor } from './transaction-policy.js';
 
 /** Isi transaksi yang merujuk data lain, setelah perubahan diterapkan. */
 export interface TransactionReferences {
@@ -11,35 +9,30 @@ export interface TransactionReferences {
   transactionDate: string;
   accountId: string;
   categoryId: string;
-  projectId: string | null;
 }
 
 /** Bagian mana yang baru dipilih (dan karenanya harus masih aktif). Saat membuat, semuanya. */
 export interface ChangedReferences {
   account: boolean;
   category: boolean;
-  project: boolean;
 }
 
-export const ALL_REFERENCES: ChangedReferences = { account: true, category: true, project: true };
+export const ALL_REFERENCES: ChangedReferences = { account: true, category: true };
 
 function fieldError(field: string, message: string): FieldError {
   return { field, messages: [message] };
 }
 
 /**
- * Memeriksa bahwa pelaku boleh mencatat untuk proyek itu dan bahwa akun, kategori, dan
- * proyek yang dipilih sah. Data yang sudah terpasang sebelumnya tidak ditolak hanya karena
+ * Memeriksa bahwa akun dan kategori yang dipilih sah. Data yang sudah terpasang sebelumnya tidak ditolak hanya karena
  * kini nonaktif; yang selalu dicek adalah kecocokan tipe dengan kategori.
  */
 export async function assertReferencesValid(
   tx: Prisma.TransactionClient,
-  actor: PolicyActor,
+  _actor: PolicyActor,
   refs: TransactionReferences,
   changed: ChangedReferences,
 ): Promise<void> {
-  if (changed.project) await assertProjectAllowed(tx, actor, refs.projectId);
-
   const errors: FieldError[] = [];
   if (refs.transactionDate > todayInJakarta()) {
     errors.push(fieldError('transactionDate', 'Tanggal transaksi tidak boleh di masa depan'));
@@ -65,21 +58,3 @@ export async function assertReferencesValid(
   if (errors.length > 0) throw validationFailed(errors);
 }
 
-async function assertProjectAllowed(
-  tx: Prisma.TransactionClient,
-  actor: PolicyActor,
-  projectId: string | null,
-): Promise<void> {
-  if (!canRecordFor(actor, projectId)) {
-    // Proyek yang bukan miliknya dijawab seperti proyek yang tidak ada.
-    if (projectId !== null) throw projectNotFound();
-    throw new ForbiddenException('Koordinator proyek tidak bisa mencatat transaksi overhead');
-  }
-  if (projectId === null) return;
-
-  const project = await tx.project.findUnique({ where: { id: projectId } });
-  if (!project) throw projectNotFound();
-  if (project.status !== 'ACTIVE' && actor.role !== 'SUPER_ADMIN') {
-    throw validationFailed([fieldError('projectId', 'Proyek sudah tidak aktif')]);
-  }
-}

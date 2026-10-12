@@ -30,9 +30,6 @@ const ADMIN_ONLY = [
   'PATCH /api/v1/accounts/{id}',
   'POST /api/v1/categories',
   'PATCH /api/v1/categories/{id}',
-  'POST /api/v1/projects',
-  'PATCH /api/v1/projects/{id}',
-  'PUT /api/v1/projects/{id}/members',
   'POST /api/v1/transactions/transfer',
   'GET /api/v1/dashboard/company',
   'GET /api/v1/audit-logs',
@@ -65,16 +62,19 @@ describe('route guards', () => {
   it('finds the routes of every module', () => {
     const names = registeredRoutes(ctx).map(nameOf);
 
-    expect(names.length).toBeGreaterThanOrEqual(40);
+    expect(names.length).toBeGreaterThanOrEqual(25);
     expect(names).toEqual(expect.arrayContaining([...PUBLIC, ...ADMIN_ONLY]));
     expect(names).toEqual(
       expect.arrayContaining([
         'GET /api/v1/transactions/export',
         'POST /api/v1/transactions/{id}/attachments',
         'GET /api/v1/attachments/{id}/download',
-        'GET /api/v1/projects/{id}/summary',
       ]),
     );
+  });
+
+  it('has no project routes in the personal edition', () => {
+    expect(registeredRoutes(ctx).map(nameOf).filter((name) => name.includes('/projects'))).toEqual([]);
   });
 
   it('refuse every route but the public ones to a visitor without a token', async () => {

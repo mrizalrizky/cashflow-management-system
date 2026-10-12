@@ -8,14 +8,11 @@ import DateRangeFilter, { type DateRange } from '@/components/DateRangeFilter.vu
 import FilterBar from '@/components/FilterBar.vue'
 import FilterSelect from '@/components/FilterSelect.vue'
 import { useDebouncedInput } from '@/composables/useDebouncedInput'
-import { projectLabel, type TransactionOptions } from '@/composables/useTransactionOptions'
+import type { TransactionOptions } from '@/composables/useTransactionOptions'
 import { TX_STATUS_OPTIONS, TX_TYPE_OPTIONS, type Option } from '@/lib/labels'
-import { OVERHEAD } from '@/lib/transactions'
 
 const props = defineProps<{
   options: TransactionOptions
-  /** Tawarkan pilihan transaksi tanpa proyek. */
-  allowOverhead?: boolean
   /** Tawarkan sakelar untuk menyembunyikan transfer antar akun. */
   transferSwitch?: boolean
 }>()
@@ -49,15 +46,6 @@ const type = computed({
   },
 })
 
-const project = computed({
-  get: () => (model.value.overhead ? OVERHEAD : model.value.projectId),
-  set: (value) =>
-    patch({
-      projectId: value && value !== OVERHEAD ? value : undefined,
-      overhead: value === OVERHEAD ? true : undefined,
-    }),
-})
-
 /** Menyala berarti transfer ikut tampil, yaitu bawaan API; hanya "sembunyikan" yang dikirim. */
 const showTransfers = computed({
   get: () => model.value.includeTransfers !== false,
@@ -78,11 +66,6 @@ function named(items: { id: string; name: string }[]): Option<string>[] {
 
 const accountOptions = computed(() => named(props.options.accounts.value))
 const categoryOptions = computed(() => named(props.options.categoriesFor(model.value.type)))
-const projectOptions = computed<Option<string>[]>(() => [
-  ...(props.allowOverhead ? [{ value: OVERHEAD, label: 'Overhead (tanpa proyek)' }] : []),
-  ...props.options.projects.value.map((p) => ({ value: p.id, label: projectLabel(p) })),
-])
-
 function reset(): void {
   search.value = ''
   dates.value?.clear()
@@ -118,12 +101,6 @@ function reset(): void {
       :options="categoryOptions"
       placeholder="Semua kategori"
       label="Kategori"
-    />
-    <FilterSelect
-      v-model="project"
-      :options="projectOptions"
-      placeholder="Semua proyek"
-      label="Proyek"
     />
     <div class="flex items-center justify-between gap-3 sm:col-span-2">
       <label v-if="transferSwitch" class="flex items-center gap-2 text-sm">

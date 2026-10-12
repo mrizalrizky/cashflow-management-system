@@ -19,12 +19,6 @@ interface MenuDefinition extends MenuItem {
 const MENU: MenuDefinition[] = [
   { label: 'Dashboard', icon: 'pi pi-chart-bar', to: PATHS.dashboard },
   { label: 'Transaksi', icon: 'pi pi-receipt', to: PATHS.transactions },
-  {
-    label: 'Proyek',
-    icon: 'pi pi-briefcase',
-    to: PATHS.projects,
-    labelFor: { PROJECT_MANAGER: 'Proyek Saya' },
-  },
   { label: 'Master data', icon: 'pi pi-database', to: PATHS.masterData },
   { label: 'Pengguna', icon: 'pi pi-users', to: PATHS.users },
   { label: 'Audit log', icon: 'pi pi-history', to: PATHS.auditLog },

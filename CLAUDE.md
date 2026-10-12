@@ -2,6 +2,8 @@
 
 Spec: `docs/superpowers/specs/2026-10-06-cashflow-mvp-design.md`. Dokumen dasar: `implementation-plan-cashflow-mvp.md`. Bila bertentangan, spec yang berlaku.
 
+Branch `personal-edition`: `docs/superpowers/specs/2026-10-12-personal-edition-design.md` berlaku di atas spec MVP bila keduanya bertentangan.
+
 - Kerjakan satu fase pada satu waktu; jangan memulai fase berikutnya sebelum acceptance criteria fase saat ini lulus.
 - Jangan membangun fitur di luar ruang lingkup (BOQ, payroll, dll) walau terlihat mudah.
 - Tulis test bersamaan dengan fitur, terutama aturan bisnis.

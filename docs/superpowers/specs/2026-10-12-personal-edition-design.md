@@ -34,6 +34,10 @@ Semua penghapusan lewat migrasi Prisma. Database edisi pribadi adalah database b
 
 Akun (tipe `CASH` dan `BANK`; dompet digital dicatat sebagai `BANK`), kategori, transaksi dengan bukti, transfer antar akun, dasbor perusahaan tanpa bagian proyek, ekspor CSV, cadangan dan pemulihan, susunan deploy (tunnel, Caddy, Neon). Log audit tetap ditulis untuk setiap perubahan penting dan dipindah ke menu Pengaturan.
 
+### Catat pengeluaran dari dasbor
+
+Dasbor mendapat tombol utama **"Catat pengeluaran"** di kepala halaman. Tombol membuka form transaksi yang sama dengan di halaman Transaksi, dengan jenis pengeluaran sudah terpilih (tetap bisa diganti). Setelah disimpan, dasbor memuat ulang angkanya; batal tidak mengubah apa pun. Di P2, form ini otomatis ikut menampilkan pilihan "Cicilan yang dibayar".
+
 ### Pemilik
 
 Tabel `users` tetap ada dengan tepat satu baris "pemilik" yang tidak pernah ditampilkan, karena sesi, transaksi, bukti, dan log audit sudah menunjuk ke pengguna. Kolom yang tidak dipakai lagi (`email`, `role`, `must_change_password`, `is_active`) dihapus; `password_hash` diganti `pin_hash` (boleh null: belum diatur).
@@ -55,6 +59,7 @@ Penghitung PIN salah disimpan di database supaya tidak hilang saat aplikasi diny
 ### Kriteria penerimaan P1
 
 - Tidak ada lagi kode, rute, halaman, tabel, atau kolom proyek, persetujuan, atau pengguna.
+- Tombol "Catat pengeluaran" di dasbor membuka form pengeluaran dan memuat ulang dasbor setelah disimpan.
 - Test: buat PIN (dan menolak membuat kedua kali), masuk, lima salah lalu jeda 15 menit (dengan waktu palsu), jeda bertahan setelah aplikasi dinyalakan ulang, sesi 30 hari, ganti PIN mencabut sesi lain, reset PIN, sapuan rute: setiap endpoint menolak tanpa sesi.
 - Uji asap deploy lulus dengan variabel env yang baru.
 

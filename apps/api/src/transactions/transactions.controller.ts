@@ -20,14 +20,12 @@ import {
   CreateTransactionDto,
   ListTransactionsQueryDto,
   ReasonDto,
-  RejectDto,
-  ReviewDto,
   TransactionFiltersDto,
   TransferDto,
   UpdateTransactionDto,
 } from './dto/transaction.dto.js';
 import type { TransactionResponse } from './transaction.mapper.js';
-import { ApprovalResponse, TransactionWorkflowService } from './transaction-workflow.service.js';
+import { TransactionWorkflowService } from './transaction-workflow.service.js';
 import { TransactionsService } from './transactions.service.js';
 import { TransactionExportService } from './transaction-export.service.js';
 import { TransfersService } from './transfers.service.js';
@@ -123,39 +121,6 @@ export class TransactionsController {
     @Ip() ip: string,
   ): Promise<TransactionResponse> {
     return this.transactions.update(user, id, dto, ip);
-  }
-
-  @Post(':id/cancel')
-  @HttpCode(200)
-  cancel(
-    @CurrentUser() user: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ReasonDto,
-    @Ip() ip: string,
-  ): Promise<TransactionResponse> {
-    return this.workflow.cancel(user, id, dto.reason, ip);
-  }
-
-  @Post(':id/approve')
-  @HttpCode(200)
-  approve(
-    @CurrentUser() user: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ReviewDto,
-    @Ip() ip: string,
-  ): Promise<ApprovalResponse> {
-    return this.workflow.approve(user, id, ip, dto.expectedUpdatedAt);
-  }
-
-  @Post(':id/reject')
-  @HttpCode(200)
-  reject(
-    @CurrentUser() user: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: RejectDto,
-    @Ip() ip: string,
-  ): Promise<TransactionResponse> {
-    return this.workflow.reject(user, id, dto.reason, ip, dto.expectedUpdatedAt);
   }
 
   @Post(':id/void')

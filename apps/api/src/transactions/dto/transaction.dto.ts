@@ -1,7 +1,6 @@
 import {
   IsBoolean,
   IsIn,
-  IsISO8601,
   IsString,
   IsUUID,
   MaxLength,
@@ -67,23 +66,8 @@ export class UpdateTransactionDto {
   categoryId?: string;
 }
 
-/** Alasan untuk menolak, membatalkan, atau melakukan void. */
+/** Alasan pembatalan (void). */
 export class ReasonDto {
-  @IsName(TEXT_MAX)
-  reason: string;
-}
-
-/**
- * Keputusan peninjau. `expectedUpdatedAt` adalah `updatedAt` transaksi saat ia membukanya;
- * bila disertakan dan transaksinya sudah berubah, keputusan ditolak (409).
- */
-export class ReviewDto {
-  @IsOptionalNotNull()
-  @IsISO8601({ strict: true })
-  expectedUpdatedAt?: string;
-}
-
-export class RejectDto extends ReviewDto {
   @IsName(TEXT_MAX)
   reason: string;
 }

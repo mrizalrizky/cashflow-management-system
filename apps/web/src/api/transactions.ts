@@ -31,9 +31,6 @@ export interface TransferInput {
   description: string
 }
 
-/** Saldo akun sesudah disetujui hanya dikirim API kepada SUPER_ADMIN. */
-export type ApprovedTransaction = Transaction & { accountBalance?: string }
-
 function action<T>(id: string, name: string, body: Record<string, string>): Promise<T> {
   return request(`/transactions/${id}/${name}`, { method: 'POST', body })
 }
@@ -52,36 +49,11 @@ export function createTransaction(input: TransactionInput): Promise<Transaction>
   return request('/transactions', { method: 'POST', body: input })
 }
 
-/** Mengubah transaksi REJECTED sekaligus mengajukannya lagi. */
 export function updateTransaction(
   id: string,
   input: Partial<TransactionInput>,
 ): Promise<Transaction> {
   return request(`/transactions/${id}`, { method: 'PATCH', body: input })
-}
-
-export function cancelTransaction(id: string, reason: string): Promise<Transaction> {
-  return action(id, 'cancel', { reason })
-}
-
-/**
- * `expectedUpdatedAt` adalah `updatedAt` transaksi yang dilihat peninjau; API menolak (409)
- * bila transaksi atau buktinya berubah sesudah itu. Hanya boleh dikosongkan oleh pembuat
- * yang menyetujui transaksinya sendiri begitu selesai dicatat.
- */
-export function approveTransaction(
-  id: string,
-  expectedUpdatedAt?: string,
-): Promise<ApprovedTransaction> {
-  return action(id, 'approve', expectedUpdatedAt ? { expectedUpdatedAt } : {})
-}
-
-export function rejectTransaction(
-  id: string,
-  reason: string,
-  expectedUpdatedAt: string,
-): Promise<Transaction> {
-  return action(id, 'reject', { reason, expectedUpdatedAt })
 }
 
 export function voidTransaction(id: string, reason: string): Promise<Transaction> {

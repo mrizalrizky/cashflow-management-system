@@ -1,28 +1,34 @@
 import { E2eContext, setupE2e } from './e2e-context.js';
 import { call, createAccount, createCategory, errorFields } from './fixtures.js';
-import { expenseBody, record, setupWorld, transactionUrl, World } from './transaction-fixtures.js';
+import { expenseBody, record, setupWorld, transactionUrl } from './transaction-fixtures.js';
 
-/** Menandai transaksi sebagai ditolak langsung di database, seperti hasil peninjauan. */
-async function markRejected(ctx: E2eContext, world: World, id: string): Promise<void> {
-  await ctx.prisma.transaction.update({
-    where: { id },
-    data: {
-      status: 'REJECTED',
-      reviewed_by_id: world.admin.user.id,
-      reviewed_at: new Date(),
-      reject_reason: 'Nota tidak terbaca',
-    },
-  });
-}
-
-async function setStatus(ctx: E2eContext, id: string, status: 'APPROVED' | 'VOID'): Promise<void> {
+async function setStatus(ctx: E2eContext, id: string, status: 'VOID'): Promise<void> {
   await ctx.prisma.transaction.update({ where: { id }, data: { status } });
 }
 
 describe('PATCH /transactions/:id', () => {
   const ctx = setupE2e();
 
-  it('lets the creator change every field of a pending transaction, recording before and after', async () => {
+  it('edits a recorded transaction in place and keeps it counted', async () => {
+    const world = await setupWorld(ctx);
+    const created = await record(ctx, world.admin, expenseBody(world));
+
+    const res = await call(ctx, world.admin, 'patch', transactionUrl(created.id)).send({ amount: '75000' }).expect(200);
+
+    expect(res.body).toMatchObject({ amount: '75000', status: 'APPROVED' });
+    const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE', entity_id: created.id } });
+    expect(row.before).toMatchObject({ amount: '150000' });
+  });
+
+  it('refuses to edit a voided transaction', async () => {
+    const world = await setupWorld(ctx);
+    const created = await record(ctx, world.admin, expenseBody(world));
+    await call(ctx, world.admin, 'post', transactionUrl(created.id, 'void')).send({ reason: 'salah' }).expect(200);
+
+    await call(ctx, world.admin, 'patch', transactionUrl(created.id)).send({ amount: '1' }).expect(409);
+  });
+
+  it('lets the creator change every field of a recorded transaction, recording before and after', async () => {
     const world = await setupWorld(ctx);
     const tx = await record(ctx, world.staff, expenseBody(world));
 
@@ -41,7 +47,7 @@ describe('PATCH /transactions/:id', () => {
       amount: '275000',
       transactionDate: '2026-09-15',
       description: 'Termin kedua',
-      status: 'PENDING',
+      status: 'APPROVED',
       category: { id: world.income.id },
     });
     const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE' } });
@@ -98,7 +104,7 @@ describe('PATCH /transactions/:id', () => {
     expect([row.account_id, row.category_id]).toEqual([world.account.id, world.expense.id]);
   });
 
-  it('lets an admin edit anyone’s pending transaction, but nobody else', async () => {
+  it('lets an admin edit anyone’s transaction, but nobody else', async () => {
     const world = await setupWorld(ctx);
     const tx = await record(ctx, world.staff, expenseBody(world));
 
@@ -106,7 +112,7 @@ describe('PATCH /transactions/:id', () => {
     await call(ctx, world.otherStaff, 'patch', transactionUrl(tx.id)).send({ amount: '3' }).expect(404);
   });
 
-  it.each(['APPROVED', 'VOID'] as const)('refuses to edit a %s transaction, even for an admin', async (status) => {
+  it.each(['VOID'] as const)('refuses to edit a %s transaction, even for an admin', async (status) => {
     const world = await setupWorld(ctx);
     const tx = await record(ctx, world.staff, expenseBody(world));
     await setStatus(ctx, tx.id, status);
@@ -117,56 +123,26 @@ describe('PATCH /transactions/:id', () => {
     }
   });
 
-  it('resubmits a rejected transaction when its creator edits it', async () => {
-    const world = await setupWorld(ctx);
-    const tx = await record(ctx, world.staff, expenseBody(world));
-    await markRejected(ctx, world, tx.id);
-
-    const res = await call(ctx, world.staff, 'patch', transactionUrl(tx.id))
-      .send({ description: 'Beli semen (nota baru)' })
-      .expect(200);
-
-    expect(res.body).toMatchObject({
-      status: 'PENDING',
-      description: 'Beli semen (nota baru)',
-      reviewedBy: null,
-      reviewedAt: null,
-      rejectReason: null,
-    });
-    const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { action: 'RESUBMIT' } });
-    expect(row.before).toMatchObject({ status: 'REJECTED', reject_reason: 'Nota tidak terbaca' });
-    expect(row.after).toMatchObject({ status: 'PENDING', reject_reason: null });
-  });
-
-  it('resubmits even when nothing is changed', async () => {
-    const world = await setupWorld(ctx);
-    const tx = await record(ctx, world.staff, expenseBody(world));
-    await markRejected(ctx, world, tx.id);
-
-    const res = await call(ctx, world.staff, 'patch', transactionUrl(tx.id)).send({}).expect(200);
-
-    expect(res.body.status).toBe('PENDING');
-  });
 });
 
-describe('POST /transactions/:id/cancel', () => {
+describe('POST /transactions/:id/void', () => {
   const ctx = setupE2e();
   const reason = { reason: 'Salah input' };
 
-  it('voids a pending transaction with a reason, for its creator', async () => {
+  it('voids a recorded transaction with a reason, for its creator', async () => {
     const world = await setupWorld(ctx);
     const tx = await record(ctx, world.staff, expenseBody(world));
 
-    const res = await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'cancel')).send(reason).expect(200);
+    const res = await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'void')).send(reason).expect(200);
 
     expect(res.body).toMatchObject({
       status: 'VOID',
       voidedBy: { id: world.staff.user.id },
       voidReason: 'Salah input',
-      permissions: { canEdit: false, canCancel: false },
+      permissions: { canEdit: false, canVoid: false },
     });
     expect(res.body.voidedAt).toEqual(expect.any(String));
-    const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { action: 'CANCEL' } });
+    const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { action: 'VOID' } });
     expect(row.after).toMatchObject({ status: 'VOID', void_reason: 'Salah input' });
     expect(await ctx.prisma.transaction.count()).toBe(1);
   });
@@ -176,40 +152,40 @@ describe('POST /transactions/:id/cancel', () => {
     const first = await record(ctx, world.staff, expenseBody(world));
     const second = await record(ctx, world.staff, expenseBody(world));
 
-    await call(ctx, world.otherStaff, 'post', transactionUrl(first.id, 'cancel')).send(reason).expect(404);
-    await call(ctx, world.admin, 'post', transactionUrl(second.id, 'cancel')).send(reason).expect(200);
+    await call(ctx, world.otherStaff, 'post', transactionUrl(first.id, 'void')).send(reason).expect(404);
+    await call(ctx, world.admin, 'post', transactionUrl(second.id, 'void')).send(reason).expect(200);
   });
 
   it.each([{}, { reason: '   ' }, { reason: 'x'.repeat(501) }])('requires a usable reason: %j', async (body) => {
     const world = await setupWorld(ctx);
     const tx = await record(ctx, world.staff, expenseBody(world));
 
-    const res = await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'cancel')).send(body).expect(400);
+    const res = await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'void')).send(body).expect(400);
 
     expect(errorFields(res.body)).toEqual(['reason']);
   });
 
-  it('answers 409 the second time, and for anything that is not pending', async () => {
+  it('answers 409 the second time', async () => {
     const world = await setupWorld(ctx);
     const tx = await record(ctx, world.staff, expenseBody(world));
-    const approved = await record(ctx, world.staff, expenseBody(world));
-    await setStatus(ctx, approved.id, 'APPROVED');
+    const voided = await record(ctx, world.staff, expenseBody(world));
+    await setStatus(ctx, voided.id, 'VOID');
 
-    await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'cancel')).send(reason).expect(200);
-    await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'cancel')).send(reason).expect(409);
-    await call(ctx, world.admin, 'post', transactionUrl(approved.id, 'cancel')).send(reason).expect(409);
+    await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'void')).send(reason).expect(200);
+    await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'void')).send(reason).expect(409);
+    await call(ctx, world.admin, 'post', transactionUrl(voided.id, 'void')).send(reason).expect(409);
   });
 
-  it('lets only one of two simultaneous cancellations succeed', async () => {
+  it('lets only one of two simultaneous voids succeed', async () => {
     const world = await setupWorld(ctx);
     const tx = await record(ctx, world.staff, expenseBody(world));
 
     const results = await Promise.all([
-      call(ctx, world.staff, 'post', transactionUrl(tx.id, 'cancel')).send(reason),
-      call(ctx, world.admin, 'post', transactionUrl(tx.id, 'cancel')).send(reason),
+      call(ctx, world.staff, 'post', transactionUrl(tx.id, 'void')).send(reason),
+      call(ctx, world.admin, 'post', transactionUrl(tx.id, 'void')).send(reason),
     ]);
 
     expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 409]);
-    expect(await ctx.prisma.auditLog.count({ where: { action: 'CANCEL' } })).toBe(1);
+    expect(await ctx.prisma.auditLog.count({ where: { action: 'VOID' } })).toBe(1);
   });
 });

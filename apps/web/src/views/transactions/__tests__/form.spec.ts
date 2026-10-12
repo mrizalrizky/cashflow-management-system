@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
-import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import Select from 'primevue/select'
 import * as accountsApi from '@/api/accounts'
@@ -76,10 +75,6 @@ async function fillExpense(wrapper: VueWrapper): Promise<void> {
   await fill(wrapper, '#tx-description', ' Beli semen ')
 }
 
-function acceptConfirm(): void {
-  document.querySelector<HTMLButtonElement>('.p-confirmdialog-accept-button')!.click()
-}
-
 function errorOf(wrapper: VueWrapper, id: string): string {
   return wrapper.get(`#${id}-error`).text()
 }
@@ -95,6 +90,16 @@ beforeEach(() => {
 })
 
 describe('TransactionFormDialog: recording', () => {
+  it('saves an expense without proof straight away, without asking', async () => {
+    const { wrapper } = await mountForm('SUPER_ADMIN')
+    await fillExpense(wrapper)
+    await submitForm(wrapper)
+
+    expect(document.body.textContent).not.toContain('Simpan tanpa bukti')
+    expect(transactionsApi.createTransaction).toHaveBeenCalledOnce()
+    expect(document.body.textContent).not.toContain('Langsung setujui')
+  })
+
   it('has no project field', async () => {
     const { wrapper } = await mountForm('SUPER_ADMIN')
     expect(() => select(wrapper, 'tx-project')).toThrow('Tidak ada pilihan tx-project')
@@ -162,7 +167,6 @@ describe('TransactionFormDialog: recording', () => {
       categoryId: MATERIAL.id,
     })
     expect(attachmentsApi.uploadAttachment).toHaveBeenCalledExactlyOnceWith('t-baru', NOTA)
-    expect(transactionsApi.approveTransaction).not.toHaveBeenCalled()
     expect(onVisible).toHaveBeenLastCalledWith(false)
     expect(onSaved).toHaveBeenCalledExactlyOnceWith(CREATED)
     expect(document.body.textContent).toContain('Transaksi dicatat')
@@ -266,29 +270,6 @@ describe('TransactionFormDialog: recording', () => {
     expect(transactionsApi.createTransaction).toHaveBeenCalledTimes(1)
   })
 
-  it('asks before saving an expense without proof, but not income', async () => {
-    const { wrapper } = await mountForm('STAFF')
-    await fillExpense(wrapper)
-
-    await submitForm(wrapper)
-    expect(document.body.textContent).toContain('Pengeluaran tanpa bukti tidak bisa disetujui')
-    expect(transactionsApi.createTransaction).not.toHaveBeenCalled()
-
-    acceptConfirm()
-    await flushPromises()
-    expect(transactionsApi.createTransaction).toHaveBeenCalledTimes(1)
-
-    freshPinia()
-    document.body.innerHTML = ''
-    const income = await mountForm('STAFF')
-    await fillExpense(income.wrapper)
-    await choose(income.wrapper, 'tx-type', 'IN')
-    await choose(income.wrapper, 'tx-category', TERMIN.id)
-    await submitForm(income.wrapper)
-
-    expect(transactionsApi.createTransaction).toHaveBeenCalledTimes(2)
-  })
-
   it('puts API field errors under their fields and keeps what was typed', async () => {
     vi.mocked(transactionsApi.createTransaction).mockRejectedValue(
       new ApiError(400, 'Validasi gagal', [{ field: 'accountId', messages: ['Akun sudah tidak aktif'] }]),
@@ -307,101 +288,11 @@ describe('TransactionFormDialog: recording', () => {
 
 })
 
-describe('TransactionFormDialog: approving at once', () => {
-  const APPROVED = makeTransaction({ id: 't-baru', status: 'APPROVED' })
-
-  async function saveApproved(wrapper: VueWrapper): Promise<void> {
-    await fillExpense(wrapper)
-    await pickProof(wrapper, [NOTA])
-    wrapper.findComponent(Checkbox).vm.$emit('update:modelValue', true)
-    await flushPromises()
-    await submitForm(wrapper)
-    await flushPromises()
-  }
-
-  it('is offered to an admin only', async () => {
-    const admin = await mountForm('SUPER_ADMIN')
-    expect(admin.wrapper.text()).toContain('Langsung setujui')
-
-    freshPinia()
-    const staff = await mountForm('STAFF')
-    expect(staff.wrapper.findComponent(Checkbox).exists()).toBe(false)
-  })
-
-  it('creates, uploads, then approves', async () => {
-    const order: string[] = []
-    vi.mocked(transactionsApi.createTransaction).mockImplementation(() => (order.push('create'), Promise.resolve(CREATED)))
-    vi.mocked(attachmentsApi.uploadAttachment).mockImplementation(
-      () => (order.push('upload'), Promise.resolve(makeAttachment())),
-    )
-    vi.mocked(transactionsApi.approveTransaction).mockImplementation(
-      () => (order.push('approve'), Promise.resolve({ ...APPROVED, accountBalance: '850000' })),
-    )
-    const { wrapper } = await mountForm('SUPER_ADMIN')
-
-    await saveApproved(wrapper)
-
-    expect(order).toEqual(['create', 'upload', 'approve'])
-    expect(transactionsApi.approveTransaction).toHaveBeenCalledWith('t-baru')
-    expect(document.body.textContent).toContain('Transaksi dicatat dan disetujui')
-    expect(document.body.textContent).not.toContain('minus')
-    expect(onSaved).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ status: 'APPROVED' }))
-  })
-
-  it('warns when the approval leaves the account below zero', async () => {
-    vi.mocked(transactionsApi.approveTransaction).mockResolvedValue({ ...APPROVED, accountBalance: '-50000' })
-    const { wrapper } = await mountForm('SUPER_ADMIN')
-
-    await saveApproved(wrapper)
-
-    expect(document.body.textContent).toContain('Saldo Kas Kecil sekarang minus: -Rp 50.000')
-  })
-
-  it('needs proof for an expense before anything is sent', async () => {
-    const { wrapper } = await mountForm('SUPER_ADMIN')
-    await fillExpense(wrapper)
-    wrapper.findComponent(Checkbox).vm.$emit('update:modelValue', true)
-    await flushPromises()
-
-    await submitForm(wrapper)
-
-    expect(errorOf(wrapper, 'tx-proof')).toBe('Pengeluaran perlu bukti untuk langsung disetujui')
-    expect(transactionsApi.createTransaction).not.toHaveBeenCalled()
-  })
-
-  it('skips the approval when a proof failed, and shows the saved transaction', async () => {
-    vi.mocked(attachmentsApi.uploadAttachment).mockRejectedValue(new ApiError(0, 'Tidak dapat terhubung ke server'))
-    const { wrapper, router } = await mountForm('SUPER_ADMIN')
-
-    await saveApproved(wrapper)
-
-    expect(transactionsApi.approveTransaction).not.toHaveBeenCalled()
-    expect(router.currentRoute.value.path).toBe('/transaksi/t-baru')
-  })
-
-  it('shows the saved transaction when the approval itself is refused', async () => {
-    vi.mocked(transactionsApi.approveTransaction).mockRejectedValue(new ApiError(500, 'Terjadi kesalahan pada server'))
-    const { wrapper, router } = await mountForm('SUPER_ADMIN')
-
-    await saveApproved(wrapper)
-
-    expect(router.currentRoute.value.path).toBe('/transaksi/t-baru')
-    expect(document.body.textContent).toContain('Transaksi tersimpan, tetapi belum disetujui: Terjadi kesalahan pada server')
-    expect(transactionsApi.createTransaction).toHaveBeenCalledTimes(1)
-    expect(onVisible).toHaveBeenLastCalledWith(false)
-  })
-})
-
 describe('TransactionFormDialog: editing', () => {
-  const PENDING = makeTransaction({ permissions: { canEdit: true } })
-  const REJECTED = makeTransaction({
-    status: 'REJECTED',
-    rejectReason: 'Nominal tidak sesuai nota',
-    permissions: { canEdit: true },
-  })
+  const RECORDED = makeTransaction({ permissions: { canEdit: true } })
 
   it('pre-fills every field and has no proof picker', async () => {
-    const { wrapper } = await mountForm('STAFF', PENDING)
+    const { wrapper } = await mountForm('STAFF', RECORDED)
 
     expect(wrapper.text()).toContain('Ubah transaksi')
     expect(select(wrapper, 'tx-type').props('modelValue')).toBe('OUT')
@@ -411,13 +302,12 @@ describe('TransactionFormDialog: editing', () => {
     expect(select(wrapper, 'tx-category').props('modelValue')).toBe(MATERIAL.id)
     expect((wrapper.get('#tx-description').element as HTMLTextAreaElement).value).toBe('Beli semen')
     expect(wrapper.findComponent(ProofPicker).exists()).toBe(false)
-    expect(wrapper.findComponent(Checkbox).exists()).toBe(false)
   })
 
   it('sends only what changed', async () => {
     const saved = makeTransaction({ amount: '90000' })
     vi.mocked(transactionsApi.updateTransaction).mockResolvedValue(saved)
-    const { wrapper } = await mountForm('STAFF', PENDING)
+    const { wrapper } = await mountForm('STAFF', RECORDED)
 
     await fill(wrapper, '#tx-amount', '90000')
     await submitForm(wrapper)
@@ -429,8 +319,8 @@ describe('TransactionFormDialog: editing', () => {
     expect(document.body.textContent).toContain('Transaksi disimpan')
   })
 
-  it('closes without a request when a pending transaction was not changed', async () => {
-    const { wrapper } = await mountForm('STAFF', PENDING)
+  it('closes without a request when nothing was changed', async () => {
+    const { wrapper } = await mountForm('STAFF', RECORDED)
 
     await submitForm(wrapper)
 
@@ -451,24 +341,10 @@ describe('TransactionFormDialog: editing', () => {
     expect(optionLabels(wrapper, 'tx-category')).toContain('Bahan Lama')
   })
 
-  it('resubmits a rejected transaction even when nothing was changed, showing why it was rejected', async () => {
-    const resubmitted = makeTransaction({ status: 'PENDING' })
-    vi.mocked(transactionsApi.updateTransaction).mockResolvedValue(resubmitted)
-    const { wrapper } = await mountForm('STAFF', REJECTED)
-    expect(wrapper.text()).toContain('Perbaiki dan ajukan lagi')
-    expect(wrapper.text()).toContain('Nominal tidak sesuai nota')
-
-    await submitForm(wrapper)
-
-    expect(transactionsApi.updateTransaction).toHaveBeenCalledExactlyOnceWith('t-semen', {})
-    expect(onSaved).toHaveBeenCalledExactlyOnceWith(resubmitted)
-    expect(document.body.textContent).toContain('Transaksi diajukan lagi')
-  })
-
   it('starts clean when reopened after an error', async () => {
     vi.mocked(transactionsApi.updateTransaction).mockRejectedValue(new ApiError(409, 'Transaksi tidak bisa diubah pada status ini'))
     // Tanpa Toast dan ConfirmDialog, supaya props dialognya bisa diubah langsung.
-    const { wrapper } = await mountForm('STAFF', PENDING, false)
+    const { wrapper } = await mountForm('STAFF', RECORDED, false)
     await fill(wrapper, '#tx-amount', '90000')
     await submitForm(wrapper)
     expect(wrapper.text()).toContain('Transaksi tidak bisa diubah pada status ini')

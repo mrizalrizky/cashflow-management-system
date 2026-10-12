@@ -35,7 +35,6 @@ export class TransfersService {
         this.systemCategoryId(tx, 'IN'),
       ]);
 
-      const now = new Date();
       const shared = {
         amount: toMoney(dto.amount),
         transaction_date: parseCalendarDate(dto.transactionDate),
@@ -43,8 +42,6 @@ export class TransfersService {
         status: 'APPROVED',
         transfer_group_id: randomUUID(),
         created_by_id: user.id,
-        reviewed_by_id: user.id,
-        reviewed_at: now,
       } as const;
       const out = await tx.transaction.create({
         data: { ...shared, type: 'OUT', account_id: dto.fromAccountId, category_id: outCategoryId },

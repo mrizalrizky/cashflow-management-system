@@ -28,8 +28,6 @@ export interface CompanyDashboardResponse {
   monthly: (CashflowResponse & { month: string })[];
   expenseByCategory: CategoryAmountResponse[];
   recentTransactions: TransactionResponse[];
-  /** Transaksi yang menunggu ditinjau, tanpa melihat periode. */
-  pendingCount: number;
 }
 
 export function toCashflow(totals: TypeTotals): CashflowResponse {
@@ -55,7 +53,6 @@ export function toCompanyDashboard(data: {
   monthly: MonthTotals[];
   expenseByCategory: CategoryTotal[];
   recentTransactions: TransactionResponse[];
-  pendingCount: number;
 }): CompanyDashboardResponse {
   return {
     period: data.period,
@@ -71,6 +68,5 @@ export function toCompanyDashboard(data: {
     monthly: data.monthly.map((month) => ({ month: month.month, ...toCashflow(month) })),
     expenseByCategory: toCategoryAmounts(data.expenseByCategory),
     recentTransactions: data.recentTransactions,
-    pendingCount: data.pendingCount,
   };
 }

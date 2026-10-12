@@ -9,20 +9,20 @@ import { createAccount, createCategory, createTransaction, createUser } from './
  *
  * Saldo awal: Bank 10.000.000, Kas 500.000.
  *
- * Disetujui (yang dihitung):
- *   trx-1  01 Agu  IN   Termin       30.000.000  Bank  Proyek A
- *   trx-2  15 Agu  OUT  Material     12.000.000  Bank  Proyek A
- *   trx-3  31 Agu  OUT  Upah          5.000.000  Bank  Proyek A
- *   trx-4  01 Sep  OUT  Sewa Kantor   3.000.000  Bank  overhead
- *   trx-5  10 Sep  OUT  Material      8.000.000  Bank  Proyek B
- *   trx-6  30 Sep  OUT  Material     20.000.000  Bank  Proyek A
- *   trx-7  01 Okt  IN   Termin       25.000.000  Bank  Proyek B
- *   trx-8  05 Okt  OUT  Upah          2.000.000  Kas   Proyek B
- *   trx-9  06 Okt  OUT  Sewa Kantor   1.500.000  Bank  overhead
+ * Tercatat (yang dihitung):
+ *   trx-1  01 Agu  IN   Termin       30.000.000  Bank
+ *   trx-2  15 Agu  OUT  Material     12.000.000  Bank
+ *   trx-3  31 Agu  OUT  Upah          5.000.000  Bank
+ *   trx-4  01 Sep  OUT  Sewa Kantor   3.000.000  Bank
+ *   trx-5  10 Sep  OUT  Material      8.000.000  Bank
+ *   trx-6  30 Sep  OUT  Material     20.000.000  Bank
+ *   trx-7  01 Okt  IN   Termin       25.000.000  Bank
+ *   trx-8  05 Okt  OUT  Upah          2.000.000  Kas
+ *   trx-9  06 Okt  OUT  Sewa Kantor   1.500.000  Bank
  * Tidak dihitung:
- *   trx-10 15 Sep  OUT  Material      7.000.000  PENDING   Proyek A
- *   trx-11 16 Sep  OUT  Upah          4.000.000  REJECTED  Proyek A
- *   trx-12 02 Okt  IN   Termin        9.000.000  VOID      Proyek A
+ *   trx-10 15 Sep  OUT  Material      7.000.000  VOID
+ *   trx-11 16 Sep  OUT  Upah          4.000.000  VOID
+ *   trx-12 02 Okt  IN   Termin        9.000.000  VOID
  * Transfer (hanya memengaruhi saldo akun):
  *   trx-13/14 20 Sep  Bank -> Kas 1.000.000
  *
@@ -57,7 +57,6 @@ export const EXPECTED = {
     { name: 'Upah', amount: '7000000' },
     { name: 'Sewa Kantor', amount: '4500000' },
   ],
-  pendingCount: 1,
   /** Sepuluh yang terakhir dicatat, terbaru dulu (kedua sisi transfer adalah trx-13 dan trx-14). */
   recent: ['trx-14', 'trx-13', 'trx-12', 'trx-11', 'trx-10', 'trx-9', 'trx-8', 'trx-7', 'trx-6', 'trx-5'],
 };
@@ -93,8 +92,8 @@ const ROWS: Row[] = [
   ['2026-10-01', 'IN', 'income', 25_000_000n, 'bank'],
   ['2026-10-05', 'OUT', 'wages', 2_000_000n, 'cash'],
   ['2026-10-06', 'OUT', 'rent', 1_500_000n, 'bank'],
-  ['2026-09-15', 'OUT', 'material', 7_000_000n, 'bank', 'PENDING'],
-  ['2026-09-16', 'OUT', 'wages', 4_000_000n, 'bank', 'REJECTED'],
+  ['2026-09-15', 'OUT', 'material', 7_000_000n, 'bank', 'VOID'],
+  ['2026-09-16', 'OUT', 'wages', 4_000_000n, 'bank', 'VOID'],
   ['2026-10-02', 'IN', 'income', 9_000_000n, 'bank', 'VOID'],
 ];
 

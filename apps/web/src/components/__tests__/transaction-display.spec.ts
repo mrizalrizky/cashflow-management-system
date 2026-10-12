@@ -7,7 +7,7 @@ import TransactionStatusTag from '../TransactionStatusTag.vue'
 describe('TransactionStatusTag', () => {
   it.each<[TxStatus, string, string]>([
     ['PENDING', 'Menunggu', 'warn'],
-    ['APPROVED', 'Disetujui', 'success'],
+    ['APPROVED', 'Tercatat', 'success'],
     ['REJECTED', 'Ditolak', 'danger'],
     ['VOID', 'Dibatalkan', 'secondary'],
   ])('shows %s as "%s"', async (status, label, severity) => {

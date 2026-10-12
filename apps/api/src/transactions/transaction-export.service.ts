@@ -18,10 +18,11 @@ export const EXPORT_BATCH_SIZE = 1_000;
 
 const TYPE_LABELS: Record<TxType, string> = { IN: 'Masuk', OUT: 'Keluar' };
 const STATUS_LABELS: Record<TxStatus, string> = {
-  PENDING: 'Menunggu',
-  APPROVED: 'Disetujui',
-  REJECTED: 'Ditolak',
+  APPROVED: 'Tercatat',
   VOID: 'Dibatalkan',
+  // Tidak dibuat lagi oleh edisi pribadi; hilang bersama nilainya di migrasi skema.
+  PENDING: 'Menunggu',
+  REJECTED: 'Ditolak',
 };
 
 const HEADER = [
@@ -34,8 +35,6 @@ const HEADER = [
   'Status',
   'Transfer',
   'Dicatat oleh',
-  'Ditinjau oleh',
-  'Alasan penolakan',
   'Alasan pembatalan',
   'Jumlah bukti',
   'Dicatat pada',
@@ -50,13 +49,11 @@ const EXPORT_SELECT = {
   description: true,
   status: true,
   transfer_group_id: true,
-  reject_reason: true,
   void_reason: true,
   created_at: true,
   account: { select: { name: true } },
   category: { select: { name: true } },
   created_by: { select: { name: true } },
-  reviewed_by: { select: { name: true } },
   _count: { select: { attachments: true } },
 } satisfies Prisma.TransactionSelect;
 
@@ -73,8 +70,6 @@ function toCells(row: ExportRow): (string | null)[] {
     STATUS_LABELS[row.status],
     row.transfer_group_id ? 'Ya' : 'Tidak',
     row.created_by.name,
-    row.reviewed_by?.name ?? null,
-    row.reject_reason,
     row.void_reason,
     String(row._count.attachments),
     formatJakartaTimestamp(row.created_at),

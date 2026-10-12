@@ -1,18 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
-import Checkbox from 'primevue/checkbox'
-import Message from 'primevue/message'
 import Textarea from 'primevue/textarea'
-import { useConfirm } from 'primevue/useconfirm'
-import {
-  approveTransaction,
-  createTransaction,
-  updateTransaction,
-  type ApprovedTransaction,
-  type TransactionInput,
-} from '@/api/transactions'
+import { createTransaction, updateTransaction, type TransactionInput } from '@/api/transactions'
 import type { Transaction, TxType } from '@/api/types'
 import DateField from '@/components/DateField.vue'
 import FormDialog from '@/components/FormDialog.vue'
@@ -29,7 +19,6 @@ import {
 } from '@/composables/useProofUpload'
 import type { TransactionOptions } from '@/composables/useTransactionOptions'
 import { todayInJakarta } from '@/lib/calendar'
-import { errorMessage } from '@/lib/errors'
 import { TX_TYPE_OPTIONS, type Option } from '@/lib/labels'
 import { MAX_PROOFS } from '@/lib/proof-files'
 import {
@@ -38,10 +27,8 @@ import {
   descriptionRules,
   transactionDateRules,
 } from '@/lib/transaction-rules'
-import { negativeBalanceWarning } from '@/lib/transactions'
 import { collectErrors } from '@/lib/validation'
 import { transactionPath } from '@/router/paths'
-import { useSessionStore } from '@/stores/session'
 import TransactionOptionsError from './TransactionOptionsError.vue'
 
 const props = defineProps<{
@@ -52,10 +39,8 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [transaction: Transaction] }>()
 const visible = defineModel<boolean>('visible', { required: true })
 
-const { isAdmin } = storeToRefs(useSessionStore())
 const router = useRouter()
 const notify = useNotify()
-const confirm = useConfirm()
 const proof = useProofUpload()
 
 interface Form {
@@ -65,74 +50,46 @@ interface Form {
   accountId: string | null
   categoryId: string | null
   description: string
-  /** Hanya SUPER_ADMIN: setujui begitu tersimpan. */
-  approveNow: boolean
 }
 
 /** Bukti yang dipilih untuk transaksi baru; diunggah setelah transaksinya tersimpan. */
 const files = ref<File[]>([])
-const isResubmit = computed(() => props.transaction?.status === 'REJECTED')
 
-function validate(values: Form, editing: boolean): Record<string, string> {
-  const errors = collectErrors(values, {
+function validate(values: Form): Record<string, string> {
+  return collectErrors(values, {
     amount: amountRules(),
     transactionDate: transactionDateRules(),
     accountId: [chosen('Akun')],
     categoryId: [chosen('Kategori')],
     description: descriptionRules(),
   })
-  if (!editing && values.approveNow && values.type === 'OUT' && files.value.length === 0) {
-    errors.proof = 'Pengeluaran perlu bukti untuk langsung disetujui'
-  }
-  return errors
 }
 
-/** Yang terjadi setelah transaksi baru tersimpan; menentukan pesan dan halaman berikutnya. */
-interface Aftermath {
-  failedUploads: FailedUpload[]
-  approved: ApprovedTransaction | null
-  approveError: string | null
-}
-let aftermath: Aftermath = { failedUploads: [], approved: null, approveError: null }
+/** Bukti yang gagal diunggah setelah transaksi baru tersimpan; menentukan pesan dan halaman berikutnya. */
+let failedUploads: FailedUpload[] = []
 
 /**
- * Simpan, unggah bukti, lalu (bila diminta admin) setujui. Begitu transaksinya tersimpan,
- * tidak ada lagi yang dilempar: kegagalan sesudahnya dicatat di `aftermath`, supaya dialog
- * tetap tertutup dan transaksi yang sama tidak bisa tersimpan dua kali.
+ * Simpan, lalu unggah bukti. Begitu transaksinya tersimpan, tidak ada lagi yang dilempar:
+ * bukti yang gagal dicatat di `failedUploads`, supaya dialog tetap tertutup dan transaksi yang
+ * sama tidak bisa tersimpan dua kali.
  */
 async function createWithProof(input: TransactionInput): Promise<Transaction> {
   // Dicatat sebelum permintaan pertama: isi form tidak boleh mengubah apa yang sedang disimpan.
   const proofFiles = [...files.value]
-  const approveNow = form.approveNow
-
   const created = await createTransaction(input)
-  const { failed } = await proof.upload(created.id, proofFiles)
-  aftermath = { failedUploads: failed, approved: null, approveError: null }
-  if (!approveNow || failed.length > 0) return created
-
-  try {
-    aftermath.approved = await approveTransaction(created.id)
-    return aftermath.approved
-  } catch (cause) {
-    aftermath.approveError = errorMessage(cause, 'Gagal menyetujui')
-    return created
-  }
+  failedUploads = (await proof.upload(created.id, proofFiles)).failed
+  return created
 }
 
 function afterCreate(transaction: Transaction): void {
-  const { failedUploads, approved, approveError } = aftermath
-  if (failedUploads.length > 0 || approveError) {
+  if (failedUploads.length > 0) {
     notify.warn(
-      failedUploads.length > 0
-        ? `Transaksi tersimpan, tetapi bukti berikut gagal diunggah: ${describeFailedUploads(failedUploads)}. Tambahkan lagi di halaman ini.`
-        : `Transaksi tersimpan, tetapi belum disetujui: ${approveError}`,
+      `Transaksi tersimpan, tetapi bukti berikut gagal diunggah: ${describeFailedUploads(failedUploads)}. Tambahkan lagi di halaman ini.`,
     )
     void router.push(transactionPath(transaction.id))
     return
   }
-  notify.success(approved ? 'Transaksi dicatat dan disetujui' : 'Transaksi dicatat')
-  const warning = approved && negativeBalanceWarning(approved)
-  if (warning) notify.warn(warning)
+  notify.success('Transaksi dicatat')
 }
 
 const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntityDialog<
@@ -149,7 +106,6 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     accountId: null,
     categoryId: null,
     description: '',
-    approveNow: false,
   }),
   fromEntity: (transaction) => ({
     type: transaction.type,
@@ -158,7 +114,6 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     accountId: transaction.account.id,
     categoryId: transaction.category.id,
     description: transaction.description,
-    approveNow: false,
   }),
   toInput: (values) => ({
     type: values.type,
@@ -171,11 +126,9 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
   validate,
   create: createWithProof,
   update: (transaction, changes) => updateTransaction(transaction.id, changes),
-  // Menyimpan transaksi yang ditolak berarti mengajukannya lagi, walau isinya tidak diubah.
-  alwaysUpdate: (transaction) => transaction.status === 'REJECTED',
   onSaved: (saved) => {
     if (props.transaction === null) afterCreate(saved)
-    else notify.success(isResubmit.value ? 'Transaksi diajukan lagi' : 'Transaksi disimpan')
+    else notify.success('Transaksi disimpan')
     emit('saved', saved)
   },
 })
@@ -183,27 +136,6 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
 watch(visible, (open) => {
   if (open) files.value = []
 })
-
-function save(): void {
-  const needsProofWarning =
-    !editing.value &&
-    form.type === 'OUT' &&
-    files.value.length === 0 &&
-    Object.keys(validate(form, false)).length === 0
-  if (!needsProofWarning) {
-    void onSubmit()
-    return
-  }
-  confirm.require({
-    header: 'Simpan tanpa bukti',
-    message:
-      'Pengeluaran tanpa bukti tidak bisa disetujui. Simpan dulu dan tambahkan bukti nanti?',
-    acceptLabel: 'Simpan',
-    rejectLabel: 'Batal',
-    rejectProps: { severity: 'secondary', variant: 'text' },
-    accept: () => void onSubmit(),
-  })
-}
 
 function onTypeChange(type: TxType | null): void {
   // Kategori terikat pada tipe; yang tidak cocok lagi dilepas.
@@ -231,10 +163,7 @@ const categoryOptions = computed(() =>
     current.value?.type === form.type ? named(current.value.category) : null,
   ),
 )
-const title = computed(() => {
-  if (!editing.value) return 'Catat transaksi'
-  return isResubmit.value ? 'Perbaiki dan ajukan lagi' : 'Ubah transaksi'
-})
+const title = computed(() => (editing.value ? 'Ubah transaksi' : 'Catat transaksi'))
 </script>
 
 <template>
@@ -243,13 +172,9 @@ const title = computed(() => {
     :title="title"
     :submitting="submitting"
     :form-error="formError"
-    :submit-label="isResubmit ? 'Ajukan lagi' : undefined"
-    @submit="save"
+    @submit="onSubmit"
   >
     <TransactionOptionsError :options="options" />
-    <Message v-if="isResubmit" severity="warn" :closable="false">
-      Ditolak: {{ transaction?.rejectReason }}
-    </Message>
 
     <div class="grid gap-4 sm:grid-cols-2">
       <SelectField
@@ -313,10 +238,6 @@ const title = computed(() => {
         <ProofPicker v-model="files" :max="MAX_PROOFS" :disabled="submitting" />
       </FormField>
 
-      <label v-if="isAdmin" class="flex items-center gap-2 text-sm">
-        <Checkbox v-model="form.approveNow" binary input-id="tx-approve-now" />
-        <span>Langsung setujui</span>
-      </label>
     </template>
   </FormDialog>
 </template>

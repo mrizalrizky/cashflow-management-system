@@ -73,6 +73,13 @@ describe('route guards', () => {
     );
   });
 
+  it('has no approval routes in the personal edition', () => {
+    const names = registeredRoutes(ctx).map(nameOf);
+    for (const removed of ['approve', 'reject', 'cancel']) {
+      expect(names).not.toContain(`POST /api/v1/transactions/{id}/${removed}`);
+    }
+  });
+
   it('has no project routes in the personal edition', () => {
     expect(registeredRoutes(ctx).map(nameOf).filter((name) => name.includes('/projects'))).toEqual([]);
   });

@@ -33,7 +33,7 @@ vi.mock('@/api/accounts')
 vi.mock('@/api/categories')
 vi.mock('@/lib/download')
 
-const SEMEN = makeTransaction()
+const SEMEN = makeTransaction({ status: 'VOID' })
 const TERMIN_MASUK = makeTransaction({
   id: 't-termin',
   type: 'IN',
@@ -117,10 +117,10 @@ describe('TransactionsView', () => {
     expect(rows[0]).toContain('Material')
     expect(rows[0]).toContain('Kas Kecil')
     expect(rows[0]).toContain('-Rp 150.000')
-    expect(rows[0]).toContain('Menunggu')
+    expect(rows[0]).toContain('Dibatalkan')
     expect(rows[0]).toContain('Sari')
     expect(rows[1]).toContain('+Rp 5.000.000')
-    expect(rows[1]).toContain('Disetujui')
+    expect(rows[1]).toContain('Tercatat')
     expect(rows[2]).toContain('Listrik kantor')
   })
 
@@ -140,15 +140,6 @@ describe('TransactionsView', () => {
     expect(links).toContain('/transaksi/t-termin')
   })
 
-  it('marks the rows the user may review', async () => {
-    const waiting = makeTransaction({ permissions: { canReview: true } })
-    const { wrapper } = await mountList('PROJECT_MANAGER', [waiting, TERMIN_MASUK])
-
-    const rows = wrapper.findAll('tbody tr').map((row) => row.text())
-    expect(rows[0]).toContain('Perlu ditinjau')
-    expect(rows[1]).not.toContain('Perlu ditinjau')
-  })
-
   it('shows only counted amounts in colour', async () => {
     const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN, TERMIN_MASUK])
 
@@ -162,14 +153,14 @@ describe('TransactionsView', () => {
     await flushPromises()
     expect(lastListParams()).toMatchObject({ page: 3, pageSize: 50 })
 
-    await choose(wrapper, 'Status', 'PENDING')
-    expect(lastListParams()).toMatchObject({ status: 'PENDING', page: 1 })
+    await choose(wrapper, 'Status', 'VOID')
+    expect(lastListParams()).toMatchObject({ status: 'VOID', page: 1 })
 
     await choose(wrapper, 'Tipe', 'OUT')
     await choose(wrapper, 'Akun', KAS.id)
     await choose(wrapper, 'Kategori', MATERIAL.id)
     expect(lastListParams()).toMatchObject({
-      status: 'PENDING',
+      status: 'VOID',
       type: 'OUT',
       accountId: KAS.id,
       categoryId: MATERIAL.id,
@@ -220,11 +211,11 @@ describe('TransactionsView', () => {
   })
 
   it('opens on the status named in the address, with one request', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN], '/transaksi?status=PENDING')
+    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN], '/transaksi?status=VOID')
 
     expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
-    expect(lastListParams()).toMatchObject({ status: 'PENDING', page: 1 })
-    expect(select(wrapper, 'Status').props('modelValue')).toBe('PENDING')
+    expect(lastListParams()).toMatchObject({ status: 'VOID', page: 1 })
+    expect(select(wrapper, 'Status').props('modelValue')).toBe('VOID')
 
     await wrapper.get('[data-testid="reset-filters"]').trigger('click')
     await flushPromises()
@@ -232,8 +223,8 @@ describe('TransactionsView', () => {
     expect(select(wrapper, 'Status').props('modelValue')).toBeUndefined()
   })
 
-  it('ignores a status in the address that does not exist', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN], '/transaksi?status=apa&status=PENDING')
+  it('ignores a status in the address that does not exist, or is no longer offered', async () => {
+    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN], '/transaksi?status=PENDING')
 
     expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
     expect(lastListParams().status).toBeUndefined()
@@ -249,7 +240,7 @@ describe('TransactionsView', () => {
 
   it('clears every filter with Reset', async () => {
     const { wrapper } = await mountList('SUPER_ADMIN')
-    await choose(wrapper, 'Status', 'PENDING')
+    await choose(wrapper, 'Status', 'VOID')
     await pickDates(wrapper, '2026-10-01', null)
 
     await wrapper.get('[data-testid="reset-filters"]').trigger('click')
@@ -325,7 +316,7 @@ describe('TransactionsView', () => {
   it('shows staff their own transactions, without a creator column or transfer controls', async () => {
     const { wrapper } = await mountList('STAFF')
 
-    expect(wrapper.get('h1').text()).toBe('Transaksi Saya')
+    expect(wrapper.get('h1').text()).toBe('Transaksi')
     expect(wrapper.find('[data-testid="add-transfer"]').exists()).toBe(false)
     expect(wrapper.findComponent(ToggleSwitch).exists()).toBe(false)
     const headers = wrapper.findAll('thead th').map((th) => th.text())
@@ -390,7 +381,7 @@ describe('TransactionsView: export', () => {
 
   it('exports with exactly the filters of the list on screen', async () => {
     const { wrapper } = await mountList('SUPER_ADMIN')
-    await choose(wrapper, 'Status', 'PENDING')
+    await choose(wrapper, 'Status', 'VOID')
     await choose(wrapper, 'Akun', KAS.id)
     wrapper.findComponent(ToggleSwitch).vm.$emit('update:modelValue', false)
     await flushPromises()
@@ -399,7 +390,7 @@ describe('TransactionsView: export', () => {
 
     const { page: _page, pageSize: _pageSize, ...listed } = lastListParams()
     const sent = exportFile.mock.calls[0]![0]
-    expect(sent).toMatchObject({ status: 'PENDING', accountId: KAS.id, includeTransfers: false })
+    expect(sent).toMatchObject({ status: 'VOID', accountId: KAS.id, includeTransfers: false })
     expect(sent).not.toHaveProperty('page')
     expect(sent).not.toHaveProperty('pageSize')
     // Yang terisi di permintaan daftar sama dengan yang terisi di permintaan ekspor.
@@ -425,13 +416,13 @@ describe('TransactionsView: export', () => {
   })
 
   it('carries a status that came from the address, and leaves out a backwards date range', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN', '/transaksi?status=PENDING')
+    const { wrapper } = await mountList('SUPER_ADMIN', '/transaksi?status=VOID')
     await pickDates(wrapper, '2026-11-05', '2026-10-31')
 
     await clickExport(wrapper)
 
     const sent = exportFile.mock.calls[0]![0]
-    expect(sent.status).toBe('PENDING')
+    expect(sent.status).toBe('VOID')
     expect(sent.dateFrom).toBeUndefined()
     expect(sent.dateTo).toBeUndefined()
   })

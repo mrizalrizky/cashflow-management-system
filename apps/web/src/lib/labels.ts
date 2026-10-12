@@ -31,13 +31,17 @@ export const txTypeLabel = txTypes.label
 export const TX_TYPE_OPTIONS: Option<TxType>[] = txTypes.options
 
 const txStatuses = labelSet<TxStatus>({
-  PENDING: 'Menunggu',
-  APPROVED: 'Disetujui',
-  REJECTED: 'Ditolak',
+  APPROVED: 'Tercatat',
   VOID: 'Dibatalkan',
+  // Tidak dibuat lagi oleh edisi pribadi; hilang bersama tipenya.
+  PENDING: 'Menunggu',
+  REJECTED: 'Ditolak',
 })
 export const txStatusLabel = txStatuses.label
-export const TX_STATUS_OPTIONS: Option<TxStatus>[] = txStatuses.options
+/** Status yang bisa dipilih di filter: hanya yang masih dibuat API. */
+export const TX_STATUS_OPTIONS: Option<TxStatus>[] = txStatuses.options.filter(
+  (option) => option.value === 'APPROVED' || option.value === 'VOID',
+)
 
 /** Warna tag PrimeVue untuk tiap status transaksi. */
 export const TX_STATUS_SEVERITY: Record<TxStatus, 'warn' | 'success' | 'danger' | 'secondary'> = {

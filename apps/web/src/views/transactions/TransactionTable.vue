@@ -79,12 +79,6 @@ defineExpose({ reload: list.reload })
         </RouterLink>
         <p class="text-sm text-surface-500">{{ data.category.name }}</p>
         <Tag v-if="data.isTransfer" severity="info" value="Transfer" class="mt-1" />
-        <Tag
-          v-if="data.permissions.canReview"
-          severity="warn"
-          value="Perlu ditinjau"
-          class="mt-1"
-        />
       </template>
     </Column>
     <Column header="Akun" class="hidden md:table-cell">

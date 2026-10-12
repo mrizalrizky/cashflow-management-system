@@ -46,24 +46,6 @@ describe('transaction API modules', () => {
       ['/transactions/t1', { method: 'PATCH', body: { amount: '90000' } }],
     ],
     [
-      'cancelTransaction',
-      () => transactions.cancelTransaction('t1', 'Salah input'),
-      ['/transactions/t1/cancel', { method: 'POST', body: { reason: 'Salah input' } }],
-    ],
-    [
-      'approveTransaction',
-      () => transactions.approveTransaction('t1', '2026-10-01T03:00:00.000Z'),
-      ['/transactions/t1/approve', { method: 'POST', body: { expectedUpdatedAt: '2026-10-01T03:00:00.000Z' } }],
-    ],
-    [
-      'rejectTransaction',
-      () => transactions.rejectTransaction('t1', 'Nota buram', '2026-10-01T03:00:00.000Z'),
-      [
-        '/transactions/t1/reject',
-        { method: 'POST', body: { reason: 'Nota buram', expectedUpdatedAt: '2026-10-01T03:00:00.000Z' } },
-      ],
-    ],
-    [
       'voidTransaction',
       () => transactions.voidTransaction('t1', 'Nota ganda'),
       ['/transactions/t1/void', { method: 'POST', body: { reason: 'Nota ganda' } }],

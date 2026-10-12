@@ -31,7 +31,7 @@ function downloadUrl(attachmentId: string): string {
   return `${ATTACHMENTS}/${attachmentId}/download`;
 }
 
-async function setStatus(ctx: E2eContext, id: string, status: 'APPROVED' | 'VOID' | 'REJECTED') {
+async function setStatus(ctx: E2eContext, id: string, status: 'APPROVED' | 'VOID') {
   await ctx.prisma.transaction.update({ where: { id }, data: { status } });
 }
 
@@ -138,14 +138,11 @@ describe('POST /transactions/:id/attachments', () => {
     await api(ctx).post(transactionUrl(tx.id, 'attachments')).attach('file', PDF.content, PDF.filename).expect(401);
     await upload(ctx, world.admin, tx.id).expect(201);
 
-    await setStatus(ctx, tx.id, 'REJECTED');
     await upload(ctx, world.staff, tx.id).expect(201);
 
-    for (const status of ['APPROVED', 'VOID'] as const) {
-      await setStatus(ctx, tx.id, status);
-      const res = await upload(ctx, world.admin, tx.id).expect(409);
-      expect(res.body.message).toBe('Transaksi tidak bisa diberi bukti pada status ini');
-    }
+    await setStatus(ctx, tx.id, 'VOID');
+    const res = await upload(ctx, world.admin, tx.id).expect(409);
+    expect(res.body.message).toBe('Transaksi tidak bisa diberi bukti pada status ini');
     await upload(ctx, world.staff, randomUUID()).expect(404);
   });
 });
@@ -217,10 +214,10 @@ describe('DELETE /attachments/:id', () => {
     await call(ctx, world.staff, 'delete', `${ATTACHMENTS}/${second.attachment.id}`).expect(204);
   });
 
-  it('keeps the proof of a transaction that has been approved', async () => {
+  it('keeps the proof of a transaction that has been voided', async () => {
     const world = await setupWorld(ctx);
     const { tx, attachment } = await withProof(ctx, world);
-    await setStatus(ctx, tx.id, 'APPROVED');
+    await setStatus(ctx, tx.id, 'VOID');
 
     for (const session of [world.staff, world.admin]) {
       await call(ctx, session, 'delete', `${ATTACHMENTS}/${attachment.id}`).expect(409);

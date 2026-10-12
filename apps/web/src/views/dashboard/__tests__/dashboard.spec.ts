@@ -37,11 +37,10 @@ function makeDashboard(overrides: Partial<CompanyDashboard> = {}): CompanyDashbo
       { categoryId: 'c2', name: 'Upah', amount: '7000000' },
     ],
     recentTransactions: [
-      makeTransaction(),
+      makeTransaction({ status: 'VOID' }),
       makeTransaction({ id: 't-listrik', description: 'Listrik kantor', status: 'APPROVED' }),
       makeTransaction({ id: 't-pindah', description: 'Isi kas kecil', isTransfer: true }),
     ],
-    pendingCount: 3,
     ...overrides,
   }
 }
@@ -53,7 +52,6 @@ const EMPTY = makeDashboard({
   monthly: [{ month: '2026-10', income: '0', expense: '0', net: '0' }],
   expenseByCategory: [],
   recentTransactions: [],
-  pendingCount: 0,
 })
 
 async function mountDashboard(first: CompanyDashboard = makeDashboard()) {
@@ -172,21 +170,6 @@ describe('DashboardView', () => {
     ])
   })
 
-  it('links the waiting count to the pending transactions', async () => {
-    const { wrapper } = await mountDashboard()
-
-    const link = wrapper.get('[data-testid="pending-link"]')
-    expect(link.text()).toContain('3 transaksi menunggu ditinjau')
-    expect(link.attributes('href')).toBe('/transaksi?status=PENDING')
-  })
-
-  it('says nothing is waiting, without a link, when the count is zero', async () => {
-    const { wrapper } = await mountDashboard(makeDashboard({ pendingCount: 0 }))
-
-    expect(wrapper.find('[data-testid="pending-link"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Tidak ada transaksi yang menunggu')
-  })
-
   it('lists the recent transactions with links, amount and status', async () => {
     const { wrapper } = await mountDashboard()
 
@@ -196,7 +179,7 @@ describe('DashboardView', () => {
     expect(rows[0]!.get('a').text()).toBe('Beli semen')
     expect(rows[0]!.get('a').attributes('href')).toBe('/transaksi/t-semen')
     expect(rows[0]!.text()).toContain('-Rp 150.000')
-    expect(rows[0]!.text()).toContain('Menunggu')
+    expect(rows[0]!.text()).toContain('Dibatalkan')
     expect(rows[0]!.find('[title="Belum dihitung dalam saldo"]').exists()).toBe(true)
     expect(rows[1]!.find('[title="Belum dihitung dalam saldo"]').exists()).toBe(false)
     expect(rows[2]!.text()).toContain('Transfer')

@@ -147,7 +147,7 @@ describe('POST /accounts', () => {
 describe('GET /accounts', () => {
   const ctx = setupE2e();
 
-  it('counts only approved transactions of that account towards its balance', async () => {
+  it('counts only recorded transactions of that account towards its balance', async () => {
     const admin = await asAdmin(ctx);
     const account = await createAccount(ctx.prisma, { name: 'Utama', openingBalance: 1_000_000n });
     const other = await createAccount(ctx.prisma, { name: 'Lain', openingBalance: 50n });
@@ -158,8 +158,6 @@ describe('GET /accounts', () => {
 
     await createTransaction(ctx.prisma, { ...onAccount, type: 'IN', amount: 500_000n });
     await createTransaction(ctx.prisma, { ...onAccount, type: 'OUT', amount: 200_000n });
-    await createTransaction(ctx.prisma, { ...onAccount, type: 'OUT', amount: 9n, status: 'PENDING' });
-    await createTransaction(ctx.prisma, { ...onAccount, type: 'IN', amount: 9n, status: 'REJECTED' });
     await createTransaction(ctx.prisma, { ...onAccount, type: 'OUT', amount: 9n, status: 'VOID' });
     await createTransaction(ctx.prisma, { ...base, accountId: other.id, type: 'OUT', amount: 80n });
 

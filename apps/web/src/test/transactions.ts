@@ -24,8 +24,6 @@ export const TRANSFER_KELUAR: Category = {
 
 export const NO_PERMISSIONS: TransactionPermissions = {
   canEdit: false,
-  canCancel: false,
-  canReview: false,
   canVoid: false,
   canAttach: false,
 }
@@ -54,15 +52,12 @@ export function makeTransaction(
     amount: '150000',
     transactionDate: '2026-10-01',
     description: 'Beli semen',
-    status: 'PENDING',
+    status: 'APPROVED',
     account: { id: KAS.id, name: KAS.name },
     category: { id: MATERIAL.id, name: MATERIAL.name },
     isTransfer: false,
     transferGroupId: null,
     createdBy: { id: 'u-staf', name: 'Sari' },
-    reviewedBy: null,
-    reviewedAt: null,
-    rejectReason: null,
     voidedBy: null,
     voidedAt: null,
     voidReason: null,

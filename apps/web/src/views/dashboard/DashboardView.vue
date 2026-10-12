@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -17,7 +16,6 @@ import StatCard from '@/components/StatCard.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { formatCalendarDate } from '@/lib/format'
 import { accountTypeLabel } from '@/lib/labels'
-import { PATHS } from '@/router/paths'
 import PeriodPicker from './PeriodPicker.vue'
 import RecentTransactions from './RecentTransactions.vue'
 
@@ -126,17 +124,6 @@ onMounted(reload)
           data-testid="stat-net"
         />
       </div>
-
-      <RouterLink
-        v-if="dashboard.pendingCount > 0"
-        :to="{ path: PATHS.transactions, query: { status: 'PENDING' } }"
-        class="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 font-medium text-amber-900 hover:underline"
-        data-testid="pending-link"
-      >
-        <i class="pi pi-clock" aria-hidden="true" />
-        {{ dashboard.pendingCount }} transaksi menunggu ditinjau
-      </RouterLink>
-      <p v-else class="text-surface-600">Tidak ada transaksi yang menunggu.</p>
 
       <section class="rounded-xl border border-surface-200 bg-surface-0 p-4">
         <h2 class="mb-3 text-lg font-semibold">Arus kas per bulan</h2>

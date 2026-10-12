@@ -23,8 +23,8 @@ const isStaff = computed(() => role.value === 'STAFF')
 
 const options = useTransactionOptions()
 /**
- * Halaman lain bisa membuka daftar ini pada satu status, mis. dashboard ke yang menunggu
- * (`?status=PENDING`). Dibaca sekali saat halaman dibuka; nilai yang tidak dikenal diabaikan.
+ * Halaman lain bisa membuka daftar ini pada satu status, mis. yang dibatalkan
+ * (`?status=VOID`). Dibaca sekali saat halaman dibuka; nilai yang tidak dikenal diabaikan.
  */
 function statusFromAddress(): TxStatus | undefined {
   const asked = useRoute().query.status
@@ -57,7 +57,7 @@ function reloadTable(): void {
 </script>
 
 <template>
-  <PageHeader :title="isStaff ? 'Transaksi Saya' : 'Transaksi'">
+  <PageHeader title="Transaksi">
     <template #actions>
       <Button
         label="Ekspor CSV"

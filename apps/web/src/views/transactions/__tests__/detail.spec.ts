@@ -20,12 +20,10 @@ vi.mock('@/api/accounts')
 vi.mock('@/api/categories')
 
 const PATH = '/transaksi/t-semen'
-const CHANGED = 'Transaksi berubah sejak Anda membukanya. Periksa lagi sebelum memproses.'
-const PROCESSED = 'Transaksi sudah diproses pengguna lain'
-const ACTIONS = ['edit', 'cancel', 'approve', 'reject', 'void'] as const
+const ACTIONS = ['edit', 'void'] as const
 
 const WITH_PROOF = makeTransaction({ attachments: [makeAttachment()] })
-const REVIEWABLE = makeTransaction({ attachments: [makeAttachment()], permissions: { canReview: true } })
+const VOIDABLE = makeTransaction({ attachments: [makeAttachment()], permissions: { canVoid: true } })
 
 async function mountDetail(role: Role, transaction: Transaction = WITH_PROOF, path = PATH) {
   signInAs(role)
@@ -39,11 +37,6 @@ function button(wrapper: VueWrapper, action: (typeof ACTIONS)[number]) {
 
 async function click(wrapper: VueWrapper, action: (typeof ACTIONS)[number]): Promise<void> {
   await button(wrapper, action).trigger('click')
-  await flushPromises()
-}
-
-async function acceptConfirm(): Promise<void> {
-  document.querySelector<HTMLButtonElement>('.p-confirmdialog-accept-button')!.click()
   await flushPromises()
 }
 
@@ -77,32 +70,21 @@ describe('TransactionDetailView', () => {
     expect(field(wrapper, 'category')).toBe('Material')
     expect(wrapper.find('[data-testid="tx-project"]').exists()).toBe(false)
     expect(field(wrapper, 'created')).toBe('Sari · 01 Okt 2026')
-    expect(wrapper.text()).toContain('Menunggu')
-    expect(wrapper.find('[data-testid="tx-reviewed"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Tercatat')
     expect(wrapper.get('[data-testid="back-to-transactions"]').attributes('href')).toBe('/transaksi')
   })
 
-  it('shows who reviewed it, why it was rejected, and who voided it with the reason', async () => {
-    const rejected = makeTransaction({
-      status: 'REJECTED',
-      reviewedBy: { id: 'u-ani', name: 'Ani' },
-      reviewedAt: '2026-10-02T04:00:00.000Z',
-      rejectReason: 'Nominal tidak sesuai nota',
-    })
-    const first = await mountDetail('STAFF', rejected)
-    expect(field(first.wrapper, 'reviewed')).toBe('Ani · 02 Okt 2026')
-    expect(field(first.wrapper, 'reject-reason')).toBe('Nominal tidak sesuai nota')
-
-    freshPinia()
+  it('shows who voided it, with the reason', async () => {
     const voided = makeTransaction({
       status: 'VOID',
       voidedBy: { id: 'u-dewi', name: 'Dewi' },
       voidedAt: '2026-10-03T04:00:00.000Z',
       voidReason: 'Nota ganda',
     })
-    const second = await mountDetail('SUPER_ADMIN', voided)
-    expect(field(second.wrapper, 'voided')).toBe('Dewi · 03 Okt 2026')
-    expect(field(second.wrapper, 'void-reason')).toBe('Nota ganda')
+    const { wrapper } = await mountDetail('SUPER_ADMIN', voided)
+    expect(field(wrapper, 'voided')).toBe('Dewi · 03 Okt 2026')
+    expect(field(wrapper, 'void-reason')).toBe('Nota ganda')
+    expect(wrapper.find('[data-testid="tx-reviewed"]').exists()).toBe(false)
   })
 
   it('links an admin, and nobody else, to the history of this transaction', async () => {
@@ -164,15 +146,6 @@ describe('TransactionDetailView: proof', () => {
       canRemove: false,
     })
     expect(wrapper.findComponent(ProofPicker).exists()).toBe(false)
-  })
-
-  it('warns that a pending expense without proof cannot be approved', async () => {
-    const { wrapper } = await mountDetail('STAFF', makeTransaction())
-    expect(wrapper.text()).toContain('Pengeluaran ini belum punya bukti dan belum bisa disetujui')
-
-    freshPinia()
-    const income = await mountDetail('STAFF', makeTransaction({ type: 'IN' }))
-    expect(income.wrapper.text()).not.toContain('belum bisa disetujui')
   })
 
   it('lets the owner add proof up to what is left of ten, then shows the new list', async () => {
@@ -253,8 +226,6 @@ describe('TransactionDetailView: actions', () => {
 
   it.each([
     ['canEdit', ['edit']],
-    ['canCancel', ['cancel']],
-    ['canReview', ['approve', 'reject']],
     ['canVoid', ['void']],
   ] as const)('offers exactly what %s allows', async (permission, expected) => {
     const { wrapper } = await mountDetail('STAFF', makeTransaction({ permissions: { [permission]: true } }))
@@ -277,137 +248,7 @@ describe('TransactionDetailView: actions', () => {
     expect(field(wrapper, 'amount')).toBe('-Rp 90.000')
   })
 
-  it('calls editing a rejected transaction fixing and resubmitting', async () => {
-    const rejected = makeTransaction({ status: 'REJECTED', rejectReason: 'Buram', permissions: { canEdit: true } })
-    const { wrapper } = await mountDetail('STAFF', rejected)
-
-    expect(button(wrapper, 'edit').text()).toBe('Perbaiki dan ajukan lagi')
-  })
-
-  it('approves the version on screen after confirmation', async () => {
-    const approved = { ...REVIEWABLE, status: 'APPROVED' as const, permissions: WITH_PROOF.permissions }
-    vi.mocked(transactionsApi.approveTransaction).mockResolvedValue(approved)
-    const { wrapper } = await mountDetail('PROJECT_MANAGER', REVIEWABLE)
-
-    await click(wrapper, 'approve')
-    expect(document.body.textContent).toContain('Setujui pengeluaran Rp 150.000 untuk "Beli semen"?')
-    expect(transactionsApi.approveTransaction).not.toHaveBeenCalled()
-    await acceptConfirm()
-
-    expect(transactionsApi.approveTransaction).toHaveBeenCalledExactlyOnceWith('t-semen', '2026-10-01T03:00:00.000Z')
-    expect(wrapper.text()).toContain('Disetujui')
-    expect(button(wrapper, 'approve').exists()).toBe(false)
-    expect(document.body.textContent).toContain('Transaksi disetujui')
-    expect(document.body.textContent).not.toContain('minus')
-  })
-
-  it('sends one approval even when the confirmation is pressed twice', async () => {
-    vi.mocked(transactionsApi.approveTransaction).mockReturnValue(new Promise(() => undefined))
-    const { wrapper } = await mountDetail('PROJECT_MANAGER', REVIEWABLE)
-
-    await click(wrapper, 'approve')
-    const accept = document.querySelector<HTMLButtonElement>('.p-confirmdialog-accept-button')!
-    accept.click()
-    accept.click()
-    await flushPromises()
-
-    expect(transactionsApi.approveTransaction).toHaveBeenCalledTimes(1)
-  })
-
-  it('warns an admin when the approval leaves the account below zero', async () => {
-    vi.mocked(transactionsApi.approveTransaction).mockResolvedValue({
-      ...REVIEWABLE,
-      status: 'APPROVED',
-      accountBalance: '-50000',
-    })
-    const { wrapper } = await mountDetail('SUPER_ADMIN', REVIEWABLE)
-
-    await click(wrapper, 'approve')
-    await acceptConfirm()
-
-    expect(document.body.textContent).toContain('Saldo Kas Kecil sekarang minus: -Rp 50.000')
-  })
-
-  it('shows why an approval was refused', async () => {
-    vi.mocked(transactionsApi.approveTransaction).mockRejectedValue(
-      new ApiError(400, 'Pengeluaran wajib punya bukti sebelum disetujui'),
-    )
-    const { wrapper } = await mountDetail('PROJECT_MANAGER', REVIEWABLE)
-
-    await click(wrapper, 'approve')
-    await acceptConfirm()
-
-    expect(document.body.textContent).toContain('Pengeluaran wajib punya bukti sebelum disetujui')
-    expect(wrapper.text()).toContain('Menunggu')
-  })
-
-  it('approves nothing when the transaction changed meanwhile, and shows the new version', async () => {
-    vi.mocked(transactionsApi.approveTransaction).mockRejectedValue(new ApiError(409, CHANGED))
-    const { wrapper } = await mountDetail('PROJECT_MANAGER', REVIEWABLE)
-    const edited = { ...REVIEWABLE, amount: '9000000', updatedAt: '2026-10-01T05:00:00.000Z' }
-    vi.mocked(transactionsApi.getTransaction).mockResolvedValue(edited)
-
-    await click(wrapper, 'approve')
-    await acceptConfirm()
-
-    expect(document.body.textContent).toContain(CHANGED)
-    expect(field(wrapper, 'amount')).toBe('-Rp 9.000.000')
-    expect(wrapper.text()).toContain('Menunggu')
-    expect(button(wrapper, 'approve').exists()).toBe(true)
-    expect(document.body.textContent).not.toContain('Transaksi disetujui')
-  })
-
-  it('says so when someone else already processed it, and follows the fresh permissions', async () => {
-    vi.mocked(transactionsApi.rejectTransaction).mockRejectedValue(
-      new ApiError(409, 'Transaksi tidak bisa ditolak pada status ini'),
-    )
-    const { wrapper } = await mountDetail('PROJECT_MANAGER', REVIEWABLE)
-    vi.mocked(transactionsApi.getTransaction).mockResolvedValue({ ...WITH_PROOF, status: 'APPROVED' })
-
-    await click(wrapper, 'reject')
-    await giveReason(wrapper, 'Nota buram')
-    await flushPromises()
-
-    expect(document.body.textContent).toContain(PROCESSED)
-    expect(wrapper.text()).toContain('Disetujui')
-    expect(button(wrapper, 'reject').exists()).toBe(false)
-    expect(wrapper.find('#reason-text').exists()).toBe(false)
-  })
-
-  it('rejects with a reason, for the version on screen', async () => {
-    const rejected = { ...WITH_PROOF, status: 'REJECTED' as const, rejectReason: 'Nota buram' }
-    vi.mocked(transactionsApi.rejectTransaction).mockResolvedValue(rejected)
-    const { wrapper } = await mountDetail('PROJECT_MANAGER', REVIEWABLE)
-
-    await click(wrapper, 'reject')
-    expect(wrapper.text()).toContain('Tolak transaksi')
-    await giveReason(wrapper, '  Nota buram  ')
-    await flushPromises()
-
-    expect(transactionsApi.rejectTransaction).toHaveBeenCalledExactlyOnceWith(
-      't-semen',
-      'Nota buram',
-      '2026-10-01T03:00:00.000Z',
-    )
-    expect(field(wrapper, 'reject-reason')).toBe('Nota buram')
-    expect(document.body.textContent).toContain('Transaksi ditolak')
-    expect(wrapper.find('#reason-text').exists()).toBe(false)
-  })
-
-  it('cancels a pending transaction with a reason', async () => {
-    vi.mocked(transactionsApi.cancelTransaction).mockResolvedValue({ ...WITH_PROOF, status: 'VOID' })
-    const { wrapper } = await mountDetail('STAFF', makeTransaction({ permissions: { canCancel: true } }))
-
-    await click(wrapper, 'cancel')
-    await giveReason(wrapper, 'Salah input')
-    await flushPromises()
-
-    expect(transactionsApi.cancelTransaction).toHaveBeenCalledExactlyOnceWith('t-semen', 'Salah input')
-    expect(wrapper.text()).toContain('Dibatalkan')
-    expect(document.body.textContent).toContain('Transaksi dibatalkan')
-  })
-
-  it('voids an approved transaction with a reason', async () => {
+  it('voids a recorded transaction with a reason', async () => {
     const approved = makeTransaction({ status: 'APPROVED', permissions: { canVoid: true } })
     vi.mocked(transactionsApi.voidTransaction).mockResolvedValue({ ...WITH_PROOF, status: 'VOID' })
     const { wrapper } = await mountDetail('SUPER_ADMIN', approved)
@@ -438,45 +279,42 @@ describe('TransactionDetailView: actions', () => {
   })
 
   it('disables every action while one is in flight', async () => {
-    vi.mocked(transactionsApi.approveTransaction).mockReturnValue(new Promise(() => undefined))
-    const all = makeTransaction({
-      attachments: [makeAttachment()],
-      permissions: { canEdit: true, canCancel: true, canReview: true },
-    })
+    vi.mocked(transactionsApi.voidTransaction).mockReturnValue(new Promise(() => undefined))
+    const all = makeTransaction({ attachments: [makeAttachment()], permissions: { canEdit: true, canVoid: true } })
     const { wrapper } = await mountDetail('SUPER_ADMIN', all)
 
-    await click(wrapper, 'approve')
-    await acceptConfirm()
+    await click(wrapper, 'void')
+    await giveReason(wrapper, 'Nota ganda')
 
-    for (const action of ['edit', 'cancel', 'approve', 'reject'] as const) {
+    for (const action of ACTIONS) {
       expect(button(wrapper, action).attributes('disabled')).toBeDefined()
     }
   })
 })
 
-describe('ReasonDialog, through the reject action', () => {
-  async function openReject() {
-    const { wrapper } = await mountDetail('PROJECT_MANAGER', REVIEWABLE)
-    await click(wrapper, 'reject')
+describe('ReasonDialog, through the void action', () => {
+  async function openVoid() {
+    const { wrapper } = await mountDetail('SUPER_ADMIN', VOIDABLE)
+    await click(wrapper, 'void')
     return wrapper
   }
 
   it('requires a reason of at most 500 characters, with a counter', async () => {
-    const wrapper = await openReject()
+    const wrapper = await openVoid()
 
     await giveReason(wrapper, '   ')
-    expect(wrapper.get('#reason-text-error').text()).toBe('Alasan penolakan wajib diisi')
+    expect(wrapper.get('#reason-text-error').text()).toBe('Alasan void wajib diisi')
 
     await fill(wrapper, '#reason-text', 'x'.repeat(501))
     expect(wrapper.text()).toContain('501/500')
     await submitForm(wrapper)
-    expect(wrapper.get('#reason-text-error').text()).toBe('Alasan penolakan maksimal 500 karakter')
-    expect(transactionsApi.rejectTransaction).not.toHaveBeenCalled()
+    expect(wrapper.get('#reason-text-error').text()).toBe('Alasan void maksimal 500 karakter')
+    expect(transactionsApi.voidTransaction).not.toHaveBeenCalled()
   })
 
   it('shows an API error inside the dialog and keeps the text', async () => {
-    vi.mocked(transactionsApi.rejectTransaction).mockRejectedValue(new ApiError(500, 'Terjadi kesalahan pada server'))
-    const wrapper = await openReject()
+    vi.mocked(transactionsApi.voidTransaction).mockRejectedValue(new ApiError(500, 'Terjadi kesalahan pada server'))
+    const wrapper = await openVoid()
 
     await giveReason(wrapper, 'Nota buram')
     await flushPromises()
@@ -487,17 +325,17 @@ describe('ReasonDialog, through the reject action', () => {
 
   it('sends one request however often it is submitted, and starts empty next time', async () => {
     let finish!: (tx: Transaction) => void
-    vi.mocked(transactionsApi.rejectTransaction).mockReturnValue(new Promise((resolve) => (finish = resolve)))
-    const wrapper = await openReject()
+    vi.mocked(transactionsApi.voidTransaction).mockReturnValue(new Promise((resolve) => (finish = resolve)))
+    const wrapper = await openVoid()
 
     await giveReason(wrapper, 'Nota buram')
     await submitForm(wrapper)
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
-    finish({ ...REVIEWABLE, status: 'PENDING' })
+    finish(VOIDABLE)
     await flushPromises()
-    expect(transactionsApi.rejectTransaction).toHaveBeenCalledTimes(1)
+    expect(transactionsApi.voidTransaction).toHaveBeenCalledTimes(1)
 
-    await click(wrapper, 'reject')
+    await click(wrapper, 'void')
     expect((wrapper.get('#reason-text').element as HTMLTextAreaElement).value).toBe('')
   })
 })

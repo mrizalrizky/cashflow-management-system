@@ -57,16 +57,15 @@ describe('GET /dashboard/company', () => {
     expect(body.monthly).toEqual(EXPECTED.monthly);
     expect(named(body.expenseByCategory)).toEqual(EXPECTED.expenseByCategory);
     expect(body.expenseByCategory[0]!.categoryId).toEqual(expect.any(String));
-    expect(body.pendingCount).toBe(EXPECTED.pendingCount);
   });
 
-  it('never counts pending, rejected or void transactions, nor transfers', async () => {
+  it('never counts void transactions, nor transfers', async () => {
     const ledger = await seedReportLedger(ctx);
     const admin = await asAdmin(ctx);
     const before = await dashboard(ctx, admin);
 
     await ctx.prisma.transaction.updateMany({
-      where: { status: { in: ['PENDING', 'REJECTED', 'VOID'] } },
+      where: { status: 'VOID' },
       data: { amount: 999_999_999n },
     });
     await ctx.prisma.transaction.updateMany({
@@ -161,12 +160,10 @@ describe('GET /dashboard/company', () => {
     expect(body.recentTransactions.map((t) => t.description)).toEqual(EXPECTED.recent);
     expect(body.recentTransactions[0]).toMatchObject({ isTransfer: true, status: 'APPROVED', amount: '1000000' });
     expect(body.recentTransactions[4]).toMatchObject({
-      status: 'PENDING',
-      permissions: { canReview: true, canEdit: true },
+      status: 'VOID',
+      permissions: { canEdit: false, canVoid: false },
       createdBy: { name: 'Pencatat Laporan' },
     });
-    // Jumlah yang menunggu tidak mengikuti periode.
-    expect(body.pendingCount).toBe(1);
   });
 
   it('reports zeros on an empty database', async () => {
@@ -178,7 +175,6 @@ describe('GET /dashboard/company', () => {
     expect(body.monthly.every((m) => m.income === '0' && m.expense === '0' && m.net === '0')).toBe(true);
     expect(body.expenseByCategory).toEqual([]);
     expect(body.recentTransactions).toEqual([]);
-    expect(body.pendingCount).toBe(0);
   });
 
   it('adds up sums beyond what a JavaScript number can hold', async () => {

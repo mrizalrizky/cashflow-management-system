@@ -3,7 +3,7 @@ import { todayInJakarta } from '../src/common/calendar-date.js';
 import { api, setupE2e } from './e2e-context.js';
 import { call, createAccount, createCategory, errorFields } from './fixtures.js';
 import { TRANSACTIONS } from './routes.js';
-import { expenseBody, incomeBody, record, setupWorld } from './transaction-fixtures.js';
+import { expenseBody, record, setupWorld } from './transaction-fixtures.js';
 
 function tomorrowInJakarta(): string {
   const tomorrow = new Date(`${todayInJakarta()}T00:00:00.000Z`);
@@ -14,6 +14,14 @@ function tomorrowInJakarta(): string {
 describe('POST /transactions', () => {
   const ctx = setupE2e();
 
+  it('counts a new transaction at once', async () => {
+    const world = await setupWorld(ctx);
+    const res = await call(ctx, world.admin, 'post', TRANSACTIONS).send(expenseBody(world)).expect(201);
+    expect(res.body.status).toBe('APPROVED');
+    expect(res.body).not.toHaveProperty('reviewedBy');
+    expect(res.body.permissions).toEqual({ canEdit: true, canAttach: true, canVoid: true });
+  });
+
   it('refuses a projectId as an unknown field', async () => {
     const world = await setupWorld(ctx);
     const res = await call(ctx, world.admin, 'post', TRANSACTIONS)
@@ -22,7 +30,7 @@ describe('POST /transactions', () => {
     expect(errorFields(res.body)).toContain('projectId');
   });
 
-  it('records a pending transaction and returns it with its relations and permissions', async () => {
+  it('records a transaction and returns it with its relations and permissions', async () => {
     const world = await setupWorld(ctx);
 
     const res = await call(ctx, world.staff, 'post', TRANSACTIONS)
@@ -35,35 +43,23 @@ describe('POST /transactions', () => {
       amount: '150000',
       transactionDate: '2026-10-01',
       description: 'Beli semen',
-      status: 'PENDING',
+      status: 'APPROVED',
       account: { id: world.account.id, name: 'Kas Uji' },
       category: { id: world.expense.id, name: 'Material Uji' },
       isTransfer: false,
       transferGroupId: null,
       createdBy: { id: world.staff.user.id, name: 'Staf Satu' },
-      reviewedBy: null,
-      reviewedAt: null,
-      rejectReason: null,
       voidedBy: null,
       voidedAt: null,
       voidReason: null,
       attachments: [],
-      permissions: { canEdit: true, canCancel: true, canReview: false, canVoid: false, canAttach: true },
+      permissions: { canEdit: true, canAttach: true, canVoid: true },
       createdAt: expect.any(String),
       updatedAt: expect.any(String),
     });
     const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { entity_type: 'transaction' } });
     expect(row).toMatchObject({ action: 'CREATE', user_id: world.staff.user.id, entity_id: res.body.id });
-    expect(row.after).toMatchObject({ amount: '150000', status: 'PENDING' });
-  });
-
-  it('keeps even an admin transaction pending', async () => {
-    const world = await setupWorld(ctx);
-
-    const own = await record(ctx, world.admin, incomeBody(world));
-
-    expect(own.status).toBe('PENDING');
-    expect(own.permissions.canReview).toBe(true);
+    expect(row.after).toMatchObject({ amount: '150000', status: 'APPROVED' });
   });
 
   it.each([

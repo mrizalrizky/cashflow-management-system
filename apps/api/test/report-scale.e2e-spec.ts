@@ -9,15 +9,15 @@ const MAX_RESPONSE_MS = 1_500;
 const FIRST_DAY = Date.UTC(2024, 10, 1);
 const DAYS = 730;
 const PERIOD = 'from=2024-11-01&to=2026-10-31';
-// Tujuh dari sepuluh disetujui; sisanya tidak boleh ikut dihitung.
+// Tujuh dari sepuluh tercatat; sisanya dibatalkan dan tidak boleh ikut dihitung.
 const STATUSES: TxStatus[] = [
   'APPROVED',
   'APPROVED',
   'APPROVED',
-  'PENDING',
+  'VOID',
   'APPROVED',
   'APPROVED',
-  'REJECTED',
+  'VOID',
   'APPROVED',
   'APPROVED',
   'VOID',
@@ -108,7 +108,6 @@ describe('reports on 10,000 transactions', () => {
       ]);
     }
     expect(dashboard.body.recentTransactions).toHaveLength(10);
-    expect(dashboard.body.pendingCount).toBe(ROWS / 10);
 
     expect(dashboard.ms).toBeLessThan(MAX_RESPONSE_MS);
   }, 60_000);

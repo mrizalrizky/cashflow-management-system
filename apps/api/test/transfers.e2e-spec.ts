@@ -86,8 +86,7 @@ describe('POST /transactions/transfer', () => {
       description: 'Isi kas kecil',
       transactionDate: '2026-10-01',
       createdBy: { id: world.admin.user.id },
-      reviewedBy: { id: world.admin.user.id },
-      permissions: { canEdit: false, canCancel: false, canReview: false, canVoid: true, canAttach: false },
+      permissions: { canEdit: false, canAttach: false, canVoid: true },
     });
     expect(incoming).toMatchObject({
       type: 'IN',
@@ -185,16 +184,14 @@ describe('transfer legs afterwards', () => {
     expect(withThem.body.data).toHaveLength(2);
   });
 
-  it('cannot be edited, cancelled, reviewed or given proof on their own', async () => {
+  it('cannot be edited or given proof on their own', async () => {
     const world = await setupTransferWorld(ctx);
     const [out] = await transfer(ctx, world);
     const url = (action?: string) => transactionUrl(out!.id, action);
 
-    await call(ctx, world.admin, 'patch', url()).send({ amount: '1' }).expect(409);
-    await call(ctx, world.admin, 'post', url('cancel')).send({ reason: 'x' }).expect(409);
-    await call(ctx, world.admin, 'post', url('approve')).expect(409);
-    await call(ctx, world.admin, 'post', url('reject')).send({ reason: 'x' }).expect(409);
-    await call(ctx, world.admin, 'post', url('attachments')).attach('file', SAMPLE_FILES.pdf, 'nota.pdf').expect(409);
+    // Statusnya boleh diubah, tetapi sisi transfer memang tidak diubah sendiri: 403, bukan 409.
+    await call(ctx, world.admin, 'patch', url()).send({ amount: '1' }).expect(403);
+    await call(ctx, world.admin, 'post', url('attachments')).attach('file', SAMPLE_FILES.pdf, 'nota.pdf').expect(403);
 
     expect(await ctx.prisma.transaction.count({ where: { status: 'APPROVED' } })).toBe(2);
   });

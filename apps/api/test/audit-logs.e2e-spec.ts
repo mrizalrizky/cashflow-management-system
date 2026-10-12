@@ -20,13 +20,13 @@ function keysOf(value: unknown): string[] {
   return Object.entries(value).flatMap(([key, child]) => [key, ...keysOf(child)]);
 }
 
-/** Staf mencatat pengeluaran berbukti, lalu admin menyetujuinya. */
-async function approvedExpense(ctx: E2eContext, world: World): Promise<string> {
+/** Staf mencatat pengeluaran berbukti, lalu admin membatalkannya. */
+async function voidedExpense(ctx: E2eContext, world: World): Promise<string> {
   const tx = await record(ctx, world.staff, expenseBody(world));
   await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'attachments'))
     .attach('file', SAMPLE_FILES.pdf, 'nota.pdf')
     .expect(201);
-  await call(ctx, world.admin, 'post', transactionUrl(tx.id, 'approve')).expect(200);
+  await call(ctx, world.admin, 'post', transactionUrl(tx.id, 'void')).send({ reason: 'Ganda' }).expect(200);
   return tx.id;
 }
 
@@ -56,24 +56,24 @@ describe('GET /audit-logs', () => {
 
   it('lists entries newest first, with who did what to which record', async () => {
     const world = await setupWorld(ctx);
-    const id = await approvedExpense(ctx, world);
+    const id = await voidedExpense(ctx, world);
 
     const all = await logs(ctx, world.admin);
 
     expect(all[0]).toEqual({
       id: expect.any(String),
-      action: 'APPROVE',
+      action: 'VOID',
       entityType: 'transaction',
       entityId: id,
       user: { id: world.admin.user.id, name: world.admin.user.name },
-      before: expect.objectContaining({ status: 'PENDING', amount: '150000' }),
-      after: expect.objectContaining({ status: 'APPROVED' }),
+      before: expect.objectContaining({ status: 'APPROVED', amount: '150000' }),
+      after: expect.objectContaining({ status: 'VOID' }),
       ip: expect.any(String),
       createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
     });
     const times = all.map((row) => row.createdAt);
     expect(times).toEqual([...times].sort().reverse());
-    expect(all.map((row) => row.action)).toEqual(expect.arrayContaining(['LOGIN', 'CREATE', 'ATTACH', 'APPROVE']));
+    expect(all.map((row) => row.action)).toEqual(expect.arrayContaining(['LOGIN', 'CREATE', 'ATTACH', 'VOID']));
   });
 
   it('shows an entry nobody is attached to, such as a failed login', async () => {
@@ -87,18 +87,18 @@ describe('GET /audit-logs', () => {
 
   it('filters by record, user and action, alone and together', async () => {
     const world = await setupWorld(ctx);
-    const id = await approvedExpense(ctx, world);
+    const id = await voidedExpense(ctx, world);
     await call(ctx, world.admin, 'post', ACCOUNTS).send({ name: 'Kas Baru', type: 'CASH' }).expect(201);
 
     const history = await logs(ctx, world.admin, `&entityType=transaction&entityId=${id}`);
-    expect(history.map((row) => row.action)).toEqual(['APPROVE', 'ATTACH', 'CREATE']);
+    expect(history.map((row) => row.action)).toEqual(['VOID', 'ATTACH', 'CREATE']);
 
     const byStaff = await logs(ctx, world.admin, `&userId=${world.staff.user.id}`);
     expect(byStaff.length).toBeGreaterThan(0);
     expect(new Set(byStaff.map((row) => row.user?.id))).toEqual(new Set([world.staff.user.id]));
 
-    const approvals = await logs(ctx, world.admin, '&action=APPROVE');
-    expect(approvals.map((row) => row.entityId)).toEqual([id]);
+    const voids = await logs(ctx, world.admin, '&action=VOID');
+    expect(voids.map((row) => row.entityId)).toEqual([id]);
 
     const accounts = await logs(ctx, world.admin, '&entityType=account');
     expect(accounts.map((row) => [row.action, (row.after as { name: string }).name])).toEqual([['CREATE', 'Kas Baru']]);
@@ -135,7 +135,7 @@ describe('GET /audit-logs', () => {
 
   it('never shows a password, a token or where a file is stored', async () => {
     const world = await setupWorld(ctx);
-    await approvedExpense(ctx, world);
+    await voidedExpense(ctx, world);
     await call(ctx, world.staff, 'post', CHANGE_PASSWORD)
       .send({ currentPassword: 'password-123', newPassword: 'password-baru-456' })
       .expect(200);

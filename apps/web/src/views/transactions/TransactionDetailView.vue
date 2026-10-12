@@ -60,13 +60,7 @@ function show(latest: Transaction): void {
   transaction.value = latest
 }
 
-const actions = useTransactionActions({
-  onChanged: show,
-  refresh: async () => {
-    await reload()
-    return error.value ? null : transaction.value
-  },
-})
+const actions = useTransactionActions({ onChanged: show })
 
 function byWhom(person: { name: string }, at: string | null): string {
   return `${person.name} · ${formatDate(at)}`
@@ -82,20 +76,9 @@ const facts = computed(() => {
     { id: 'account', label: 'Akun', value: tx.account.name },
     { id: 'category', label: 'Kategori', value: tx.category.name },
     { id: 'created', label: 'Dicatat oleh', value: byWhom(tx.createdBy, tx.createdAt) },
-    tx.reviewedBy && {
-      id: 'reviewed',
-      label: 'Ditinjau oleh',
-      value: byWhom(tx.reviewedBy, tx.reviewedAt),
-    },
-    tx.rejectReason && { id: 'reject-reason', label: 'Alasan penolakan', value: tx.rejectReason },
     tx.voidedBy && { id: 'voided', label: 'Dibatalkan oleh', value: byWhom(tx.voidedBy, tx.voidedAt) },
     tx.voidReason && { id: 'void-reason', label: 'Alasan pembatalan', value: tx.voidReason },
   ].filter((fact) => fact !== null && fact !== '')
-})
-
-const needsProof = computed(() => {
-  const tx = transaction.value
-  return tx?.type === 'OUT' && tx.status === 'PENDING' && tx.attachments.length === 0
 })
 
 // Bukti tambahan.
@@ -144,40 +127,13 @@ function openForm(): void {
         <TransactionStatusTag :status="transaction.status" />
         <Button
           v-if="transaction.permissions.canEdit"
-          :label="transaction.status === 'REJECTED' ? 'Perbaiki dan ajukan lagi' : 'Ubah'"
+          label="Ubah"
           icon="pi pi-pencil"
           severity="secondary"
           :disabled="actions.busy.value"
           data-testid="edit-transaction"
           @click="openForm"
         />
-        <Button
-          v-if="transaction.permissions.canCancel"
-          label="Batalkan"
-          icon="pi pi-times"
-          severity="secondary"
-          :disabled="actions.busy.value"
-          data-testid="cancel-transaction"
-          @click="actions.cancel(transaction)"
-        />
-        <template v-if="transaction.permissions.canReview">
-          <Button
-            label="Tolak"
-            icon="pi pi-ban"
-            severity="danger"
-            variant="outlined"
-            :disabled="actions.busy.value"
-            data-testid="reject-transaction"
-            @click="actions.reject(transaction)"
-          />
-          <Button
-            label="Setujui"
-            icon="pi pi-check"
-            :disabled="actions.busy.value"
-            data-testid="approve-transaction"
-            @click="actions.approve(transaction)"
-          />
-        </template>
         <Button
           v-if="transaction.permissions.canVoid"
           label="Void"
@@ -246,9 +202,6 @@ function openForm(): void {
 
     <section class="flex flex-col gap-3">
       <h2 class="text-lg font-semibold">Bukti</h2>
-      <Message v-if="needsProof" severity="warn" :closable="false">
-        Pengeluaran ini belum punya bukti dan belum bisa disetujui.
-      </Message>
       <ProofList
         :attachments="transaction.attachments"
         :can-remove="transaction.permissions.canAttach"

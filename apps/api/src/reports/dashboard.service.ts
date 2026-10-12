@@ -16,7 +16,7 @@ import { resolvePeriod } from './report-period.js';
 
 const RECENT_COUNT = 10;
 
-/** Dashboard perusahaan: saldo saat ini, arus kas pada periode, dan yang perlu diperhatikan. */
+/** Dashboard: saldo saat ini dan arus kas pada periode. */
 @Injectable()
 export class DashboardService {
   constructor(
@@ -33,14 +33,13 @@ export class DashboardService {
     const period = resolvePeriod(query, todayInJakarta());
     const filter = { period, excludeTransfers: true };
 
-    const [accounts, totals, monthly, expenseByCategory, recent, pendingCount] =
+    const [accounts, totals, monthly, expenseByCategory, recent] =
       await Promise.all([
         this.accountsWithBalance(),
         this.report.totals(this.prisma, filter),
         this.report.monthly(this.prisma, period),
         this.report.expenseByCategory(this.prisma, filter),
         this.recentTransactions(user),
-        this.prisma.transaction.count({ where: { status: 'PENDING' } }),
       ]);
 
     return toCompanyDashboard({
@@ -50,7 +49,6 @@ export class DashboardService {
       monthly,
       expenseByCategory,
       recentTransactions: recent,
-      pendingCount,
     });
   }
 

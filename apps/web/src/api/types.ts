@@ -82,9 +82,6 @@ export interface Attachment {
 /** Yang boleh dilakukan pengguna saat ini pada sebuah transaksi; ditentukan oleh API. */
 export interface TransactionPermissions {
   canEdit: boolean
-  canCancel: boolean
-  /** Menyetujui atau menolak. */
-  canReview: boolean
   canVoid: boolean
   /** Menambah atau menghapus bukti. */
   canAttach: boolean
@@ -103,9 +100,6 @@ export interface Transaction {
   isTransfer: boolean
   transferGroupId: string | null
   createdBy: NamedRef
-  reviewedBy: NamedRef | null
-  reviewedAt: string | null
-  rejectReason: string | null
   voidedBy: NamedRef | null
   voidedAt: string | null
   voidReason: string | null
@@ -152,8 +146,6 @@ export interface CompanyDashboard {
   monthly: (Cashflow & { month: string })[]
   expenseByCategory: CategoryAmount[]
   recentTransactions: Transaction[]
-  /** Transaksi yang menunggu ditinjau, tanpa melihat periode. */
-  pendingCount: number
 }
 
 /** Satu catatan log audit. `before` dan `after` adalah keadaan data seperti disimpan API. */

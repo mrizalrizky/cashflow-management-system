@@ -58,7 +58,7 @@ export class AttachmentsService {
     await this.storage.save(storageKey, file.buffer);
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Dicek lagi di bawah kunci baris: status bisa berubah (mis. disetujui) selagi berkas diunggah.
+        // Dicek lagi di bawah kunci baris: status bisa berubah (mis. dibatalkan) selagi berkas diunggah.
         const transaction = await this.access.loadForUpdate(tx, actor, transactionId);
         this.assertCanChangeProof(actor, transaction);
         if (transaction.attachments.length >= MAX_ATTACHMENTS) {
@@ -129,10 +129,7 @@ export class AttachmentsService {
     return attachment;
   }
 
-  /**
-   * Mencatat perubahan bukti dan menandai transaksinya berubah, supaya peninjau yang
-   * membukanya sebelum ini tidak menyetujui bukti yang belum ia lihat.
-   */
+  /** Mencatat perubahan bukti dan menandai transaksinya berubah. */
   private async recordChange(
     tx: Prisma.TransactionClient,
     action: 'ATTACH' | 'DETACH',

@@ -14,9 +14,7 @@ const PERSON = { select: { id: true, name: true } } as const;
 export const TRANSACTION_INCLUDE = {
   account: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
-  // Peran pembuat dibutuhkan aturan peninjauan.
-  created_by: { select: { id: true, name: true, role: true } },
-  reviewed_by: PERSON,
+  created_by: PERSON,
   voided_by: PERSON,
   attachments: { orderBy: { created_at: 'asc' } },
 } satisfies Prisma.TransactionInclude;
@@ -50,9 +48,6 @@ export interface TransactionResponse {
   isTransfer: boolean;
   transferGroupId: string | null;
   createdBy: Named;
-  reviewedBy: Named | null;
-  reviewedAt: string | null;
-  rejectReason: string | null;
   voidedBy: Named | null;
   voidedAt: string | null;
   voidReason: string | null;
@@ -84,8 +79,6 @@ export function toAuditSnapshot(tx: TransactionWithRelations): Record<string, un
     account_id: tx.account_id,
     category_id: tx.category_id,
     transfer_group_id: tx.transfer_group_id,
-    reviewed_by_id: tx.reviewed_by_id,
-    reject_reason: tx.reject_reason,
     voided_by_id: tx.voided_by_id,
     void_reason: tx.void_reason,
     attachment_ids: tx.attachments.map((attachment) => attachment.id),
@@ -97,7 +90,6 @@ export function toPolicySubject(tx: TransactionWithRelations): PolicySubject {
   return {
     status: tx.status,
     createdById: tx.created_by_id,
-    creatorRole: tx.created_by.role,
     isTransfer: tx.transfer_group_id !== null,
   };
 }
@@ -117,10 +109,7 @@ export function toTransactionResponse(
     category: tx.category,
     isTransfer: tx.transfer_group_id !== null,
     transferGroupId: tx.transfer_group_id,
-    createdBy: { id: tx.created_by.id, name: tx.created_by.name },
-    reviewedBy: tx.reviewed_by,
-    reviewedAt: tx.reviewed_at?.toISOString() ?? null,
-    rejectReason: tx.reject_reason,
+    createdBy: tx.created_by,
     voidedBy: tx.voided_by,
     voidedAt: tx.voided_at?.toISOString() ?? null,
     voidReason: tx.void_reason,

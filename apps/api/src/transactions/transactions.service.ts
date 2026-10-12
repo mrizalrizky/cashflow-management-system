@@ -61,7 +61,7 @@ export class TransactionsService {
     return toTransactionResponse(await this.access.loadForUser(this.prisma, actor, id), actor);
   }
 
-  /** Transaksi baru selalu PENDING, siapa pun pembuatnya. */
+  /** Transaksi baru langsung tercatat dan dihitung. */
   async create(
     user: AuthUser,
     dto: CreateTransactionDto,
@@ -89,6 +89,7 @@ export class TransactionsService {
           description: dto.description,
           account_id: dto.accountId,
           category_id: dto.categoryId,
+          status: 'APPROVED',
           created_by_id: user.id,
         },
       });
@@ -105,10 +106,7 @@ export class TransactionsService {
     });
   }
 
-  /**
-   * Mengubah transaksi yang belum disetujui. Transaksi REJECTED yang diubah kembali menjadi
-   * PENDING (diajukan ulang), walau isinya tidak diubah.
-   */
+  /** Mengubah transaksi yang tercatat. Statusnya tetap APPROVED. */
   async update(
     user: AuthUser,
     id: string,
@@ -142,7 +140,7 @@ export class TransactionsService {
         },
       );
 
-      await this.workflow.transition(tx, { id }, before.status, {
+      await this.workflow.transition(tx, { id }, 'APPROVED', {
         type: dto.type,
         amount: dto.amount === undefined ? undefined : toMoney(dto.amount),
         transaction_date:
@@ -150,16 +148,12 @@ export class TransactionsService {
         description: dto.description,
         account_id: dto.accountId,
         category_id: dto.categoryId,
-        status: 'PENDING',
-        reviewed_by_id: null,
-        reviewed_at: null,
-        reject_reason: null,
       });
 
       const after = await this.access.loadForUser(tx, actor, id);
       await this.audit.log(tx, {
         userId: user.id,
-        action: before.status === 'REJECTED' ? 'RESUBMIT' : 'UPDATE',
+        action: 'UPDATE',
         entityType: TRANSACTION_ENTITY,
         entityId: id,
         before: toAuditSnapshot(before),

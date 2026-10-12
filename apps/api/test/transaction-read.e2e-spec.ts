@@ -87,8 +87,8 @@ describe('GET /transactions: who sees what', () => {
       (await list(ctx, world.staff)).map((row) => [row.description, row.permissions]),
     );
 
-    expect(forAdmin['staf satu']).toMatchObject({ canReview: true });
-    expect(forStaff['staf satu']).toMatchObject({ canReview: false, canEdit: true });
+    expect(forAdmin['staf satu']).toMatchObject({ canEdit: true, canVoid: true });
+    expect(forStaff['staf satu']).toMatchObject({ canEdit: true, canAttach: true });
   });
 
   it('shows no balance or other account detail to anyone', async () => {
@@ -114,7 +114,7 @@ describe('GET /transactions: filters, order and paging', () => {
     await record(ctx, world.admin, expenseBody(world, { transactionDate: '2026-09-01', description: 'semen 100% asli' }));
     await record(ctx, world.admin, expenseBody(world, { transactionDate: '2026-09-15', description: 'upah tukang', categoryId: otherCategory.id }));
     await record(ctx, world.admin, incomeBody(world, { transactionDate: '2026-09-30', description: 'pendapatan lain', accountId: otherAccount.id }));
-    await ctx.prisma.transaction.updateMany({ where: { description: 'upah tukang' }, data: { status: 'APPROVED' } });
+    await ctx.prisma.transaction.updateMany({ where: { description: 'upah tukang' }, data: { status: 'VOID' } });
 
     const found = async (query: string) => descriptions(await list(ctx, world.admin, query));
 
@@ -122,7 +122,8 @@ describe('GET /transactions: filters, order and paging', () => {
     expect(await found('dateTo=2026-09-15')).toEqual(['semen 100% asli', 'upah tukang']);
     expect(await found('dateFrom=2026-09-01&dateTo=2026-09-01')).toEqual(['semen 100% asli']);
     expect(await found('type=IN')).toEqual(['pendapatan lain']);
-    expect(await found('status=APPROVED')).toEqual(['upah tukang']);
+    expect(await found('status=VOID')).toEqual(['upah tukang']);
+    expect(await found('status=APPROVED')).toEqual(['pendapatan lain', 'semen 100% asli']);
     expect(await found(`accountId=${otherAccount.id}`)).toEqual(['pendapatan lain']);
     expect(await found(`categoryId=${otherCategory.id}`)).toEqual(['upah tukang']);
     expect(await found('search=TUKANG')).toEqual(['upah tukang']);

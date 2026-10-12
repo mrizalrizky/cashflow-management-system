@@ -18,12 +18,6 @@ export function notAllowed(action: string): ForbiddenException {
   return new ForbiddenException(`Anda tidak boleh ${action} transaksi ini`);
 }
 
-export function changedSinceSeen(): ConflictException {
-  return new ConflictException(
-    'Transaksi berubah sejak Anda membukanya. Periksa lagi sebelum memproses.',
-  );
-}
-
 /** Sebuah tindakan pada transaksi, dengan kata-kata untuk pesan penolakannya. */
 export interface GuardedAction {
   permission: keyof TransactionPermissions;
@@ -50,16 +44,3 @@ export function assertPermitted(
     : wrongStatus(action.verb);
 }
 
-/**
- * Peninjau memutuskan berdasarkan apa yang ia lihat. Bila ia menyertakan versi yang dilihatnya
- * (`updatedAt`) dan transaksi atau buktinya sudah berubah sesudah itu, keputusannya ditolak.
- */
-export function assertSeenVersion(
-  transaction: TransactionWithRelations,
-  expectedUpdatedAt: string | undefined,
-): void {
-  if (expectedUpdatedAt === undefined) return;
-  if (new Date(expectedUpdatedAt).getTime() !== transaction.updated_at.getTime()) {
-    throw changedSinceSeen();
-  }
-}

@@ -17,9 +17,13 @@ import { FinanceSummaryService } from '../finance-summary.service.js';
 import type { FinanceSummary } from '../finance-summary.js';
 import { toWishlistAnswers, toWishlistItemResponse, toWishlistSnapshot, WishlistItemResponse } from '../wishlist.mapper.js';
 import { WISHLIST_ENTITY, wishlistItemNotFound } from '../wishlist.service.js';
-import { AI_MESSAGES, AiMessages, AiResponse, AiTimeoutError } from './ai-messages.js';
+import { AI_MESSAGES, AiConfigError, AiMessages, AiResponse, AiTimeoutError } from './ai-messages.js';
 import { parseReviewOutput, ReviewOutput } from './review-output.js';
 import { buildReviewMessage, REVIEW_SCHEMA, REVIEW_SYSTEM_PROMPT } from './review-prompt.js';
+
+function sameAnswers(a: WishlistItem, b: WishlistItem): boolean {
+  return JSON.stringify(toWishlistAnswers(a)) === JSON.stringify(toWishlistAnswers(b));
+}
 
 /**
  * "Minta pendapat AI". Penilaian yang gagal tidak mengubah barang, tidak ditulis ke log audit,
@@ -39,6 +43,8 @@ export class AiReviewService {
     if (!this.ai || !this.config.get<string>('ANTHROPIC_API_KEY')) {
       throw new ServiceUnavailableException('Penilaian AI belum diaktifkan di server.');
     }
+    // Penilaian dianggap dibuat saat jawabannya dibaca; perubahan selama AI berpikir lebih baru darinya.
+    const readAt = new Date();
     const item = await this.prisma.wishlistItem.findUnique({ where: { id } });
     if (!item) throw wishlistItemNotFound();
 
@@ -54,6 +60,8 @@ export class AiReviewService {
     const { output, model } = await this.ask(this.ai, item, finance);
 
     return this.prisma.$transaction(async (tx) => {
+      const current = await tx.wishlistItem.findUnique({ where: { id } });
+      if (!current) throw wishlistItemNotFound();
       const saved = await tx.wishlistItem.update({
         where: { id },
         data: {
@@ -61,7 +69,9 @@ export class AiReviewService {
           ai_reasons: output.reasons,
           ai_suggestion: output.suggestion,
           ai_finance_snapshot: finance === null ? Prisma.DbNull : (finance as unknown as Prisma.InputJsonObject),
-          ai_reviewed_at: new Date(),
+          ai_reviewed_at: readAt,
+          // Jawaban berubah selagi AI berpikir (juga untuk penilaian pertama): tandai penilaian ini usang.
+          answers_changed_at: sameAnswers(item, current) ? undefined : new Date(),
           ai_model: model,
         },
       });
@@ -70,7 +80,7 @@ export class AiReviewService {
         action: 'AI_REVIEW',
         entityType: WISHLIST_ENTITY,
         entityId: id,
-        before: toWishlistSnapshot(item),
+        before: toWishlistSnapshot(current),
         after: toWishlistSnapshot(saved),
         ip,
       });
@@ -93,6 +103,11 @@ export class AiReviewService {
     } catch (error) {
       if (error instanceof AiTimeoutError) {
         throw new GatewayTimeoutException('AI tidak menjawab dalam 60 detik. Coba lagi.');
+      }
+      if (error instanceof AiConfigError) {
+        throw new ServiceUnavailableException(
+          'Kunci AI di server ditolak atau tidak punya akses ke model. Periksa ANTHROPIC_API_KEY.',
+        );
       }
       throw new BadGatewayException('Layanan AI sedang bermasalah. Coba lagi nanti.');
     }

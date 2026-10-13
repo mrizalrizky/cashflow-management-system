@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { startOfJakartaDay, todayInJakarta } from '../src/common/calendar-date.js';
 import type { PrismaClient } from '../src/generated/prisma/client.js';
-import { AI_MESSAGES, AiTimeoutError, AiUnavailableError } from '../src/wishlist/ai/ai-messages.js';
+import { AI_MESSAGES, AiConfigError, AiTimeoutError, AiUnavailableError } from '../src/wishlist/ai/ai-messages.js';
 import { createTestApp, TestApp } from './app-factory.js';
 import { FakeAi } from './fake-ai.js';
 import {
@@ -159,6 +159,12 @@ describe('POST /wishlist/:id/review', () => {
 
   it.each([
     ['a timeout', (f: FakeAi) => f.fail(new AiTimeoutError()), 504, 'AI tidak menjawab dalam 60 detik. Coba lagi.'],
+    [
+      'a key the API refuses',
+      (f: FakeAi) => f.fail(new AiConfigError()),
+      503,
+      'Kunci AI di server ditolak atau tidak punya akses ke model. Periksa ANTHROPIC_API_KEY.',
+    ],
     ['an API error', (f: FakeAi) => f.fail(new AiUnavailableError('overloaded')), 502, 'Layanan AI sedang bermasalah. Coba lagi nanti.'],
     [
       'a refusal',
@@ -193,6 +199,32 @@ describe('POST /wishlist/:id/review', () => {
     fake.answer(GOOD).answer(GOOD);
     await review(item.id).expect(200);
     await review(item.id).expect(200);
+  });
+
+  it('marks a first review as outdated when an answer changed while the AI was thinking', async () => {
+    const item = await createWishlistItem(prisma, { reason: 'Alasan lama' });
+    fake.answerAfter(() => prisma.wishlistItem.update({ where: { id: item.id }, data: { reason: 'Alasan baru' } }), GOOD);
+
+    const res = await review(item.id).expect(200);
+    expect(res.body.reason).toBe('Alasan baru');
+    expect(res.body.review.answersChanged).toBe(true);
+  });
+
+  it('keeps a later review marked outdated when the owner edits during the call', async () => {
+    const item = await createWishlistItem(prisma, { ...REVIEWED });
+    fake.answerAfter(
+      () =>
+        request(app.getHttpServer())
+          .patch(`${WISHLIST}/${item.id}`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ price: '99000' })
+          .expect(200),
+      GOOD,
+    );
+
+    const res = await review(item.id).expect(200);
+    expect(res.body.price).toBe('99000');
+    expect(res.body.review.answersChanged).toBe(true);
   });
 
   it('answers 404 for an unknown item without calling the AI', async () => {

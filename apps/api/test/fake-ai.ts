@@ -10,6 +10,15 @@ export class FakeAi implements AiMessages {
     return this;
   }
 
+  /** Menjalankan `during` selagi "AI berpikir", lalu menjawab; mis. pemilik mengubah barang di tab lain. */
+  answerAfter(during: () => Promise<unknown>, output: unknown, model = 'claude-opus-5-5'): this {
+    this.next.push(async () => {
+      await during();
+      return { stopReason: 'end_turn', text: JSON.stringify(output), model };
+    });
+    return this;
+  }
+
   raw(response: AiResponse): this {
     this.next.push(async () => response);
     return this;

@@ -8,7 +8,6 @@ const SESSION = { accessToken: 'token-baru', user: { id: 'u1' } }
 const QUIET = {
   onExpired: () => undefined,
   onRefreshed: () => undefined,
-  onForbidden: () => undefined,
 }
 
 function json(status: number, body: unknown): Response {
@@ -278,34 +277,6 @@ describe('http client', () => {
     })
   })
 
-  describe('forbidden responses', () => {
-    const forbidden = () => json(403, { statusCode: 403, message: 'Anda tidak memiliki akses' })
-
-    it('tells the session listener about a 403 and still rejects with it', async () => {
-      const onForbidden = vi.fn<() => void>()
-      http.bindSessionEvents({ ...QUIET, onForbidden })
-      http.setAccessToken('token-1')
-      respond(forbidden)
-
-      await expect(http.request('/users')).rejects.toMatchObject({ statusCode: 403 })
-
-      expect(onForbidden).toHaveBeenCalledTimes(1)
-      expect(refreshCalls()).toBe(0)
-    })
-
-    it('says nothing for a 403 on an unauthenticated request', async () => {
-      const onForbidden = vi.fn<() => void>()
-      http.bindSessionEvents({ ...QUIET, onForbidden })
-      respond(forbidden)
-
-      await expect(http.request('/auth/login', { method: 'POST', body: {}, auth: false })).rejects.toMatchObject({
-        statusCode: 403,
-      })
-
-      expect(onForbidden).not.toHaveBeenCalled()
-    })
-  })
-
   describe('refreshSession', () => {
     it('returns the session and stores its token', async () => {
       respond((url) => (url.endsWith('/auth/refresh') ? json(200, SESSION) : json(200, {})))
@@ -380,18 +351,16 @@ describe('http client', () => {
       expect(refreshCalls()).toBe(1)
     })
 
-    it('reports a refused download with the API message, and a 403 to the session listener', async () => {
-      const onForbidden = vi.fn<() => void>()
-      http.bindSessionEvents({ ...QUIET, onForbidden })
+    it('reports a refused download with the API message', async () => {
+      http.bindSessionEvents(QUIET)
       respond(() => json(404, { statusCode: 404, message: 'Bukti tidak ditemukan' }))
 
       const missing = await failureOf(http.requestBlob('/attachments/a1/download'))
       expect(missing).toMatchObject({ statusCode: 404, message: 'Bukti tidak ditemukan' })
-      expect(onForbidden).not.toHaveBeenCalled()
 
       respond(() => json(403, { statusCode: 403, message: 'Anda tidak memiliki akses' }))
-      await failureOf(http.requestBlob('/attachments/a1/download'))
-      expect(onForbidden).toHaveBeenCalledTimes(1)
+      const forbidden = await failureOf(http.requestBlob('/attachments/a1/download'))
+      expect(forbidden).toMatchObject({ statusCode: 403 })
     })
   })
 

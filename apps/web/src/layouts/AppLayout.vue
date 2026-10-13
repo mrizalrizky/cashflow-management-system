@@ -1,22 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import SideNav from '@/components/SideNav.vue'
 import { useLogout } from '@/composables/useLogout'
 import { APP_NAME } from '@/lib/app'
-import { roleLabel } from '@/lib/labels'
-import { menuFor } from '@/router/navigation'
-import { PATHS } from '@/router/paths'
+import { menu as menuItems } from '@/router/navigation'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
-const router = useRouter()
 const logout = useLogout()
 
 const drawerOpen = ref(false)
-const menu = computed(() => (session.role ? menuFor(session.role) : []))
+const menu = computed(() => (session.user ? menuItems() : []))
 </script>
 
 <template>
@@ -51,20 +47,8 @@ const menu = computed(() => (session.role ? menuFor(session.role) : []))
           data-testid="menu-toggle"
           @click="drawerOpen = true"
         />
-        <div v-if="session.user" class="ml-auto min-w-0 text-right leading-tight">
-          <p class="truncate text-sm font-medium">{{ session.user.name }}</p>
-          <p class="truncate text-xs text-surface-500">{{ roleLabel(session.user.role) }}</p>
-        </div>
         <Button
-          icon="pi pi-key"
-          severity="secondary"
-          variant="text"
-          aria-label="Ganti password"
-          title="Ganti password"
-          data-testid="change-password"
-          @click="router.push(PATHS.changePassword)"
-        />
-        <Button
+          class="ml-auto"
           icon="pi pi-sign-out"
           severity="secondary"
           variant="text"

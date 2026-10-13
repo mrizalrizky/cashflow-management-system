@@ -4,31 +4,29 @@ import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
 import * as auditApi from '@/api/audit-logs'
 import { ApiError } from '@/api/http'
-import type { AuditLog, Role, User } from '@/api/types'
-import * as usersApi from '@/api/users'
+import type { AuditLog } from '@/api/types'
 import DateField from '@/components/DateField.vue'
-import { menuFor } from '@/router/navigation'
+import { menu } from '@/router/navigation'
 import { routes } from '@/router/routes'
 import { freshPinia, mountView } from '@/test/mount'
-import { signInAs } from '@/test/session'
+import { signIn } from '@/test/session'
 import { pageOf } from '@/test/transactions'
 import AuditLogView from '../AuditLogView.vue'
 
 vi.mock('@/api/audit-logs')
-vi.mock('@/api/users')
 
 const TX_ID = '11111111-2222-4333-8444-555555555555'
 const DEWI = { id: 'u-dewi', name: 'Dewi' }
 
 function makeLog(overrides: Partial<AuditLog> = {}): AuditLog {
   return {
-    id: 'l-approve',
-    action: 'APPROVE',
+    id: 'l-void',
+    action: 'VOID',
     entityType: 'transaction',
     entityId: TX_ID,
     user: DEWI,
-    before: { status: 'PENDING', amount: '150000', reviewed_by_id: null },
-    after: { status: 'APPROVED', amount: '150000', reviewed_by_id: 'u-dewi' },
+    before: { status: 'APPROVED', amount: '150000', void_reason: null },
+    after: { status: 'VOID', amount: '150000', void_reason: 'Nota ganda' },
     ip: '10.0.0.7',
     createdAt: '2026-10-06T03:05:00.000Z',
     ...overrides,
@@ -55,19 +53,6 @@ const NEW_ACCOUNT = makeLog({
   after: { name: 'Kas Kecil', opening_balance: '500000', is_active: true },
 })
 
-function user(id: string, name: string): User {
-  return {
-    id,
-    name,
-    email: `${id}@example.com`,
-    role: 'STAFF',
-    isActive: true,
-    mustChangePassword: false,
-    createdAt: '2026-10-06T03:00:00.000Z',
-    updatedAt: '2026-10-06T03:00:00.000Z',
-  }
-}
-
 const listLogs = vi.mocked(auditApi.listAuditLogs)
 
 function lastParams() {
@@ -85,10 +70,9 @@ async function choose(wrapper: VueWrapper, label: string, value: string | null):
   await flushPromises()
 }
 
-async function mountLog(logs: AuditLog[] = [APPROVE, FAILED_LOGIN, NEW_ACCOUNT], path = '/audit-log') {
-  signInAs('SUPER_ADMIN')
+async function mountLog(logs: AuditLog[] = [APPROVE, FAILED_LOGIN, NEW_ACCOUNT], path = '/pengaturan/audit-log') {
+  signIn()
   listLogs.mockResolvedValue(pageOf(logs))
-  vi.mocked(usersApi.listUsers).mockResolvedValue(pageOf([user('u-dewi', 'Dewi'), user('u-sari', 'Sari')]))
   return mountView(AuditLogView, { path, withOverlays: true })
 }
 
@@ -104,24 +88,13 @@ beforeEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('audit log route and menu', () => {
-  it('is for the admin only', async () => {
-    const route = routes.find((r) => r.path === '/audit-log')!
+describe('audit log route', () => {
+  it('lives under the settings, not in the main menu', async () => {
+    const route = routes.find((r) => r.path === '/pengaturan/audit-log')!
     const loaded = await (route.component as () => Promise<{ default: unknown }>)()
 
     expect(loaded.default).toBe(AuditLogView)
-    expect(route.meta?.roles).toEqual(['SUPER_ADMIN'])
-  })
-
-  it.each<[Role, boolean]>([
-    ['SUPER_ADMIN', true],
-    ['PROJECT_MANAGER', false],
-    ['STAFF', false],
-  ])('appears in the menu of %s: %s', (role, expected) => {
-    const labels = menuFor(role).map((item) => item.label)
-
-    // Untuk admin, di urutan terakhir; untuk peran lain, tidak ada.
-    expect(labels.indexOf('Audit log')).toBe(expected ? labels.length - 1 : -1)
+    expect(menu().map((item) => item.label)).not.toContain('Audit log')
   })
 })
 
@@ -132,12 +105,10 @@ describe('AuditLogView', () => {
     expect(wrapper.get('h1').text()).toBe('Audit log')
     const rows = wrapper.findAll('tbody tr').map((row) => row.text())
     expect(rows[0]).toContain('06 Okt 2026 10.05')
-    expect(rows[0]).toContain('Dewi')
-    expect(rows[0]).toContain('Menyetujui')
+    expect(rows[0]).toContain('Void')
     expect(rows[0]).toContain('Transaksi')
     expect(rows[0]).toContain('11111111')
     expect(rows[0]).toContain('10.0.0.7')
-    expect(rows[1]).toContain('Tidak dikenal')
     expect(rows[1]).toContain('Gagal masuk')
     expect(rows[2]).toContain('Membuat')
     expect(rows[2]).toContain('Akun')
@@ -158,7 +129,7 @@ describe('AuditLogView', () => {
     expect(row).toContain('invoice')
   })
 
-  it('filters by record type, action and user, starting again from page 1', async () => {
+  it('filters by record type and action, starting again from page 1', async () => {
     const { wrapper } = await mountLog()
     wrapper.findComponent(DataTable).vm.$emit('page', { page: 2, rows: 50 })
     await flushPromises()
@@ -166,14 +137,10 @@ describe('AuditLogView', () => {
 
     await choose(wrapper, 'Jenis data', 'transaction')
     expect(lastParams()).toMatchObject({ entityType: 'transaction', page: 1 })
-    await choose(wrapper, 'Tindakan', 'APPROVE')
-    await choose(wrapper, 'Pengguna', 'u-sari')
+    await choose(wrapper, 'Tindakan', 'VOID')
 
-    expect(lastParams()).toMatchObject({ entityType: 'transaction', action: 'APPROVE', userId: 'u-sari' })
-    expect((select(wrapper, 'Pengguna').props('options') as { label: string }[]).map((o) => o.label)).toEqual([
-      'Dewi',
-      'Sari',
-    ])
+    expect(lastParams()).toMatchObject({ entityType: 'transaction', action: 'VOID' })
+    expect(() => select(wrapper, 'Pengguna')).toThrow('Tidak ada pilihan berlabel Pengguna')
   })
 
   it('filters by a date range, and does not send one that runs backwards', async () => {
@@ -194,7 +161,7 @@ describe('AuditLogView', () => {
 
   it('clears every filter with Reset', async () => {
     const { wrapper } = await mountLog()
-    await choose(wrapper, 'Tindakan', 'APPROVE')
+    await choose(wrapper, 'Tindakan', 'VOID')
     wrapper.findAllComponents(DateField)[0]!.vm.$emit('update:modelValue', '2026-10-01')
     await flushPromises()
 
@@ -209,20 +176,20 @@ describe('AuditLogView', () => {
   it('tells an empty log apart from filters that match nothing, and offers a retry on failure', async () => {
     const { wrapper } = await mountLog([])
     expect(wrapper.text()).toContain('Belum ada catatan')
-    await choose(wrapper, 'Tindakan', 'VOID')
+    await choose(wrapper, 'Tindakan', 'CREATE')
     expect(wrapper.text()).toContain('Tidak ada catatan yang cocok')
 
     listLogs.mockRejectedValueOnce(new ApiError(500, 'Terjadi kesalahan pada server'))
-    await choose(wrapper, 'Tindakan', 'APPROVE')
+    await choose(wrapper, 'Tindakan', 'VOID')
     expect(wrapper.text()).toContain('Terjadi kesalahan pada server')
     listLogs.mockResolvedValue(pageOf([APPROVE]))
     await wrapper.get('[data-testid="retry"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('Menyetujui')
+    expect(wrapper.text()).toContain('Void')
   })
 
   it('opens on the history of one record when the address names it', async () => {
-    const { wrapper } = await mountLog([APPROVE], `/audit-log?entityType=transaction&entityId=${TX_ID}`)
+    const { wrapper } = await mountLog([APPROVE], `/pengaturan/audit-log?entityType=transaction&entityId=${TX_ID}`)
 
     expect(listLogs).toHaveBeenCalledTimes(1)
     expect(lastParams()).toMatchObject({ entityType: 'transaction', entityId: TX_ID, page: 1 })
@@ -238,9 +205,9 @@ describe('AuditLogView', () => {
   })
 
   it.each([
-    ['a record type that is not a simple word', '/audit-log?entityType=DROP%20TABLE&entityId=x'],
-    ['a record id that is far too long', `/audit-log?entityId=${'x'.repeat(101)}`],
-    ['repeated values', '/audit-log?entityId=a&entityId=b'],
+    ['a record type that is not a simple word', '/pengaturan/audit-log?entityType=DROP%20TABLE&entityId=x'],
+    ['a record id that is far too long', `/pengaturan/audit-log?entityId=${'x'.repeat(101)}`],
+    ['repeated values', '/pengaturan/audit-log?entityId=a&entityId=b'],
   ])('ignores %s in the address', async (_label, path) => {
     const { wrapper } = await mountLog([APPROVE], path)
 
@@ -253,24 +220,24 @@ describe('AuditLogView', () => {
 describe('AuditLogDetailDialog', () => {
   it('shows the entry and what changed, before and after', async () => {
     const { wrapper } = await mountLog()
-    await openDetail(wrapper, 'l-approve')
+    await openDetail(wrapper, 'l-void')
 
     const dialog = wrapper.get('[role="dialog"]')
     expect(dialog.text()).toContain('06 Okt 2026 10.05')
     expect(dialog.text()).toContain('Dewi')
-    expect(dialog.text()).toContain('Menyetujui')
+    expect(dialog.text()).toContain('Void')
     expect(dialog.text()).toContain(TX_ID)
     expect(dialog.text()).toContain('10.0.0.7')
     const changes = dialog.findAll('[data-testid="change-row"]').map((row) => row.findAll('td').map((td) => td.text()))
     expect(changes).toEqual([
-      ['reviewed_by_id', '-', 'u-dewi'],
-      ['status', 'PENDING', 'APPROVED'],
+      ['status', 'APPROVED', 'VOID'],
+      ['void_reason', '-', 'Nota ganda'],
     ])
   })
 
   it('links a transaction entry to the transaction, and nothing else', async () => {
     const { wrapper } = await mountLog()
-    await openDetail(wrapper, 'l-approve')
+    await openDetail(wrapper, 'l-void')
     expect(wrapper.get('[role="dialog"] a').attributes('href')).toBe(`/transaksi/${TX_ID}`)
 
     wrapper.findComponent({ name: 'Dialog' }).vm.$emit('update:visible', false)
@@ -322,7 +289,7 @@ describe('AuditLogDetailDialog', () => {
         after: { description: hostile, note: 'x'.repeat(5000), filters: { status: 'PENDING' } },
       }),
     ])
-    await openDetail(wrapper, 'l-approve')
+    await openDetail(wrapper, 'l-void')
 
     const dialog = wrapper.get('[role="dialog"]')
     expect(dialog.text()).toContain(hostile)

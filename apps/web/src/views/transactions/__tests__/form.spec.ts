@@ -7,12 +7,12 @@ import * as attachmentsApi from '@/api/attachments'
 import * as categoriesApi from '@/api/categories'
 import { ApiError } from '@/api/http'
 import * as transactionsApi from '@/api/transactions'
-import type { Role, Transaction } from '@/api/types'
+import type { Transaction } from '@/api/types'
 import DateField from '@/components/DateField.vue'
 import ProofPicker from '@/components/ProofPicker.vue'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
-import { signInAs } from '@/test/session'
+import { signIn } from '@/test/session'
 import {
   BANK,
   KAS,
@@ -37,8 +37,8 @@ const CREATED = makeTransaction({ id: 't-baru' })
 const onSaved = vi.fn<(tx: Transaction) => void>()
 const onVisible = vi.fn<(visible: boolean) => void>()
 
-async function mountForm(role: Role, transaction: Transaction | null = null, withOverlays = true) {
-  signInAs(role)
+async function mountForm(transaction: Transaction | null = null, withOverlays = true) {
+  signIn()
   const options = useTransactionOptions()
   await flushPromises()
   return mountView(TransactionFormDialog, {
@@ -91,7 +91,7 @@ beforeEach(() => {
 
 describe('TransactionFormDialog: recording', () => {
   it('saves an expense without proof straight away, without asking', async () => {
-    const { wrapper } = await mountForm('SUPER_ADMIN')
+    const { wrapper } = await mountForm()
     await fillExpense(wrapper)
     await submitForm(wrapper)
 
@@ -101,12 +101,12 @@ describe('TransactionFormDialog: recording', () => {
   })
 
   it('has no project field', async () => {
-    const { wrapper } = await mountForm('SUPER_ADMIN')
+    const { wrapper } = await mountForm()
     expect(() => select(wrapper, 'tx-project')).toThrow('Tidak ada pilihan tx-project')
   })
 
   it('starts as an expense dated today, and asks for everything else', async () => {
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     expect(wrapper.text()).toContain('Catat transaksi')
     expect(select(wrapper, 'tx-type').props('modelValue')).toBe('OUT')
     expect(wrapper.findComponent(DateField).props('modelValue')).toBe('2026-10-07')
@@ -121,7 +121,7 @@ describe('TransactionFormDialog: recording', () => {
   })
 
   it('refuses a zero amount, an amount over 13 digits, and a date in the future', async () => {
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     await fillExpense(wrapper)
 
     await fill(wrapper, '#tx-amount', '0')
@@ -140,7 +140,7 @@ describe('TransactionFormDialog: recording', () => {
   })
 
   it('offers accounts by name only, and categories of the chosen type', async () => {
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     expect(optionLabels(wrapper, 'tx-account')).toEqual(['Kas Kecil', 'Bank Utama'])
     expect(optionLabels(wrapper, 'tx-category')).toEqual(['Material', 'Upah Tukang'])
 
@@ -152,7 +152,7 @@ describe('TransactionFormDialog: recording', () => {
   })
 
   it('creates the transaction, uploads its proof, closes and reports', async () => {
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     await fillExpense(wrapper)
     await pickProof(wrapper, [NOTA])
 
@@ -175,7 +175,7 @@ describe('TransactionFormDialog: recording', () => {
   it('sends nothing more while a save is in flight', async () => {
     let finish!: (tx: Transaction) => void
     vi.mocked(transactionsApi.createTransaction).mockReturnValue(new Promise((resolve) => (finish = resolve)))
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     await fillExpense(wrapper)
     await pickProof(wrapper, [NOTA])
 
@@ -192,7 +192,7 @@ describe('TransactionFormDialog: recording', () => {
 
   it('cannot be closed while a save is in flight', async () => {
     vi.mocked(transactionsApi.createTransaction).mockReturnValue(new Promise(() => undefined))
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     const cancel = () => wrapper.findAll('button').find((b) => b.text() === 'Batal')!
     expect(wrapper.findComponent(Dialog).props()).toMatchObject({ closable: true, closeOnEscape: true })
     expect(cancel().attributes('disabled')).toBeUndefined()
@@ -208,7 +208,7 @@ describe('TransactionFormDialog: recording', () => {
   it('uploads the proof that was chosen when Simpan was pressed, whatever happens to the form meanwhile', async () => {
     let finish!: (tx: Transaction) => void
     vi.mocked(transactionsApi.createTransaction).mockReturnValue(new Promise((resolve) => (finish = resolve)))
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     await fillExpense(wrapper)
     await pickProof(wrapper, [NOTA])
 
@@ -222,7 +222,7 @@ describe('TransactionFormDialog: recording', () => {
 
   it('says so when its choices cannot be loaded, and can load them again', async () => {
     vi.mocked(accountsApi.listAccountOptions).mockRejectedValueOnce(new ApiError(0, 'Tidak dapat terhubung ke server'))
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     expect(wrapper.get('form').text()).toContain('Pilihan gagal dimuat: Tidak dapat terhubung ke server')
     expect(optionLabels(wrapper, 'tx-account')).toEqual([])
 
@@ -238,7 +238,7 @@ describe('TransactionFormDialog: recording', () => {
     vi.mocked(attachmentsApi.uploadAttachment).mockReturnValue(
       new Promise((resolve) => (finishUpload = () => resolve(makeAttachment()))),
     )
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     await fillExpense(wrapper)
     await pickProof(wrapper, [NOTA])
 
@@ -256,7 +256,7 @@ describe('TransactionFormDialog: recording', () => {
 
   it('takes the user to the saved transaction when a proof fails to upload', async () => {
     vi.mocked(attachmentsApi.uploadAttachment).mockRejectedValue(new ApiError(400, 'Jenis berkas tidak didukung'))
-    const { wrapper, router } = await mountForm('STAFF')
+    const { wrapper, router } = await mountForm()
     await fillExpense(wrapper)
     await pickProof(wrapper, [NOTA])
 
@@ -274,7 +274,7 @@ describe('TransactionFormDialog: recording', () => {
     vi.mocked(transactionsApi.createTransaction).mockRejectedValue(
       new ApiError(400, 'Validasi gagal', [{ field: 'accountId', messages: ['Akun sudah tidak aktif'] }]),
     )
-    const { wrapper } = await mountForm('STAFF')
+    const { wrapper } = await mountForm()
     await fillExpense(wrapper)
     await pickProof(wrapper, [NOTA])
 
@@ -292,7 +292,7 @@ describe('TransactionFormDialog: editing', () => {
   const RECORDED = makeTransaction({ permissions: { canEdit: true } })
 
   it('pre-fills every field and has no proof picker', async () => {
-    const { wrapper } = await mountForm('STAFF', RECORDED)
+    const { wrapper } = await mountForm(RECORDED)
 
     expect(wrapper.text()).toContain('Ubah transaksi')
     expect(select(wrapper, 'tx-type').props('modelValue')).toBe('OUT')
@@ -307,7 +307,7 @@ describe('TransactionFormDialog: editing', () => {
   it('sends only what changed', async () => {
     const saved = makeTransaction({ amount: '90000' })
     vi.mocked(transactionsApi.updateTransaction).mockResolvedValue(saved)
-    const { wrapper } = await mountForm('STAFF', RECORDED)
+    const { wrapper } = await mountForm(RECORDED)
 
     await fill(wrapper, '#tx-amount', '90000')
     await submitForm(wrapper)
@@ -320,7 +320,7 @@ describe('TransactionFormDialog: editing', () => {
   })
 
   it('closes without a request when nothing was changed', async () => {
-    const { wrapper } = await mountForm('STAFF', RECORDED)
+    const { wrapper } = await mountForm(RECORDED)
 
     await submitForm(wrapper)
 
@@ -335,7 +335,7 @@ describe('TransactionFormDialog: editing', () => {
       category: { id: 'c-lama', name: 'Bahan Lama' },
       permissions: { canEdit: true },
     })
-    const { wrapper } = await mountForm('STAFF', old)
+    const { wrapper } = await mountForm(old)
 
     expect(optionLabels(wrapper, 'tx-account')).toContain('Kas Lama')
     expect(optionLabels(wrapper, 'tx-category')).toContain('Bahan Lama')
@@ -344,7 +344,7 @@ describe('TransactionFormDialog: editing', () => {
   it('starts clean when reopened after an error', async () => {
     vi.mocked(transactionsApi.updateTransaction).mockRejectedValue(new ApiError(409, 'Transaksi tidak bisa diubah pada status ini'))
     // Tanpa Toast dan ConfirmDialog, supaya props dialognya bisa diubah langsung.
-    const { wrapper } = await mountForm('STAFF', RECORDED, false)
+    const { wrapper } = await mountForm(RECORDED, false)
     await fill(wrapper, '#tx-amount', '90000')
     await submitForm(wrapper)
     expect(wrapper.text()).toContain('Transaksi tidak bisa diubah pada status ini')

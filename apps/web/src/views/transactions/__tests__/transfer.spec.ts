@@ -5,11 +5,11 @@ import * as accountsApi from '@/api/accounts'
 import * as categoriesApi from '@/api/categories'
 import { ApiError } from '@/api/http'
 import * as transactionsApi from '@/api/transactions'
-import type { Role, Transaction } from '@/api/types'
+import type { Transaction } from '@/api/types'
 import DateField from '@/components/DateField.vue'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
-import { signInAs } from '@/test/session'
+import { signIn } from '@/test/session'
 import { BANK, KAS, makeTransaction, pageOf } from '@/test/transactions'
 import TransactionsView from '../TransactionsView.vue'
 import TransferDialog from '../TransferDialog.vue'
@@ -26,7 +26,7 @@ const onSaved = vi.fn<(legs: Transaction[]) => void>()
 const onVisible = vi.fn<(visible: boolean) => void>()
 
 async function mountTransfer() {
-  signInAs('SUPER_ADMIN')
+  signIn()
   const options = useTransactionOptions()
   await flushPromises()
   const { wrapper } = await mountView(TransferDialog, {
@@ -166,14 +166,14 @@ describe('TransferDialog', () => {
 })
 
 describe('TransactionsView: transfer', () => {
-  async function mountList(role: Role) {
-    signInAs(role)
+  async function mountList() {
+    signIn()
     vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf([makeTransaction()]))
     return mountView(TransactionsView, { path: '/transaksi', withOverlays: true })
   }
 
   it('opens the transfer dialog for an admin and reloads the list afterwards', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
 
     await wrapper.get('[data-testid="add-transfer"]').trigger('click')
     await flushPromises()
@@ -183,11 +183,5 @@ describe('TransactionsView: transfer', () => {
     wrapper.findComponent(TransferDialog).vm.$emit('saved', LEGS)
     await flushPromises()
     expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
-  })
-
-  it('is not part of the page for other roles', async () => {
-    const { wrapper } = await mountList('PROJECT_MANAGER')
-
-    expect(wrapper.findComponent(TransferDialog).exists()).toBe(false)
   })
 })

@@ -43,7 +43,7 @@ describe('useFormSubmit', () => {
       ),
     )
 
-    expect(await form.submit()).toEqual({ ok: false })
+    expect(await form.submit()).toMatchObject({ ok: false, error: expect.any(Error) })
 
     expect(form.fieldErrors.value).toEqual({ email: 'Format salah', name: 'Wajib' })
     expect(form.formError.value).toBeNull()

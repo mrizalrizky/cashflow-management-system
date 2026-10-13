@@ -1,41 +1,35 @@
 import type { RouteRecordRaw } from 'vue-router'
-import type { Role } from '@/api/types'
 import { PATHS, TRANSACTION_DETAIL_ROUTE } from './paths'
 
 declare module 'vue-router' {
   interface RouteMeta {
     /** Boleh dibuka tanpa login. */
     public?: boolean
-    /** Peran yang boleh membuka; tanpa ini semua peran boleh. */
-    roles?: Role[]
-    /** Tetap boleh dibuka selama user masih wajib ganti password. */
-    allowPendingPasswordChange?: boolean
     /** Kerangka halaman; bawaan `app`. */
     layout?: 'auth' | 'app'
     title?: string
   }
 }
 
-// Halaman yang dibangun pada fase berikutnya memakai tampilan sementara yang sama.
+// Hanya dilewati: guard selalu mengalihkan `/` ke dasbor.
 const placeholder = () => import('@/views/PlaceholderView.vue')
 
 export const routes: RouteRecordRaw[] = [
   {
     path: PATHS.login,
-    component: () => import('@/views/LoginView.vue'),
+    component: () => import('@/views/auth/PinLoginView.vue'),
     meta: { public: true, layout: 'auth', title: 'Masuk' },
   },
   {
-    path: PATHS.changePassword,
-    component: () => import('@/views/ChangePasswordView.vue'),
-    meta: { allowPendingPasswordChange: true, layout: 'auth', title: 'Ganti password' },
+    path: PATHS.setupPin,
+    component: () => import('@/views/auth/SetupPinView.vue'),
+    meta: { public: true, layout: 'auth', title: 'Buat PIN' },
   },
-  // Guard selalu mengalihkan `/` ke halaman awal sesuai peran.
   { path: PATHS.root, component: placeholder },
   {
     path: PATHS.dashboard,
     component: () => import('@/views/dashboard/DashboardView.vue'),
-    meta: { roles: ['SUPER_ADMIN'], title: 'Dashboard' },
+    meta: { title: 'Dashboard' },
   },
   {
     path: PATHS.transactions,
@@ -50,17 +44,17 @@ export const routes: RouteRecordRaw[] = [
   {
     path: PATHS.masterData,
     component: () => import('@/views/master-data/MasterDataView.vue'),
-    meta: { roles: ['SUPER_ADMIN'], title: 'Master data' },
+    meta: { title: 'Master data' },
   },
   {
-    path: PATHS.users,
-    component: () => import('@/views/users/UsersView.vue'),
-    meta: { roles: ['SUPER_ADMIN'], title: 'Pengguna' },
+    path: PATHS.settings,
+    component: () => import('@/views/settings/SettingsView.vue'),
+    meta: { title: 'Pengaturan' },
   },
   {
     path: PATHS.auditLog,
     component: () => import('@/views/audit/AuditLogView.vue'),
-    meta: { roles: ['SUPER_ADMIN'], title: 'Audit log' },
+    meta: { title: 'Audit log' },
   },
   { path: '/:pathMatch(.*)*', redirect: PATHS.root },
 ]

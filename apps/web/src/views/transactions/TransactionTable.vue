@@ -32,9 +32,8 @@ const props = withDefaults(
   defineProps<{
     filters?: TransactionFilters
     scope?: TransactionFilters
-    showCreator?: boolean
   }>(),
-  { filters: () => ({}), scope: () => ({}), showCreator: true },
+  { filters: () => ({}), scope: () => ({}) },
 )
 
 const list = usePagedList<Transaction, TransactionFilters>(
@@ -97,9 +96,6 @@ defineExpose({ reload: list.reload })
       <template #body="{ data }: { data: Transaction }">
         <TransactionStatusTag :status="data.status" />
       </template>
-    </Column>
-    <Column v-if="showCreator" header="Dicatat oleh" class="hidden lg:table-cell">
-      <template #body="{ data }: { data: Transaction }">{{ data.createdBy.name }}</template>
     </Column>
   </PagedTable>
 </template>

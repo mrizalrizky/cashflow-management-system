@@ -1,19 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import * as authApi from '@/api/auth'
-import type { Role } from '@/api/types'
 import { useSessionStore } from '@/stores/session'
 import { freshPinia, mountView } from '@/test/mount'
 import AppLayout from '../AppLayout.vue'
 
 vi.mock('@/api/auth')
 
-async function mountLayout(role: Role, path: string) {
-  vi.mocked(authApi.login).mockResolvedValueOnce({
-    accessToken: 'token',
-    user: { id: 'u1', name: 'Siti Rahma', email: 'siti@example.com', role, mustChangePassword: false },
-  })
-  await useSessionStore().login('siti@example.com', 'password-123')
+async function mountLayout(path: string) {
+  vi.mocked(authApi.login).mockResolvedValueOnce({ accessToken: 'token', user: { id: 'u1', name: 'Pemilik' } })
+  await useSessionStore().login('135792')
   return mountView(AppLayout, { path })
 }
 
@@ -28,55 +24,39 @@ beforeEach(() => {
 })
 
 describe('AppLayout', () => {
-  it.each<[Role, string, string[]]>([
-    ['SUPER_ADMIN', '/dashboard', ['Dashboard', 'Transaksi', 'Master data', 'Pengguna', 'Audit log']],
-    ['PROJECT_MANAGER', '/transaksi', ['Transaksi']],
-    ['STAFF', '/transaksi', ['Transaksi']],
-  ])('shows %s exactly their menu', async (role, path, labels) => {
-    const { wrapper } = await mountLayout(role, path)
+  it('shows the menu of the personal edition', async () => {
+    const { wrapper } = await mountLayout('/dashboard')
 
-    expect(sidebarLinks(wrapper).map((link) => link.text())).toEqual(labels)
+    expect(sidebarLinks(wrapper).map((link) => link.text())).toEqual([
+      'Dashboard',
+      'Transaksi',
+      'Master data',
+      'Pengaturan',
+    ])
   })
 
   it('marks the current page in the menu', async () => {
-    const { wrapper } = await mountLayout('SUPER_ADMIN', '/pengguna')
+    const { wrapper } = await mountLayout('/pengaturan')
 
     const current = sidebarLinks(wrapper).filter((link) => link.attributes('aria-current') === 'page')
 
-    expect(current.map((link) => link.text())).toEqual(['Pengguna'])
+    expect(current.map((link) => link.text())).toEqual(['Pengaturan'])
   })
 
-  it('shows who is logged in and in which role', async () => {
-    const { wrapper } = await mountLayout('PROJECT_MANAGER', '/transaksi')
-
-    const header = wrapper.get('header').text()
-    expect(header).toContain('Siti Rahma')
-    expect(header).toContain('Koordinator Proyek')
-  })
-
-  it('offers a way to change the password', async () => {
-    const { wrapper, router } = await mountLayout('STAFF', '/transaksi')
-
-    await wrapper.get('[data-testid="change-password"]').trigger('click')
-    await flushPromises()
-
-    expect(router.currentRoute.value.path).toBe('/ganti-password')
-  })
-
-  it('logs out and returns to the login page', async () => {
+  it('signs out and returns to the PIN entry', async () => {
     vi.mocked(authApi.logout).mockResolvedValue()
-    const { wrapper, router } = await mountLayout('STAFF', '/transaksi')
+    const { wrapper, router } = await mountLayout('/transaksi')
 
     await wrapper.get('[data-testid="logout"]').trigger('click')
     await flushPromises()
 
     expect(authApi.logout).toHaveBeenCalled()
     expect(useSessionStore().isAuthenticated).toBe(false)
-    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.path).toBe('/masuk')
   })
 
   it('opens the menu as a drawer on small screens and closes it after a choice', async () => {
-    const { wrapper, router } = await mountLayout('SUPER_ADMIN', '/dashboard')
+    const { wrapper, router } = await mountLayout('/dashboard')
     const toggle = wrapper.get('[data-testid="menu-toggle"]')
     expect(toggle.attributes('aria-expanded')).toBe('false')
 
@@ -89,18 +69,17 @@ describe('AppLayout', () => {
       'Dashboard',
       'Transaksi',
       'Master data',
-      'Pengguna',
-      'Audit log',
+      'Pengaturan',
     ])
     drawerLinks[3]!.click()
     await flushPromises()
 
-    expect(router.currentRoute.value.path).toBe('/pengguna')
+    expect(router.currentRoute.value.path).toBe('/pengaturan')
     expect(toggle.attributes('aria-expanded')).toBe('false')
   })
 
   it('renders the page content', async () => {
-    const { wrapper } = await mountLayout('STAFF', '/transaksi')
+    const { wrapper } = await mountLayout('/transaksi')
     expect(wrapper.find('main').exists()).toBe(true)
   })
 })

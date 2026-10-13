@@ -8,14 +8,8 @@ import { useSessionStore } from '../session'
 vi.mock('@/api/auth')
 vi.mock('@/api/http')
 
-const USER: AuthUser = {
-  id: 'u1',
-  name: 'Admin',
-  email: 'admin@example.com',
-  role: 'SUPER_ADMIN',
-  mustChangePassword: true,
-}
-const SESSION: SessionResponse = { accessToken: 'token-1', user: USER }
+const OWNER: AuthUser = { id: 'u-owner', name: 'Pemilik' }
+const SESSION: SessionResponse = { accessToken: 'token-1', user: OWNER }
 
 describe('session store', () => {
   beforeEach(() => {
@@ -30,12 +24,12 @@ describe('session store', () => {
 
       await session.restore()
 
-      expect(session.user).toEqual(USER)
+      expect(session.user).toEqual(OWNER)
       expect(session.isAuthenticated).toBe(true)
       expect(session.ready).toBe(true)
     })
 
-    it('ends up logged out but ready when there is no session', async () => {
+    it('ends up signed out but ready when there is no session', async () => {
       vi.mocked(http.refreshSession).mockResolvedValue(null)
       const session = useSessionStore()
 
@@ -64,43 +58,48 @@ describe('session store', () => {
     })
   })
 
-  describe('login', () => {
-    it('stores the user and hands the token to the HTTP client', async () => {
-      vi.mocked(authApi.login).mockResolvedValue(SESSION)
+  describe('signing in', () => {
+    it('creates the PIN, then holds the owner and hands the token to the HTTP client', async () => {
+      vi.mocked(authApi.setupPin).mockResolvedValue(SESSION)
       const session = useSessionStore()
 
-      await session.login('admin@example.com', 'rahasia-123')
+      await session.setupPin('000123')
 
-      expect(authApi.login).toHaveBeenCalledWith('admin@example.com', 'rahasia-123')
-      expect(session.user).toEqual(USER)
-      expect(session.role).toBe('SUPER_ADMIN')
+      expect(authApi.setupPin).toHaveBeenCalledWith('000123')
+      expect(session.user).toEqual(OWNER)
       expect(http.setAccessToken).toHaveBeenCalledWith('token-1')
     })
 
-    it('stays logged out and passes the error on when login fails', async () => {
-      const failure = new Error('Email atau password salah')
+    it('signs in with the PIN', async () => {
+      vi.mocked(authApi.login).mockResolvedValue(SESSION)
+      const session = useSessionStore()
+
+      await session.login('135792')
+
+      expect(authApi.login).toHaveBeenCalledWith('135792')
+      expect(session.user).toEqual(OWNER)
+    })
+
+    it('stays signed out and passes the error on when the PIN is refused', async () => {
+      const failure = new Error('PIN salah')
       vi.mocked(authApi.login).mockRejectedValue(failure)
       const session = useSessionStore()
 
-      await expect(session.login('a@example.com', 'salah')).rejects.toBe(failure)
+      await expect(session.login('999999')).rejects.toBe(failure)
       expect(session.user).toBeNull()
       expect(http.setAccessToken).not.toHaveBeenCalled()
     })
   })
 
-  it('replaces the user and token after a password change', async () => {
+  it('takes the new token after a PIN change', async () => {
     vi.mocked(authApi.login).mockResolvedValue(SESSION)
-    vi.mocked(authApi.changePassword).mockResolvedValue({
-      accessToken: 'token-2',
-      user: { ...USER, mustChangePassword: false },
-    })
+    vi.mocked(authApi.changePin).mockResolvedValue({ accessToken: 'token-2', user: OWNER })
     const session = useSessionStore()
-    await session.login('admin@example.com', 'lama-12345')
+    await session.login('135792')
 
-    await session.changePassword('lama-12345', 'baru-12345')
+    await session.changePin('135792', '246810')
 
-    expect(authApi.changePassword).toHaveBeenCalledWith('lama-12345', 'baru-12345')
-    expect(session.user?.mustChangePassword).toBe(false)
+    expect(authApi.changePin).toHaveBeenCalledWith('135792', '246810')
     expect(http.setAccessToken).toHaveBeenLastCalledWith('token-2')
   })
 
@@ -112,7 +111,7 @@ describe('session store', () => {
       vi.mocked(authApi.login).mockResolvedValue(SESSION)
       arrange()
       const session = useSessionStore()
-      await session.login('admin@example.com', 'rahasia-123')
+      await session.login('135792')
 
       await session.logout()
 
@@ -127,7 +126,7 @@ describe('session store', () => {
     const session = useSessionStore()
     const listener = vi.fn<() => void>()
     session.onExpired(listener)
-    await session.login('admin@example.com', 'rahasia-123')
+    await session.login('135792')
 
     vi.mocked(http.bindSessionEvents).mock.calls[0]![0].onExpired()
 
@@ -135,81 +134,15 @@ describe('session store', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('follows the user of a silently refreshed session, such as another login in a second tab', async () => {
+  it('follows a silently refreshed session', async () => {
     vi.mocked(authApi.login).mockResolvedValue(SESSION)
     const session = useSessionStore()
-    await session.login('admin@example.com', 'rahasia-123')
-    const other = { ...USER, id: 'u2', name: 'Orang Lain', role: 'STAFF' as const }
+    await session.login('135792')
+    const renamed = { ...OWNER, name: 'Pemilik Baru' }
 
-    vi.mocked(http.bindSessionEvents).mock.calls[0]![0].onRefreshed({
-      accessToken: 'token-3',
-      user: other,
-    })
+    vi.mocked(http.bindSessionEvents).mock.calls[0]![0].onRefreshed({ accessToken: 'token-3', user: renamed })
 
-    expect(session.user).toEqual(other)
-    expect(session.role).toBe('STAFF')
-  })
-
-  describe('when the API refuses a request (403)', () => {
-    async function signedIn() {
-      vi.mocked(authApi.login).mockResolvedValue(SESSION)
-      const session = useSessionStore()
-      await session.login('admin@example.com', 'rahasia-123')
-      const { onForbidden } = vi.mocked(http.bindSessionEvents).mock.calls[0]![0]
-      return { session, onForbidden }
-    }
-
-    it('re-reads the user, picking up a forced password change or a new role', async () => {
-      const { session, onForbidden } = await signedIn()
-      const changed = { ...USER, role: 'STAFF' as const, mustChangePassword: true }
-      vi.mocked(authApi.me).mockResolvedValue({ user: changed })
-
-      onForbidden()
-      await session.resync()
-
-      expect(session.user).toEqual(changed)
-    })
-
-    it('asks the API once however many requests were refused together', async () => {
-      const { session, onForbidden } = await signedIn()
-      vi.mocked(authApi.me).mockResolvedValue({ user: USER })
-
-      onForbidden()
-      onForbidden()
-      onForbidden()
-      await session.resync()
-
-      expect(authApi.me).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not bring the user back when they logged out while the check was running', async () => {
-      const { session, onForbidden } = await signedIn()
-      let reply!: (value: { user: typeof USER }) => void
-      vi.mocked(authApi.me).mockReturnValue(new Promise((resolve) => (reply = resolve)))
-      vi.mocked(authApi.logout).mockResolvedValue(undefined)
-
-      onForbidden()
-      await session.logout()
-      reply({ user: USER })
-      await session.resync()
-
-      expect(session.user).toBeNull()
-    })
-
-    it('says whether the user is an admin', async () => {
-      const { session } = await signedIn()
-      expect(session.isAdmin).toBe(true)
-    })
-
-    it('keeps the current user when the check itself fails', async () => {
-      const { session, onForbidden } = await signedIn()
-      vi.mocked(authApi.me).mockRejectedValue(new Error('offline'))
-
-      onForbidden()
-      await session.resync()
-
-      expect(session.user).toEqual(USER)
-    })
+    expect(session.user).toEqual(renamed)
   })
 
   it('never writes to browser storage', async () => {
@@ -219,7 +152,7 @@ describe('session store', () => {
     const session = useSessionStore()
 
     await session.restore()
-    await session.login('admin@example.com', 'rahasia-123')
+    await session.login('135792')
     await session.logout()
 
     expect(setItem).not.toHaveBeenCalled()

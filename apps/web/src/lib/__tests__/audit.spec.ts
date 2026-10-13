@@ -25,10 +25,10 @@ describe('audit and export API modules', () => {
     const file = { blob: new Blob(['x']), fileName: 'transaksi.csv' }
     vi.mocked(http.requestFile).mockResolvedValue(file)
 
-    expect(await exportTransactions({ status: 'PENDING', includeTransfers: false })).toBe(file)
+    expect(await exportTransactions({ status: 'VOID', includeTransfers: false })).toBe(file)
 
     expect(http.requestFile).toHaveBeenCalledExactlyOnceWith('/transactions/export', {
-      status: 'PENDING',
+      status: 'VOID',
       includeTransfers: false,
     })
   })
@@ -51,15 +51,12 @@ describe('audit labels', () => {
     'LOGIN_FAILED',
     'LOGOUT',
     'TOKEN_REUSE',
-    'CHANGE_PASSWORD',
-    'RESET_PASSWORD',
+    'LOGIN_LOCKED',
+    'PIN_SETUP',
+    'PIN_CHANGE',
+    'PIN_RESET',
     'CREATE',
     'UPDATE',
-    'SET_MEMBERS',
-    'RESUBMIT',
-    'CANCEL',
-    'APPROVE',
-    'REJECT',
     'VOID',
     'TRANSFER',
     'ATTACH',
@@ -70,7 +67,7 @@ describe('audit labels', () => {
 
   it('names every action the API writes, in Indonesian', () => {
     for (const action of ACTIONS) expect(auditActionLabel(action)).not.toBe(action)
-    expect(auditActionLabel('APPROVE')).toBe('Menyetujui')
+    expect(auditActionLabel('PIN_SETUP')).toBe('PIN dibuat')
     expect(auditActionLabel('EXPORT')).toBe('Mengekspor')
     expect(AUDIT_ACTION_OPTIONS.map((option) => option.value).sort()).toEqual([...ACTIONS].sort())
   })
@@ -120,7 +117,7 @@ describe('describeValue', () => {
   })
 
   it('shows nested values as compact JSON', () => {
-    expect(describeValue('filters', { status: 'PENDING', rows: 3 })).toBe('{"status":"PENDING","rows":3}')
+    expect(describeValue('filters', { status: 'VOID', rows: 3 })).toBe('{"status":"VOID","rows":3}')
     expect(describeValue('removed_project_ids', ['p1', 'p2'])).toBe('["p1","p2"]')
   })
 
@@ -149,12 +146,12 @@ describe('describeValue', () => {
 
 describe('changedFields', () => {
   it('lists only the fields that differ, in alphabetical order', () => {
-    const before = { status: 'PENDING', amount: '150000', description: 'Beli semen', reviewed_by_id: null }
+    const before = { status: 'VOID', amount: '150000', description: 'Beli semen', reviewed_by_id: null }
     const after = { status: 'APPROVED', amount: '150000', description: 'Beli semen', reviewed_by_id: 'u1' }
 
     expect(changedFields(before, after)).toEqual([
       { field: 'reviewed_by_id', before: '-', after: 'u1' },
-      { field: 'status', before: 'PENDING', after: 'APPROVED' },
+      { field: 'status', before: 'VOID', after: 'APPROVED' },
     ])
   })
 

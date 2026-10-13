@@ -7,7 +7,8 @@ export interface FormSubmitOptions {
   fieldForStatus?: Record<number, string>
 }
 
-export type SubmitResult<T> = { ok: true; value: T } | { ok: false }
+/** `error` diisi bila aksinya sendiri gagal (bukan karena validasi di browser). */
+export type SubmitResult<T> = { ok: true; value: T } | { ok: false; error?: unknown }
 
 export interface FormSubmit<T> {
   submitting: Ref<boolean>
@@ -64,7 +65,7 @@ export function useFormSubmit<T>(
       return { ok: true, value: await action() }
     } catch (error) {
       showError(error)
-      return FAILED
+      return { ok: false, error }
     } finally {
       submitting.value = false
     }

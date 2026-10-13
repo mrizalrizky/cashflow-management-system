@@ -1,4 +1,4 @@
-import type { AccountType, Role, TxStatus, TxType } from '@/api/types'
+import type { AccountType, TxStatus, TxType } from '@/api/types'
 import { hasOwn } from './changes'
 
 export interface Option<T> {
@@ -14,14 +14,6 @@ function labelSet<T extends string>(labels: Record<T, string>) {
   }
 }
 
-const roles = labelSet<Role>({
-  SUPER_ADMIN: 'Super Admin',
-  PROJECT_MANAGER: 'Koordinator Proyek',
-  STAFF: 'Staf',
-})
-export const roleLabel = roles.label
-export const ROLE_OPTIONS: Option<Role>[] = roles.options
-
 const accountTypes = labelSet<AccountType>({ CASH: 'Kas', BANK: 'Bank' })
 export const accountTypeLabel = accountTypes.label
 export const ACCOUNT_TYPE_OPTIONS: Option<AccountType>[] = accountTypes.options
@@ -30,24 +22,13 @@ const txTypes = labelSet<TxType>({ IN: 'Pemasukan', OUT: 'Pengeluaran' })
 export const txTypeLabel = txTypes.label
 export const TX_TYPE_OPTIONS: Option<TxType>[] = txTypes.options
 
-const txStatuses = labelSet<TxStatus>({
-  APPROVED: 'Tercatat',
-  VOID: 'Dibatalkan',
-  // Tidak dibuat lagi oleh edisi pribadi; hilang bersama tipenya.
-  PENDING: 'Menunggu',
-  REJECTED: 'Ditolak',
-})
+const txStatuses = labelSet<TxStatus>({ APPROVED: 'Tercatat', VOID: 'Dibatalkan' })
 export const txStatusLabel = txStatuses.label
-/** Status yang bisa dipilih di filter: hanya yang masih dibuat API. */
-export const TX_STATUS_OPTIONS: Option<TxStatus>[] = txStatuses.options.filter(
-  (option) => option.value === 'APPROVED' || option.value === 'VOID',
-)
+export const TX_STATUS_OPTIONS: Option<TxStatus>[] = txStatuses.options
 
 /** Warna tag PrimeVue untuk tiap status transaksi. */
-export const TX_STATUS_SEVERITY: Record<TxStatus, 'warn' | 'success' | 'danger' | 'secondary'> = {
-  PENDING: 'warn',
+export const TX_STATUS_SEVERITY: Record<TxStatus, 'success' | 'secondary'> = {
   APPROVED: 'success',
-  REJECTED: 'danger',
   VOID: 'secondary',
 }
 
@@ -72,15 +53,12 @@ const auditActions = openLabelSet({
   LOGIN_FAILED: 'Gagal masuk',
   LOGOUT: 'Keluar',
   TOKEN_REUSE: 'Sesi dipakai ulang',
-  CHANGE_PASSWORD: 'Mengganti password',
-  RESET_PASSWORD: 'Mereset password',
+  LOGIN_LOCKED: 'Masuk ditolak (PIN dikunci)',
+  PIN_SETUP: 'PIN dibuat',
+  PIN_CHANGE: 'PIN diganti',
+  PIN_RESET: 'PIN direset',
   CREATE: 'Membuat',
   UPDATE: 'Mengubah',
-  SET_MEMBERS: 'Mengatur koordinator',
-  RESUBMIT: 'Mengajukan lagi',
-  CANCEL: 'Membatalkan',
-  APPROVE: 'Menyetujui',
-  REJECT: 'Menolak',
   VOID: 'Void',
   TRANSFER: 'Transfer antar akun',
   ATTACH: 'Menambah bukti',
@@ -94,7 +72,7 @@ const auditEntities = openLabelSet({
   transaction: 'Transaksi',
   account: 'Akun',
   category: 'Kategori',
-  user: 'Pengguna',
+  user: 'Pemilik',
 })
 export const auditEntityLabel = auditEntities.label
 export const AUDIT_ENTITY_OPTIONS: Option<string>[] = auditEntities.options

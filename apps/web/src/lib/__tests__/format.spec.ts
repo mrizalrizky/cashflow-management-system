@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { formatDate } from '../format'
-import { roleLabel } from '../labels'
 
 describe('formatDate', () => {
   it('formats as dd MMM yyyy in Jakarta time', () => {
@@ -16,10 +15,3 @@ describe('formatDate', () => {
   })
 })
 
-describe('roleLabel', () => {
-  it('names each role in Indonesian', () => {
-    expect(roleLabel('SUPER_ADMIN')).toBe('Super Admin')
-    expect(roleLabel('PROJECT_MANAGER')).toBe('Koordinator Proyek')
-    expect(roleLabel('STAFF')).toBe('Staf')
-  })
-})

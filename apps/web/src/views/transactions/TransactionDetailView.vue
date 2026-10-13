@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
-import { storeToRefs } from 'pinia'
 import { RouterLink, useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -26,14 +25,12 @@ import { formatCalendarDate, formatDate } from '@/lib/format'
 import { txTypeLabel } from '@/lib/labels'
 import { MAX_PROOFS } from '@/lib/proof-files'
 import { PATHS } from '@/router/paths'
-import { useSessionStore } from '@/stores/session'
 import TransactionFormDialog from './TransactionFormDialog.vue'
 
 // 404: tidak ada atau bukan haknya. 400: id di alamat bukan id yang sah (salah ketik).
 const NOT_FOUND_STATUSES = [400, 404]
 
 const route = useRoute()
-const { isAdmin } = storeToRefs(useSessionStore())
 const notify = useNotify()
 
 const transactionId = computed(() => String(route.params.id))
@@ -191,7 +188,6 @@ function openForm(): void {
 
     <!-- Riwayat perubahan ada di log audit, yang hanya bisa dibuka admin. -->
     <RouterLink
-      v-if="isAdmin"
       :to="{ path: PATHS.auditLog, query: { entityType: 'transaction', entityId: transaction.id } }"
       class="mb-6 inline-flex items-center gap-2 text-sm text-primary-700 hover:underline"
       data-testid="transaction-history"

@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as accounts from '../accounts'
 import * as categories from '../categories'
 import * as http from '../http'
-import * as users from '../users'
 
 vi.mock('../http')
 
@@ -49,16 +48,5 @@ describe('master data API modules', () => {
   ])('%s calls the right route', async (_name, call, expected) => {
     await call()
     expect(request).toHaveBeenCalledExactlyOnceWith(...expected)
-  })
-
-  it('lists the active project managers that can be assigned', async () => {
-    const managers = [{ id: 'u1', name: 'Ani' }]
-    request.mockResolvedValue({ data: managers, meta: { page: 1, pageSize: 100, total: 1 } })
-
-    expect(await users.listAssignableManagers()).toEqual(managers)
-
-    expect(request).toHaveBeenCalledExactlyOnceWith('/users', {
-      query: { role: 'PROJECT_MANAGER', isActive: true, page: 1, pageSize: 100 },
-    })
   })
 })

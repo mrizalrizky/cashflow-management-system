@@ -5,11 +5,11 @@ import * as attachmentsApi from '@/api/attachments'
 import * as categoriesApi from '@/api/categories'
 import { ApiError } from '@/api/http'
 import * as transactionsApi from '@/api/transactions'
-import type { Role, Transaction } from '@/api/types'
+import type { Transaction } from '@/api/types'
 import ProofList from '@/components/ProofList.vue'
 import ProofPicker from '@/components/ProofPicker.vue'
 import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
-import { signInAs } from '@/test/session'
+import { signIn } from '@/test/session'
 import { KAS, makeAttachment, makeTransaction, MATERIAL } from '@/test/transactions'
 import TransactionDetailView from '../TransactionDetailView.vue'
 import TransactionFormDialog from '../TransactionFormDialog.vue'
@@ -25,8 +25,8 @@ const ACTIONS = ['edit', 'void'] as const
 const WITH_PROOF = makeTransaction({ attachments: [makeAttachment()] })
 const VOIDABLE = makeTransaction({ attachments: [makeAttachment()], permissions: { canVoid: true } })
 
-async function mountDetail(role: Role, transaction: Transaction = WITH_PROOF, path = PATH) {
-  signInAs(role)
+async function mountDetail(transaction: Transaction = WITH_PROOF, path = PATH) {
+  signIn()
   vi.mocked(transactionsApi.getTransaction).mockResolvedValue(transaction)
   return mountView(TransactionDetailView, { path, withOverlays: true })
 }
@@ -59,7 +59,7 @@ beforeEach(() => {
 
 describe('TransactionDetailView', () => {
   it('shows the transaction with its amount, dates and who recorded it', async () => {
-    const { wrapper } = await mountDetail('SUPER_ADMIN')
+    const { wrapper } = await mountDetail()
 
     expect(transactionsApi.getTransaction).toHaveBeenCalledWith('t-semen')
     expect(wrapper.get('h1').text()).toBe('Beli semen')
@@ -81,25 +81,21 @@ describe('TransactionDetailView', () => {
       voidedAt: '2026-10-03T04:00:00.000Z',
       voidReason: 'Nota ganda',
     })
-    const { wrapper } = await mountDetail('SUPER_ADMIN', voided)
+    const { wrapper } = await mountDetail(voided)
     expect(field(wrapper, 'voided')).toBe('Dewi · 03 Okt 2026')
     expect(field(wrapper, 'void-reason')).toBe('Nota ganda')
     expect(wrapper.find('[data-testid="tx-reviewed"]').exists()).toBe(false)
   })
 
-  it('links an admin, and nobody else, to the history of this transaction', async () => {
-    const admin = await mountDetail('SUPER_ADMIN')
-    expect(admin.wrapper.get('[data-testid="transaction-history"]').attributes('href')).toBe(
-      '/audit-log?entityType=transaction&entityId=t-semen',
+  it('links to the history of this transaction', async () => {
+    const { wrapper } = await mountDetail()
+    expect(wrapper.get('[data-testid="transaction-history"]').attributes('href')).toBe(
+      '/pengaturan/audit-log?entityType=transaction&entityId=t-semen',
     )
-
-    freshPinia()
-    const manager = await mountDetail('PROJECT_MANAGER')
-    expect(manager.wrapper.find('[data-testid="transaction-history"]').exists()).toBe(false)
   })
 
   it.each([404, 400])('shows "tidak ditemukan" for a %i, without an error toast', async (status) => {
-    signInAs('PROJECT_MANAGER')
+    signIn()
     vi.mocked(transactionsApi.getTransaction).mockRejectedValue(new ApiError(status, 'Transaksi tidak ditemukan'))
 
     const { wrapper } = await mountView(TransactionDetailView, { path: '/transaksi/bukan-id', withOverlays: true })
@@ -111,7 +107,7 @@ describe('TransactionDetailView', () => {
   })
 
   it('shows another failure with a retry', async () => {
-    signInAs('STAFF')
+    signIn()
     vi.mocked(transactionsApi.getTransaction).mockRejectedValueOnce(new ApiError(500, 'Terjadi kesalahan pada server'))
     const { wrapper } = await mountView(TransactionDetailView, { path: PATH, withOverlays: true })
     expect(wrapper.text()).toContain('Terjadi kesalahan pada server')
@@ -124,7 +120,7 @@ describe('TransactionDetailView', () => {
   })
 
   it('loads the other transaction when the address changes', async () => {
-    const { wrapper, router } = await mountDetail('STAFF')
+    const { wrapper, router } = await mountDetail()
     vi.mocked(transactionsApi.getTransaction).mockResolvedValue(makeTransaction({ id: 't-besi', description: 'Beli besi' }))
 
     await router.push('/transaksi/t-besi')
@@ -139,7 +135,7 @@ describe('TransactionDetailView: proof', () => {
   const NOTA = new File(['x'], 'nota.jpg', { type: 'image/jpeg' })
 
   it('lists the proof read-only when it can no longer be changed', async () => {
-    const { wrapper } = await mountDetail('STAFF')
+    const { wrapper } = await mountDetail()
 
     expect(wrapper.findComponent(ProofList).props()).toMatchObject({
       attachments: WITH_PROOF.attachments,
@@ -150,7 +146,7 @@ describe('TransactionDetailView: proof', () => {
 
   it('lets the owner add proof up to what is left of ten, then shows the new list', async () => {
     const mine = makeTransaction({ attachments: [makeAttachment()], permissions: { canAttach: true } })
-    const { wrapper } = await mountDetail('STAFF', mine)
+    const { wrapper } = await mountDetail(mine)
     expect(wrapper.findComponent(ProofList).props('canRemove')).toBe(true)
     expect(wrapper.findComponent(ProofPicker).props('max')).toBe(9)
     expect(wrapper.get('[data-testid="upload-proof"]').attributes('disabled')).toBeDefined()
@@ -171,7 +167,7 @@ describe('TransactionDetailView: proof', () => {
 
   it('keeps a file that failed to upload in the picker and says why', async () => {
     const mine = makeTransaction({ permissions: { canAttach: true } })
-    const { wrapper } = await mountDetail('STAFF', mine)
+    const { wrapper } = await mountDetail(mine)
     vi.mocked(attachmentsApi.uploadAttachment).mockRejectedValue(new ApiError(400, 'Jenis berkas tidak didukung'))
 
     wrapper.findComponent(ProofPicker).vm.$emit('update:modelValue', [NOTA])
@@ -185,7 +181,7 @@ describe('TransactionDetailView: proof', () => {
 
   it('says so when the latest version cannot be loaded after a change, and can try again', async () => {
     const mine = makeTransaction({ permissions: { canAttach: true } })
-    const { wrapper } = await mountDetail('STAFF', mine)
+    const { wrapper } = await mountDetail(mine)
     vi.mocked(attachmentsApi.uploadAttachment).mockResolvedValue(makeAttachment())
     vi.mocked(transactionsApi.getTransaction).mockRejectedValueOnce(new ApiError(0, 'Tidak dapat terhubung ke server'))
 
@@ -207,7 +203,7 @@ describe('TransactionDetailView: proof', () => {
 
   it('reloads after a proof is removed', async () => {
     const mine = makeTransaction({ attachments: [makeAttachment()], permissions: { canAttach: true } })
-    const { wrapper } = await mountDetail('STAFF', mine)
+    const { wrapper } = await mountDetail(mine)
     vi.mocked(transactionsApi.getTransaction).mockClear()
 
     wrapper.findComponent(ProofList).vm.$emit('removed', 'f-nota')
@@ -219,7 +215,7 @@ describe('TransactionDetailView: proof', () => {
 
 describe('TransactionDetailView: actions', () => {
   it('offers nothing when the API permits nothing', async () => {
-    const { wrapper } = await mountDetail('SUPER_ADMIN')
+    const { wrapper } = await mountDetail()
 
     for (const action of ACTIONS) expect(button(wrapper, action).exists()).toBe(false)
   })
@@ -228,14 +224,14 @@ describe('TransactionDetailView: actions', () => {
     ['canEdit', ['edit']],
     ['canVoid', ['void']],
   ] as const)('offers exactly what %s allows', async (permission, expected) => {
-    const { wrapper } = await mountDetail('STAFF', makeTransaction({ permissions: { [permission]: true } }))
+    const { wrapper } = await mountDetail(makeTransaction({ permissions: { [permission]: true } }))
 
     const offered = ACTIONS.filter((action) => button(wrapper, action).exists())
     expect(offered).toEqual(expected)
   })
 
   it('opens the form to edit, loading its choices only then, and shows what was saved', async () => {
-    const { wrapper } = await mountDetail('STAFF', makeTransaction({ permissions: { canEdit: true } }))
+    const { wrapper } = await mountDetail(makeTransaction({ permissions: { canEdit: true } }))
     expect(button(wrapper, 'edit').text()).toBe('Ubah')
     expect(accountsApi.listAccountOptions).not.toHaveBeenCalled()
 
@@ -251,7 +247,7 @@ describe('TransactionDetailView: actions', () => {
   it('voids a recorded transaction with a reason', async () => {
     const approved = makeTransaction({ status: 'APPROVED', permissions: { canVoid: true } })
     vi.mocked(transactionsApi.voidTransaction).mockResolvedValue({ ...WITH_PROOF, status: 'VOID' })
-    const { wrapper } = await mountDetail('SUPER_ADMIN', approved)
+    const { wrapper } = await mountDetail(approved)
 
     await click(wrapper, 'void')
     expect(wrapper.text()).not.toContain('kedua sisinya')
@@ -269,7 +265,7 @@ describe('TransactionDetailView: actions', () => {
       transferGroupId: 'g1',
       permissions: { canVoid: true },
     })
-    const { wrapper } = await mountDetail('SUPER_ADMIN', leg)
+    const { wrapper } = await mountDetail(leg)
     expect(wrapper.text()).toContain('Bagian dari transfer antar akun. Void akan membatalkan kedua sisinya.')
     expect(field(wrapper, 'transfer')).toBe('Transfer antar akun')
 
@@ -281,7 +277,7 @@ describe('TransactionDetailView: actions', () => {
   it('disables every action while one is in flight', async () => {
     vi.mocked(transactionsApi.voidTransaction).mockReturnValue(new Promise(() => undefined))
     const all = makeTransaction({ attachments: [makeAttachment()], permissions: { canEdit: true, canVoid: true } })
-    const { wrapper } = await mountDetail('SUPER_ADMIN', all)
+    const { wrapper } = await mountDetail(all)
 
     await click(wrapper, 'void')
     await giveReason(wrapper, 'Nota ganda')
@@ -294,7 +290,7 @@ describe('TransactionDetailView: actions', () => {
 
 describe('ReasonDialog, through the void action', () => {
   async function openVoid() {
-    const { wrapper } = await mountDetail('SUPER_ADMIN', VOIDABLE)
+    const { wrapper } = await mountDetail(VOIDABLE)
     await click(wrapper, 'void')
     return wrapper
   }

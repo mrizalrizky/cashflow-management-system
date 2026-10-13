@@ -8,12 +8,12 @@ import * as accountsApi from '@/api/accounts'
 import * as categoriesApi from '@/api/categories'
 import { ApiError, type DownloadedFile } from '@/api/http'
 import * as transactionsApi from '@/api/transactions'
-import type { Role, Transaction } from '@/api/types'
+import type { Transaction } from '@/api/types'
 import DateField from '@/components/DateField.vue'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import * as download from '@/lib/download'
 import { fill, freshPinia, mountView } from '@/test/mount'
-import { signInAs } from '@/test/session'
+import { signIn } from '@/test/session'
 import {
   BANK,
   KAS,
@@ -99,17 +99,16 @@ afterEach(() => {
 
 describe('TransactionsView', () => {
   async function mountList(
-    role: Role,
     rows: Transaction[] = [SEMEN, TERMIN_MASUK, LISTRIK, TRANSFER],
     path = '/transaksi',
   ) {
-    signInAs(role)
+    signIn()
     vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf(rows))
     return mountView(TransactionsView, { path, withOverlays: true })
   }
 
-  it('lists transactions with date, description, category, account, amount, status and creator', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+  it('lists transactions with date, description, category, account, amount and status', async () => {
+    const { wrapper } = await mountList()
 
     const rows = wrapper.findAll('tbody tr').map((row) => row.text())
     expect(rows[0]).toContain('01 Okt 2026')
@@ -118,21 +117,20 @@ describe('TransactionsView', () => {
     expect(rows[0]).toContain('Kas Kecil')
     expect(rows[0]).toContain('-Rp 150.000')
     expect(rows[0]).toContain('Dibatalkan')
-    expect(rows[0]).toContain('Sari')
     expect(rows[1]).toContain('+Rp 5.000.000')
     expect(rows[1]).toContain('Tercatat')
     expect(rows[2]).toContain('Listrik kantor')
   })
 
   it('marks a transfer leg as a transfer', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN', [TRANSFER])
+    const { wrapper } = await mountList([TRANSFER])
 
     const row = wrapper.get('tbody tr').text()
     expect(row).toContain('Transfer')
   })
 
   it('links each row to its detail page', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
 
     const links = wrapper.findAll('tbody a').map((a) => a.attributes('href'))
 
@@ -141,14 +139,14 @@ describe('TransactionsView', () => {
   })
 
   it('shows only counted amounts in colour', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN, TERMIN_MASUK])
+    const { wrapper } = await mountList([SEMEN, TERMIN_MASUK])
 
     const amounts = wrapper.findAll('tbody [title="Belum dihitung dalam saldo"]')
     expect(amounts.map((a) => a.text())).toEqual(['-Rp 150.000'])
   })
 
   it('filters by type, status, account and category, starting again from page 1', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
     wrapper.findComponent(DataTable).vm.$emit('page', { page: 2, rows: 50 })
     await flushPromises()
     expect(lastListParams()).toMatchObject({ page: 3, pageSize: 50 })
@@ -168,7 +166,7 @@ describe('TransactionsView', () => {
   })
 
   it('offers only the categories of the chosen type, never system ones, and drops a category that no longer fits', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
     expect(optionLabels(wrapper, 'Kategori')).toEqual(['Material', 'Upah Tukang', 'Termin Klien'])
 
     await choose(wrapper, 'Kategori', MATERIAL.id)
@@ -180,7 +178,7 @@ describe('TransactionsView', () => {
   })
 
   it('searches after a pause', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
 
     vi.useFakeTimers()
     await fill(wrapper, '#transaction-search', ' semen ')
@@ -190,7 +188,7 @@ describe('TransactionsView', () => {
   })
 
   it('filters by a date range, and does not send a range that runs backwards', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
 
     await pickDates(wrapper, '2026-10-01', '2026-10-31')
     expect(lastListParams()).toMatchObject({ dateFrom: '2026-10-01', dateTo: '2026-10-31' })
@@ -203,7 +201,7 @@ describe('TransactionsView', () => {
   })
 
   it('names the two date filters, for the eye and for a screen reader', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
 
     const pickers = wrapper.findAllComponents(DatePicker)
     expect(pickers.map((p) => p.props('ariaLabel'))).toEqual(['Dari tanggal', 'Sampai tanggal'])
@@ -211,7 +209,7 @@ describe('TransactionsView', () => {
   })
 
   it('opens on the status named in the address, with one request', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN], '/transaksi?status=VOID')
+    const { wrapper } = await mountList([SEMEN], '/transaksi?status=VOID')
 
     expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
     expect(lastListParams()).toMatchObject({ status: 'VOID', page: 1 })
@@ -224,7 +222,7 @@ describe('TransactionsView', () => {
   })
 
   it('ignores a status in the address that does not exist, or is no longer offered', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN', [SEMEN], '/transaksi?status=PENDING')
+    const { wrapper } = await mountList([SEMEN], '/transaksi?status=PENDING')
 
     expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
     expect(lastListParams().status).toBeUndefined()
@@ -232,14 +230,14 @@ describe('TransactionsView', () => {
   })
 
   it('makes a single request when the address names no status', async () => {
-    await mountList('SUPER_ADMIN')
+    await mountList()
 
     expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
     expect(lastListParams().status).toBeUndefined()
   })
 
   it('clears every filter with Reset', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
     await choose(wrapper, 'Status', 'VOID')
     await pickDates(wrapper, '2026-10-01', null)
 
@@ -253,7 +251,7 @@ describe('TransactionsView', () => {
   })
 
   it('tells an empty list apart from filters that match nothing', async () => {
-    const { wrapper } = await mountList('STAFF', [])
+    const { wrapper } = await mountList([])
     expect(wrapper.text()).toContain('Belum ada transaksi')
 
     await choose(wrapper, 'Status', 'VOID')
@@ -261,7 +259,7 @@ describe('TransactionsView', () => {
   })
 
   it('shows an error with a retry when the list cannot be loaded', async () => {
-    signInAs('STAFF')
+    signIn()
     vi.mocked(transactionsApi.listTransactions).mockRejectedValueOnce(new ApiError(500, 'Terjadi kesalahan pada server'))
     const { wrapper } = await mountView(TransactionsView, { path: '/transaksi', withOverlays: true })
     expect(wrapper.text()).toContain('Terjadi kesalahan pada server')
@@ -274,7 +272,7 @@ describe('TransactionsView', () => {
   })
 
   it('gives an admin both actions and a switch that hides transfers', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
 
     expect(wrapper.get('h1').text()).toBe('Transaksi')
     expect(wrapper.find('[data-testid="add-transaction"]').exists()).toBe(true)
@@ -291,7 +289,7 @@ describe('TransactionsView', () => {
   })
 
   it('opens the form from "Catat transaksi" and reloads the list after a save', async () => {
-    const { wrapper } = await mountList('STAFF')
+    const { wrapper } = await mountList()
 
     await wrapper.get('[data-testid="add-transaction"]').trigger('click')
     await flushPromises()
@@ -303,22 +301,11 @@ describe('TransactionsView', () => {
     expect(transactionsApi.listTransactions).toHaveBeenCalledTimes(1)
   })
 
-  it('offers a project manager no transfer controls and no project filter', async () => {
-    const { wrapper } = await mountList('PROJECT_MANAGER')
+  it('offers transfers, without a creator or project column', async () => {
+    const { wrapper } = await mountList()
 
     expect(wrapper.get('h1').text()).toBe('Transaksi')
-    expect(wrapper.find('[data-testid="add-transaction"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="add-transfer"]').exists()).toBe(false)
-    expect(wrapper.findComponent(ToggleSwitch).exists()).toBe(false)
-    expect(wrapper.findAll('label').map((l) => l.text())).not.toContain('Proyek')
-  })
-
-  it('shows staff their own transactions, without a creator column or transfer controls', async () => {
-    const { wrapper } = await mountList('STAFF')
-
-    expect(wrapper.get('h1').text()).toBe('Transaksi')
-    expect(wrapper.find('[data-testid="add-transfer"]').exists()).toBe(false)
-    expect(wrapper.findComponent(ToggleSwitch).exists()).toBe(false)
+    expect(wrapper.find('[data-testid="add-transfer"]').exists()).toBe(true)
     const headers = wrapper.findAll('thead th').map((th) => th.text())
     expect(headers).not.toContain('Dicatat oleh')
     expect(headers).not.toContain('Proyek')
@@ -326,7 +313,7 @@ describe('TransactionsView', () => {
 
   it('offers a reload when the filter choices cannot be loaded, and still lists transactions', async () => {
     vi.mocked(accountsApi.listAccountOptions).mockRejectedValueOnce(new ApiError(0, 'Tidak dapat terhubung ke server'))
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
     expect(wrapper.text()).toContain('Beli semen')
     expect(optionLabels(wrapper, 'Akun')).toEqual([])
 
@@ -342,8 +329,8 @@ describe('TransactionsView: export', () => {
   const FILE: DownloadedFile = { blob: new Blob(['isi']), fileName: 'transaksi-20261007-1005.csv' }
   const exportFile = vi.mocked(transactionsApi.exportTransactions)
 
-  async function mountList(role: Role, path = '/transaksi') {
-    signInAs(role)
+  async function mountList(path = '/transaksi') {
+    signIn()
     vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf([SEMEN]))
     exportFile.mockResolvedValue(FILE)
     return mountView(TransactionsView, { path, withOverlays: true })
@@ -361,7 +348,7 @@ describe('TransactionsView: export', () => {
   })
 
   it('saves the file under the name the API chose and says so', async () => {
-    const { wrapper } = await mountList('STAFF')
+    const { wrapper } = await mountList()
 
     await clickExport(wrapper)
 
@@ -371,7 +358,7 @@ describe('TransactionsView: export', () => {
   })
 
   it('falls back to a plain name when the API sent none', async () => {
-    const { wrapper } = await mountList('STAFF')
+    const { wrapper } = await mountList()
     exportFile.mockResolvedValue({ blob: FILE.blob, fileName: null })
 
     await clickExport(wrapper)
@@ -380,7 +367,7 @@ describe('TransactionsView: export', () => {
   })
 
   it('exports with exactly the filters of the list on screen', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
     await choose(wrapper, 'Status', 'VOID')
     await choose(wrapper, 'Akun', KAS.id)
     wrapper.findComponent(ToggleSwitch).vm.$emit('update:modelValue', false)
@@ -399,7 +386,7 @@ describe('TransactionsView: export', () => {
   })
 
   it('uses a search only once the list has applied it', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN')
+    const { wrapper } = await mountList()
     vi.useFakeTimers()
     await fill(wrapper, '#transaction-search', 'semen')
 
@@ -416,7 +403,7 @@ describe('TransactionsView: export', () => {
   })
 
   it('carries a status that came from the address, and leaves out a backwards date range', async () => {
-    const { wrapper } = await mountList('SUPER_ADMIN', '/transaksi?status=VOID')
+    const { wrapper } = await mountList('/transaksi?status=VOID')
     await pickDates(wrapper, '2026-11-05', '2026-10-31')
 
     await clickExport(wrapper)
@@ -428,7 +415,7 @@ describe('TransactionsView: export', () => {
   })
 
   it('runs one export at a time, showing that it is busy', async () => {
-    const { wrapper } = await mountList('STAFF')
+    const { wrapper } = await mountList()
     let finish!: (file: DownloadedFile) => void
     exportFile.mockReturnValue(new Promise((resolve) => (finish = resolve)))
 
@@ -447,7 +434,7 @@ describe('TransactionsView: export', () => {
     ['the API refuses', new ApiError(400, 'Validasi gagal')],
     ['the network drops', new ApiError(0, 'Tidak dapat terhubung ke server')],
   ])('saves nothing and frees the button when %s', async (_label, failure) => {
-    const { wrapper } = await mountList('STAFF')
+    const { wrapper } = await mountList()
     exportFile.mockRejectedValue(failure)
 
     await clickExport(wrapper)
@@ -461,7 +448,7 @@ describe('TransactionsView: export', () => {
 
 describe('TransactionTable', () => {
   it('keeps to its scope, which does not count as a filter', async () => {
-    signInAs('PROJECT_MANAGER')
+    signIn()
     vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf([]))
 
     const { wrapper } = await mountView(TransactionTable, {
@@ -473,7 +460,7 @@ describe('TransactionTable', () => {
   })
 
   it('loads again when its scope changes', async () => {
-    signInAs('PROJECT_MANAGER')
+    signIn()
     vi.mocked(transactionsApi.listTransactions).mockResolvedValue(pageOf([SEMEN]))
     const { wrapper } = await mountView(TransactionTable, { props: { scope: { accountId: KAS.id } } })
 

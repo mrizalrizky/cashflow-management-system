@@ -1,19 +1,7 @@
-export type Role = 'SUPER_ADMIN' | 'PROJECT_MANAGER' | 'STAFF'
-
-/** User yang sedang login. */
+/** Pemilik yang sedang masuk. */
 export interface AuthUser {
   id: string
   name: string
-  email: string
-  role: Role
-  mustChangePassword: boolean
-}
-
-/** User seperti yang dikembalikan modul pengguna. */
-export interface User extends AuthUser {
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
 }
 
 export interface Paginated<T> {
@@ -38,7 +26,7 @@ export interface SessionResponse {
 
 export type AccountType = 'CASH' | 'BANK'
 export type TxType = 'IN' | 'OUT'
-export type TxStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID'
+export type TxStatus = 'APPROVED' | 'VOID'
 
 /** Nominal (`openingBalance`, `balance`, `contractValue`, `contractValueWithPpn`) selalu string digit. */
 export interface Account {

@@ -35,8 +35,8 @@ describe('transaction API modules', () => {
   it.each<[string, () => Promise<unknown>, Parameters<typeof http.request>]>([
     [
       'listTransactions',
-      () => transactions.listTransactions({ page: 2, pageSize: 20, status: 'PENDING', accountId: null }),
-      ['/transactions', { query: { page: 2, pageSize: 20, status: 'PENDING', accountId: null } }],
+      () => transactions.listTransactions({ page: 2, pageSize: 20, status: 'VOID', accountId: null }),
+      ['/transactions', { query: { page: 2, pageSize: 20, status: 'VOID', accountId: null } }],
     ],
     ['getTransaction', () => transactions.getTransaction('t1'), ['/transactions/t1']],
     ['createTransaction', () => transactions.createTransaction(INPUT), ['/transactions', { method: 'POST', body: INPUT }]],

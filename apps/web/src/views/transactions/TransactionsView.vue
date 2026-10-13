@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { storeToRefs } from 'pinia'
+import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import { exportTransactions, type TransactionFilters as Filters } from '@/api/transactions'
@@ -10,16 +9,12 @@ import { useFileDownload } from '@/composables/useFileDownload'
 import { useNotify } from '@/composables/useNotify'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { TX_STATUS_OPTIONS } from '@/lib/labels'
-import { useSessionStore } from '@/stores/session'
 import TransactionFilters from './TransactionFilters.vue'
 import TransactionFormDialog from './TransactionFormDialog.vue'
 import TransactionOptionsError from './TransactionOptionsError.vue'
 import TransactionTable from './TransactionTable.vue'
 import TransferDialog from './TransferDialog.vue'
 
-const { isAdmin, role } = storeToRefs(useSessionStore())
-// Staf hanya melihat transaksinya sendiri.
-const isStaff = computed(() => role.value === 'STAFF')
 
 const options = useTransactionOptions()
 /**
@@ -69,7 +64,6 @@ function reloadTable(): void {
         @click="exportList"
       />
       <Button
-        v-if="isAdmin"
         label="Transfer antar akun"
         icon="pi pi-arrow-right-arrow-left"
         severity="secondary"
@@ -90,10 +84,10 @@ function reloadTable(): void {
   <TransactionFilters
     v-model="filters"
     :options="options"
-    :transfer-switch="isAdmin"
+    transfer-switch
   />
 
-  <TransactionTable ref="table" :filters="filters" :show-creator="!isStaff" />
+  <TransactionTable ref="table" :filters="filters" />
 
   <TransactionFormDialog
     v-model:visible="formOpen"
@@ -102,7 +96,6 @@ function reloadTable(): void {
     @saved="reloadTable"
   />
   <TransferDialog
-    v-if="isAdmin"
     v-model:visible="transferOpen"
     :options="options"
     @saved="reloadTable"

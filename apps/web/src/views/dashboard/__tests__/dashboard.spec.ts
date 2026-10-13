@@ -9,7 +9,7 @@ import MonthlyCashflowChart from '@/components/MonthlyCashflowChart.vue'
 import { PERIOD_PRESETS } from '@/lib/periods'
 import { routes } from '@/router/routes'
 import { freshPinia, mountView } from '@/test/mount'
-import { signInAs } from '@/test/session'
+import { signIn } from '@/test/session'
 import { makeTransaction } from '@/test/transactions'
 import DashboardView from '../DashboardView.vue'
 
@@ -55,7 +55,7 @@ const EMPTY = makeDashboard({
 })
 
 async function mountDashboard(first: CompanyDashboard = makeDashboard()) {
-  signInAs('SUPER_ADMIN')
+  signIn()
   getDashboard.mockResolvedValue(first)
   return mountView(DashboardView, { path: '/dashboard', withOverlays: true })
 }
@@ -103,7 +103,6 @@ describe('DashboardView', () => {
     const loaded = await (route.component as () => Promise<{ default: unknown }>)()
 
     expect(loaded.default).toBe(DashboardView)
-    expect(route.meta?.roles).toEqual(['SUPER_ADMIN'])
   })
 
   it('asks for the default period and shows what it covers', async () => {
@@ -199,7 +198,7 @@ describe('DashboardView', () => {
   })
 
   it('shows an error with a retry when the first load fails', async () => {
-    signInAs('SUPER_ADMIN')
+    signIn()
     getDashboard.mockRejectedValueOnce(new ApiError(500, 'Terjadi kesalahan pada server'))
     const { wrapper } = await mountView(DashboardView, { path: '/dashboard', withOverlays: true })
     expect(wrapper.text()).toContain('Terjadi kesalahan pada server')

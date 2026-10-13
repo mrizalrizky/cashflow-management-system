@@ -1,103 +1,67 @@
 import { describe, expect, it } from 'vitest'
-import { createTestRouter } from '@/test/mount'
-import { reconcileRoute } from '../reconcile'
-import type { AuthUser, Role } from '@/api/types'
-import { resolveNavigation, safeRedirect } from '../guards'
-import { menuFor } from '../navigation'
-import { landingPath } from '../paths'
+import type { AuthUser } from '@/api/types'
+import { postLoginPath, resolveNavigation, safeRedirect } from '../guards'
+import { menu } from '../navigation'
 import { routes } from '../routes'
 
-function user(role: Role, mustChangePassword = false): AuthUser {
-  return { id: 'u1', name: 'Nama', email: 'a@example.com', role, mustChangePassword }
-}
+const OWNER: AuthUser = { id: 'u-owner', name: 'Pemilik' }
 
 /** Menjalankan aturan navigasi terhadap rute yang benar-benar terdaftar. */
 function navigate(current: AuthUser | null, path: string) {
   const pathname = path.split('?')[0]
   const route = routes.find((r) => r.path === pathname)
   if (!route) throw new Error(`Rute ${pathname} tidak terdaftar`)
-  return resolveNavigation({
-    user: current,
-    to: { path: pathname!, fullPath: path, meta: route.meta ?? {} },
-  })
+  return resolveNavigation({ user: current, to: { path: pathname!, fullPath: path, meta: route.meta ?? {} } })
 }
 
 describe('resolveNavigation', () => {
-  it('sends a logged-out visitor to login and remembers where they were going', () => {
-    expect(navigate(null, '/pengguna?page=2')).toEqual({
-      path: '/login',
-      query: { redirect: '/pengguna?page=2' },
+  it('sends a visitor without a session to the PIN entry, remembering the page', () => {
+    expect(navigate(null, '/transaksi?page=2')).toEqual({
+      path: '/masuk',
+      query: { redirect: '/transaksi?page=2' },
     })
   })
 
-  it('lets a logged-out visitor open the login page', () => {
-    expect(navigate(null, '/login')).toBe(true)
+  it('lets a visitor open the PIN pages', () => {
+    expect(navigate(null, '/masuk')).toBe(true)
+    expect(navigate(null, '/buat-pin')).toBe(true)
   })
 
-  it.each<[Role, string]>([
-    ['SUPER_ADMIN', '/dashboard'],
-    ['PROJECT_MANAGER', '/transaksi'],
-    ['STAFF', '/transaksi'],
-  ])('sends a logged-in %s away from login and from / to %s', (role, landing) => {
-    expect(navigate(user(role), '/login')).toEqual({ path: landing })
-    expect(navigate(user(role), '/')).toEqual({ path: landing })
-    expect(landingPath(role)).toBe(landing)
+  it('sends the owner from the root and the PIN pages to the dashboard', () => {
+    expect(navigate(OWNER, '/')).toEqual({ path: '/dashboard' })
+    expect(navigate(OWNER, '/masuk')).toEqual({ path: '/dashboard' })
+    expect(navigate(OWNER, '/buat-pin')).toEqual({ path: '/dashboard' })
   })
 
-  it('confines a user with a pending password change to the change-password page', () => {
-    const pending = user('SUPER_ADMIN', true)
-    for (const path of ['/dashboard', '/pengguna', '/', '/login']) {
-      expect(navigate(pending, path)).toEqual({ path: '/ganti-password' })
+  it('lets the owner open every page of the menu, the settings and the audit log', () => {
+    for (const item of menu()) expect(navigate(OWNER, item.to)).toBe(true)
+    expect(navigate(OWNER, '/pengaturan/audit-log')).toBe(true)
+  })
+
+  it('no longer knows the company pages', () => {
+    for (const path of ['/pengguna', '/proyek', '/ganti-password', '/login']) {
+      expect(routes.find((route) => route.path === path)).toBeUndefined()
     }
-    expect(navigate(pending, '/ganti-password')).toBe(true)
-  })
-
-  it('lets any logged-in user change their password voluntarily', () => {
-    expect(navigate(user('STAFF'), '/ganti-password')).toBe(true)
-  })
-
-  it.each<[Role, true | { path: string }]>([
-    ['STAFF', { path: '/transaksi' }],
-    ['PROJECT_MANAGER', { path: '/transaksi' }],
-    ['SUPER_ADMIN', true],
-  ])('handles %s opening the user management page', (role, expected) => {
-    expect(navigate(user(role), '/pengguna')).toEqual(expected)
-  })
-
-  it.each<Role>(['SUPER_ADMIN', 'PROJECT_MANAGER', 'STAFF'])(
-    'allows %s to open every item in their own menu and their landing page',
-    (role) => {
-      for (const item of menuFor(role)) {
-        expect(navigate(user(role), item.to)).toBe(true)
-      }
-      expect(navigate(user(role), landingPath(role))).toBe(true)
-    },
-  )
-})
-
-describe('master data page', () => {
-  it.each<[Role, true | { path: string }]>([
-    ['STAFF', { path: '/transaksi' }],
-    ['PROJECT_MANAGER', { path: '/transaksi' }],
-    ['SUPER_ADMIN', true],
-  ])('handles %s opening it', (role, expected) => {
-    expect(navigate(user(role), '/master-data')).toEqual(expected)
   })
 })
 
-describe('menuFor', () => {
-  it.each<[Role, string[]]>([
-    ['SUPER_ADMIN', ['Dashboard', 'Transaksi', 'Master data', 'Pengguna', 'Audit log']],
-    ['PROJECT_MANAGER', ['Transaksi']],
-    ['STAFF', ['Transaksi']],
-  ])('lists the pages for %s', (role, labels) => {
-    expect(menuFor(role).map((item) => item.label)).toEqual(labels)
+describe('postLoginPath', () => {
+  it('follows a safe redirect and otherwise opens the dashboard', () => {
+    expect(postLoginPath('/transaksi')).toBe('/transaksi')
+    expect(postLoginPath('//evil.example')).toBe('/dashboard')
+    expect(postLoginPath(undefined)).toBe('/dashboard')
+  })
+})
+
+describe('menu', () => {
+  it('lists the pages of the personal edition', () => {
+    expect(menu().map((item) => item.label)).toEqual(['Dashboard', 'Transaksi', 'Master data', 'Pengaturan'])
   })
 })
 
 describe('safeRedirect', () => {
   it.each([
-    ['/pengguna?page=2', '/pengguna?page=2'],
+    ['/transaksi?page=2', '/transaksi?page=2'],
     ['//evil.example', null],
     ['https://evil.example', null],
     ['/\\evil.example', null],
@@ -107,30 +71,5 @@ describe('safeRedirect', () => {
     [['/a', '/b'], null],
   ])('maps %j to %j', (input, expected) => {
     expect(safeRedirect(input)).toBe(expected)
-  })
-})
-
-describe('reconcileRoute', () => {
-  async function at(path: string) {
-    const router = createTestRouter()
-    await router.push(path)
-    await router.isReady()
-    return router
-  }
-
-  it('moves a user whose password was reset to the change-password page', async () => {
-    const router = await at('/transaksi')
-
-    await reconcileRoute(router, user('STAFF', true))
-
-    expect(router.currentRoute.value.path).toBe('/ganti-password')
-  })
-
-  it('leaves the user where they are when the page is still allowed', async () => {
-    const router = await at('/transaksi')
-
-    await reconcileRoute(router, user('STAFF'))
-
-    expect(router.currentRoute.value.path).toBe('/transaksi')
   })
 })

@@ -1,13 +1,12 @@
 import './assets/main.css'
 
-import { createApp, watch } from 'vue'
+import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import { installPrimeVue } from './plugins/primevue'
 import router from './router'
 import { PATHS } from './router/paths'
-import { reconcileRoute } from './router/reconcile'
 import { useSessionStore } from './stores/session'
 
 const app = createApp(App)
@@ -25,14 +24,5 @@ session.onExpired(() => {
     query: { redirect: router.currentRoute.value.fullPath },
   })
 })
-
-// Data user berubah di tengah sesi (bukan login atau logout, yang mengatur navigasinya
-// sendiri): pastikan halaman yang sedang dibuka masih boleh dibukanya.
-watch(
-  () => session.user,
-  (now, before) => {
-    if (now && before) void reconcileRoute(router, now)
-  },
-)
 
 app.mount('#app')

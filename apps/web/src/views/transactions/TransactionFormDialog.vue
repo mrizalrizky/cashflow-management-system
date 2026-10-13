@@ -29,7 +29,7 @@ import {
   transactionDateRules,
 } from '@/lib/transaction-rules'
 import { collectErrors } from '@/lib/validation'
-import { transactionPath } from '@/router/paths'
+import { PATHS, transactionPath } from '@/router/paths'
 import TransactionOptionsError from './TransactionOptionsError.vue'
 
 const props = defineProps<{
@@ -140,9 +140,15 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
   },
 })
 
-watch(visible, (open) => {
-  if (open) files.value = []
-})
+watch(
+  visible,
+  (open) => {
+    if (!open) return
+    files.value = []
+    void props.options.reloadInstallments()
+  },
+  { immediate: true },
+)
 
 function onTypeChange(type: TxType | null): void {
   // Kategori terikat pada tipe; yang tidak cocok lagi dilepas.
@@ -204,7 +210,9 @@ watch(needsInstallment, (needed) => {
     form.installmentId = null
     return
   }
-  if (form.installmentId === null && installmentChoices.value.length === 1) {
+  // Hanya untuk transaksi baru: transaksi lama pada kategori yang baru ditandai harus dipilihkan
+  // cicilannya oleh pemilik, bukan diam-diam ditautkan.
+  if (props.transaction === null && form.installmentId === null && installmentChoices.value.length === 1) {
     onInstallmentChange(installmentChoices.value[0]!.id)
   }
 })
@@ -271,6 +279,14 @@ watch(needsInstallment, (needed) => {
       :error="fieldErrors.installmentId"
       @update:model-value="onInstallmentChange"
     />
+    <p
+      v-if="needsInstallment && installmentOptions.length === 0"
+      class="-mt-2 text-sm text-surface-600"
+      data-testid="no-installment"
+    >
+      Belum ada cicilan yang belum lunas.
+      <RouterLink :to="PATHS.installments" class="text-primary-700 hover:underline">Tambahkan di halaman Cicilan</RouterLink>.
+    </p>
     <FormField
       id="tx-description"
       v-slot="field"

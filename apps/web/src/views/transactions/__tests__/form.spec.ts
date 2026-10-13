@@ -434,6 +434,43 @@ describe('TransactionFormDialog: installments', () => {
     expect(transactionsApi.createTransaction).not.toHaveBeenCalled()
   })
 
+  it('loads the installments again when it opens, so the progress is current', async () => {
+    vi.mocked(installmentsApi.listInstallments)
+      .mockResolvedValueOnce(installmentList([MOTOR]))
+      .mockResolvedValue(installmentList([{ ...MOTOR, paid: 2 }]))
+    const { wrapper } = await mountForm()
+    await choose(wrapper, 'tx-category', KREDIT.id)
+    expect(installmentsApi.listInstallments).toHaveBeenCalledTimes(2)
+    expect(optionLabels(wrapper, 'tx-installment')).toEqual(['Motor · Rp 1.500.000 · 2/3'])
+  })
+
+  it('does not pick an installment by itself for an old expense being edited', async () => {
+    const old = makeTransaction({ category: { id: KREDIT.id, name: KREDIT.name }, permissions: { canEdit: true } })
+    // Seperti di halaman: dialog sudah terpasang tersembunyi, lalu dibuka.
+    signIn()
+    const options = useTransactionOptions()
+    await flushPromises()
+    const { wrapper } = await mountView(TransactionFormDialog, {
+      props: { visible: false, transaction: old, options, onSaved, 'onUpdate:visible': onVisible },
+    })
+    await wrapper.setProps({ visible: true })
+    await flushPromises()
+    expect(select(wrapper, 'tx-installment').props('modelValue')).toBeNull()
+    await fill(wrapper, '#tx-description', 'Beli semen lagi')
+    await submitForm(wrapper)
+    expect(errorOf(wrapper, 'tx-installment')).toBe('Cicilan wajib dipilih')
+    expect(transactionsApi.updateTransaction).not.toHaveBeenCalled()
+  })
+
+  it('points to the Cicilan page when no installment is left to pay', async () => {
+    vi.mocked(installmentsApi.listInstallments).mockResolvedValue(installmentList([HP]))
+    const { wrapper } = await mountForm()
+    await choose(wrapper, 'tx-category', KREDIT.id)
+    const hint = wrapper.get('[data-testid="no-installment"]')
+    expect(hint.text()).toContain('Belum ada cicilan yang belum lunas')
+    expect(hint.get('a').attributes('href')).toBe('/cicilan')
+  })
+
   it('still offers the paid-off installment a transaction already pays when editing', async () => {
     const linked = makeTransaction({
       category: { id: KREDIT.id, name: KREDIT.name },

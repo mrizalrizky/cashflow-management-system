@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext } from '@playwright/test'
-import { ADMIN } from './env'
+import { OWNER } from './env'
 
 const API = '/api/v1'
 
@@ -16,18 +16,14 @@ export interface ApiSession {
 }
 
 /**
- * Memanggil API langsung atas nama seorang pengguna, untuk menyiapkan data test tanpa
- * bergantung pada file test lain. Pengguna itu harus sudah memakai password tetapnya
- * (lihat `signIn`), karena password sementara tidak boleh dipakai selain untuk menggantinya.
+ * Memanggil API langsung atas nama pemilik, untuk menyiapkan data test tanpa bergantung pada
+ * file test lain. Pada database baru, PIN dibuat dulu.
  */
-export async function apiAs(
-  request: APIRequestContext,
-  account: { email: string; password: string },
-): Promise<ApiSession> {
-  const login = await request.post(`${API}/auth/login`, {
-    data: { email: account.email, password: account.password },
-  })
-  expect(login.ok(), `login ${account.email} lewat API`).toBe(true)
+export async function ownerApi(request: APIRequestContext): Promise<ApiSession> {
+  const status = await request.get(`${API}/auth/pin-status`)
+  const { pinSet } = (await status.json()) as { pinSet: boolean }
+  const login = await request.post(`${API}/auth/${pinSet ? 'login' : 'setup-pin'}`, { data: { pin: OWNER.pin } })
+  expect(login.ok(), `masuk dengan PIN lewat API: ${await login.text()}`).toBe(true)
   const headers = { Authorization: `Bearer ${(await login.json()).accessToken}` }
 
   async function send<T>(method: 'post' | 'put', path: string, options: object): Promise<T> {
@@ -41,8 +37,4 @@ export async function apiAs(
     put: (path, data) => send('put', path, { data }),
     upload: (path, file) => send('post', path, { multipart: { file } }),
   }
-}
-
-export function adminApi(request: APIRequestContext): Promise<ApiSession> {
-  return apiAs(request, ADMIN)
 }

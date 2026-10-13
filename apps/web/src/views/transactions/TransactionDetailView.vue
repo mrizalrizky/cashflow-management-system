@@ -63,7 +63,7 @@ function byWhom(person: { name: string }, at: string | null): string {
   return `${person.name} · ${formatDate(at)}`
 }
 
-/** Baris keterangan sederhana; jumlah dan proyek punya tampilannya sendiri di template. */
+/** Baris keterangan sederhana; jumlahnya punya tampilan sendiri di template. */
 const facts = computed(() => {
   const tx = transaction.value
   if (!tx) return []
@@ -186,7 +186,7 @@ function openForm(): void {
       </div>
     </dl>
 
-    <!-- Riwayat perubahan ada di log audit, yang hanya bisa dibuka admin. -->
+    <!-- Riwayat perubahan ada di log audit. -->
     <RouterLink
       :to="{ path: PATHS.auditLog, query: { entityType: 'transaction', entityId: transaction.id } }"
       class="mb-6 inline-flex items-center gap-2 text-sm text-primary-700 hover:underline"

@@ -198,7 +198,7 @@ describe('DashboardView', () => {
     expect(stat(wrapper, 'net')).toContain('Rp 0')
     const text = wrapper.text()
     expect(text).toContain('Belum ada akun')
-    expect(text).toContain('Belum ada transaksi yang disetujui pada periode ini')
+    expect(text).toContain('Belum ada transaksi pada periode ini')
     expect(text).toContain('Belum ada pengeluaran pada periode ini')
     expect(text).toContain('Belum ada transaksi')
     expect(text).not.toMatch(/NaN|Infinity|undefined/)

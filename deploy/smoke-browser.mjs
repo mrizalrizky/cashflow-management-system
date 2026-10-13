@@ -2,12 +2,12 @@
 // produksi dan memastikan aturan keamanan browser (Content-Security-Policy) tidak mematikan
 // apa pun. Dipanggil oleh deploy/smoke.sh.
 //
-//   node deploy/smoke-browser.mjs <alamat> <email> <password>
+//   node deploy/smoke-browser.mjs <alamat> <pin>
 import { chromium } from '@playwright/test'
 
-const [base, email, password] = process.argv.slice(2)
-if (!base || !email || !password) {
-  console.error('pemakaian: node deploy/smoke-browser.mjs <alamat> <email> <password>')
+const [base, pin] = process.argv.slice(2)
+if (!base || !pin) {
+  console.error('pemakaian: node deploy/smoke-browser.mjs <alamat> <pin>')
   process.exit(2)
 }
 
@@ -28,7 +28,7 @@ try {
   }
   page.on('pageerror', (error) => problems.push(`galat halaman: ${error.message}`))
 
-  await page.goto(`${base}/login`)
+  await page.goto(`${base}/masuk`)
   const submit = page.getByRole('button', { name: 'Masuk' })
   await submit.waitFor()
   // Gaya PrimeVue disisipkan sebagai <style>; bila CSP menolaknya, tombol utama tidak berwarna.
@@ -37,10 +37,9 @@ try {
     return background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent'
   })
   if (!styled) problems.push('gaya PrimeVue tidak diterapkan pada tombol Masuk')
-  await collect('/login')
+  await collect('/masuk')
 
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByLabel('PIN', { exact: true }).fill(pin)
   await submit.click()
   await page.waitForURL(/\/dashboard$/)
   await page.getByRole('heading', { name: 'Dashboard' }).waitFor()
@@ -54,9 +53,9 @@ try {
   await collect('/transaksi')
 
   // Alamat dalam yang dibuka langsung: sesi dipulihkan dari cookie, lalu halamannya tampil.
-  await page.goto(`${base}/audit-log`)
+  await page.goto(`${base}/pengaturan/audit-log`)
   await page.getByRole('heading', { name: 'Audit log' }).waitFor()
-  await collect('/audit-log')
+  await collect('/pengaturan/audit-log')
 } catch (error) {
   problems.push(`alur gagal: ${error.message}`)
 } finally {
@@ -67,4 +66,4 @@ if (problems.length > 0) {
   console.error(problems.join('\n'))
   process.exit(1)
 }
-console.log('browser: login, halaman dan gaya berjalan tanpa pelanggaran aturan keamanan')
+console.log('browser: masuk dengan PIN, halaman dan gaya berjalan tanpa pelanggaran aturan keamanan')

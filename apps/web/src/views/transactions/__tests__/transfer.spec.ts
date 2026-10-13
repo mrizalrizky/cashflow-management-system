@@ -172,7 +172,7 @@ describe('TransactionsView: transfer', () => {
     return mountView(TransactionsView, { path: '/transaksi', withOverlays: true })
   }
 
-  it('opens the transfer dialog for an admin and reloads the list afterwards', async () => {
+  it('opens the transfer dialog and reloads the list afterwards', async () => {
     const { wrapper } = await mountList()
 
     await wrapper.get('[data-testid="add-transfer"]').trigger('click')

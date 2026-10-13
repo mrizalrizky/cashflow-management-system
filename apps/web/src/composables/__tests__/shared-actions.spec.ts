@@ -114,13 +114,13 @@ describe('useToggleActive', () => {
   it('shows why the API refused and reports no change', async () => {
     const refused = vi
       .fn<(id: string, isActive: boolean) => Promise<unknown>>()
-      .mockRejectedValue(new ApiError(400, 'Harus ada minimal satu SUPER_ADMIN aktif'))
+      .mockRejectedValue(new ApiError(400, 'Akun masih dipakai'))
     const { toggle, onChanged } = await setup(refused)
 
     toggle(INACTIVE)
     await flushPromises()
 
-    expect(document.body.textContent).toContain('Harus ada minimal satu SUPER_ADMIN aktif')
+    expect(document.body.textContent).toContain('Akun masih dipakai')
     expect(onChanged).not.toHaveBeenCalled()
   })
 

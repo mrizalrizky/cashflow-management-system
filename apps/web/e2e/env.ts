@@ -7,12 +7,8 @@ export const API_PORT = 3100
 export const WEB_PORT = 5174
 export const API_DIR = fileURLToPath(new URL('../../api', import.meta.url))
 
-export const ADMIN = {
-  name: 'Admin Uji',
-  email: 'admin@example.com',
-  temporaryPassword: 'sementara-admin-1',
-  password: 'password-admin-1',
-}
+/** PIN pemilik. Setiap file test berakhir dengan PIN ini, supaya file lain tetap bisa masuk. */
+export const OWNER = { pin: '135792', newPin: '246810' }
 
 const DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? 'postgresql://cashflow:cashflow_dev@localhost:5432/cashflow_test'
@@ -30,7 +26,4 @@ export const apiEnv: Record<string, string> = {
   JWT_ACCESS_SECRET: 'browser-test-secret-browser-test-secret-1234',
   LOGIN_RATE_LIMIT: '1000',
   STORAGE_DIR: join(tmpdir(), 'cashflow-browser-test-storage'),
-  SEED_ADMIN_NAME: ADMIN.name,
-  SEED_ADMIN_EMAIL: ADMIN.email,
-  SEED_ADMIN_PASSWORD: ADMIN.temporaryPassword,
 }

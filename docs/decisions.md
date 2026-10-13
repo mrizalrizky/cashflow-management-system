@@ -162,3 +162,13 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Nilai kontrak + PPN tidak boleh lebih kecil dari nilai kontrak** (kecuali 0), dicek terhadap nilai akhir saat hanya salah satunya diubah.
 - **Proyek yang sudah ada** diberi nilai kontrak + PPN sama dengan nilai kontraknya oleh migrasi, supaya ringkasannya tidak berubah; admin menyesuaikannya.
 - **Pembayaran per termin tidak dimodelkan.** Tiap termin dicatat sebagai transaksi pemasukan proyek dan dijumlahkan ringkasan. Jadwal termin (jumlah per termin, jatuh tempo) adalah fitur terpisah yang belum diminta.
+
+## Edisi pribadi (P1)
+
+- **Branch `personal-edition` menghapus proyek, persetujuan, pengguna, dan peran.** Edisi ini dipakai satu orang untuk keuangan pribadi. Database-nya database baru; migrasi `20261012090000_personal_edition` membuang tabel dan kolom proyek, peninjau, dan peran beserta isinya, jadi **jangan dijalankan pada database perusahaan**.
+- **Satu baris pemilik di tabel `users`**, supaya sesi, transaksi, bukti, dan log audit tetap menunjuk ke pengguna tanpa mengubah tabel-tabel itu. Pemilik adalah baris tertua; seed membuatnya tanpa PIN.
+- **PIN 6 sampai 12 angka, jeda 15 menit setelah 5 salah untuk semua pengunjung**, disimpan di database sehingga bertahan saat API dinyalakan ulang. Batas per pengunjung (`LOGIN_RATE_LIMIT`) tetap berlaku di atasnya. Sesi berlaku 30 hari dan dirotasi; ganti PIN mengakhiri sesi perangkat lain.
+- **Transaksi yang tercatat boleh diubah**; pembatalan lewat VOID, tanpa hard delete. Status tinggal `APPROVED` (tampil "Tercatat") dan `VOID` ("Dibatalkan"). Bukti tidak lagi wajib.
+- **Akun dan kategori awal diganti untuk keperluan pribadi**: Dompet dan Rekening Bank; Gaji, Bonus, Pendapatan Lain; Makan & Minum, Belanja, Transportasi, Tagihan & Utilitas, Kesehatan, Hiburan, Pendidikan, Lain-lain.
+- **Lupa PIN lewat perintah server `reset-pin`**, bukan lewat aplikasi, supaya tidak ada jalan masuk tanpa PIN. Reset menghapus PIN dan semua sesi; data tidak tersentuh.
+- **Log audit pindah ke Pengaturan** (`/pengaturan/audit-log`); filter dan kolom pengguna dihapus karena hanya ada satu pengguna.

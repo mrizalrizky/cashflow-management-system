@@ -3,7 +3,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import type { TransactionOptions } from '@/composables/useTransactionOptions'
 
-/** Pemberitahuan bahwa pilihan akun, kategori dan proyek gagal dimuat, dengan cara mengulanginya. */
+/** Pemberitahuan bahwa pilihan akun dan kategori gagal dimuat, dengan cara mengulanginya. */
 defineProps<{ options: TransactionOptions }>()
 </script>
 

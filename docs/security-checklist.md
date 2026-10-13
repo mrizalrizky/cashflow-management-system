@@ -1,30 +1,27 @@
 # Checklist keamanan dan kualitas
 
-Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di mana ia ditegakkan, dan test mana yang membuktikannya. Path test relatif terhadap `apps/api`. Diperiksa terakhir pada Fase 6.
+Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di mana ia ditegakkan, dan test mana yang membuktikannya. Path test relatif terhadap `apps/api`. Diperiksa terakhir pada Fase 6; butir 1, 2 dan 5 disesuaikan untuk edisi pribadi (P1).
 
 | # | Butir | Status |
 |---|-------|--------|
-| 1 | Password di-hash argon2, tidak pernah di-log; refresh token disimpan sebagai hash | Terpenuhi |
-| 2 | Semua endpoint punya guard role dan scoping proyek; akses horizontal (IDOR) diuji | Terpenuhi |
+| 1 | PIN di-hash argon2, tidak pernah di-log; refresh token disimpan sebagai hash | Terpenuhi |
+| 2 | Semua endpoint wajib sesi pemilik kecuali yang ditandai terbuka (edisi pribadi: tanpa peran dan proyek) | Terpenuhi |
 | 3 | Validasi DTO dengan whitelist | Terpenuhi |
 | 4 | Unggah berkas: jenis sebenarnya, batas ukuran, nama dibuat ulang, unduh lewat endpoint terotentikasi | Terpenuhi |
-| 5 | Rate limit pada login | Terpenuhi |
+| 5 | Rate limit dan jeda pada masuk dengan PIN | Terpenuhi |
 | 6 | Tidak ada secret di repo | Terpenuhi |
 | 7 | Backup terjadwal dan pernah diuji restore | Terpenuhi |
 | 8 | Test minimal: saldo, transfer, status transaksi, permission, agregasi dashboard | Terpenuhi |
 
-## 1. Password dan token
+## 1. PIN dan token
 
-- **Di mana:** `src/auth/password.service.ts` (argon2id), `src/auth/token.service.ts` (refresh token acak, yang disimpan hanya hash SHA-256-nya). `src/audit/audit.service.ts` membuang field rahasia (`password`, `password_hash`, `token_hash`, dan sejenisnya) sebelum menyimpan `before`/`after`.
-- **Bukti:** `src/auth/password.service.spec.ts`, `src/auth/token.service.spec.ts`, `src/audit/audit.service.spec.ts`, `test/auth-refresh.e2e-spec.ts` (rotasi dan deteksi pemakaian ulang), `test/audit-logs.e2e-spec.ts` ("never shows a password, a token or where a file is stored").
+- **Di mana:** PIN 6 sampai 12 angka (`src/common/pin-policy.ts`), di-hash argon2id (`src/auth/password.service.ts`, dipakai `src/auth/pin.service.ts`). `src/auth/token.service.ts`: refresh token acak, yang disimpan hanya hash SHA-256-nya; sesi 30 hari, dirotasi tiap diperpanjang, dan diakhiri saat PIN diganti (perangkat lain) atau direset (semua). `src/audit/audit.service.ts` membuang field rahasia (`pin`, `pin_hash`, `currentPin`, `newPin`, `token_hash`, `refreshToken`) sebelum menyimpan `before`/`after`.
+- **Bukti:** `src/auth/token.service.spec.ts`, `src/audit/audit.service.spec.ts`, `test/auth-pin.e2e-spec.ts`, `test/reset-pin.e2e-spec.ts`, `test/auth-refresh.e2e-spec.ts` (rotasi dan deteksi pemakaian ulang), `test/audit-logs.e2e-spec.ts` ("never shows a password, a token or where a file is stored").
 
-## 2. Guard peran dan scoping
+## 2. Guard sesi
 
-- **Di mana:** `src/auth/jwt-auth.guard.ts` dan `roles.guard.ts` berlaku global; rute terbuka harus ditandai `@Public()`. Scoping proyek di `src/projects/project-access.service.ts`; scoping transaksi dan bukti di `src/transactions/transaction-access.service.ts`; siapa boleh apa di `src/transactions/transaction-policy.ts`.
-- **Bukti:**
-  - `test/route-guards.e2e-spec.ts` membaca semua rute yang terdaftar dan memastikan tiap rute di luar daftar terbuka (health, login, refresh, logout) menjawab 401 tanpa token maupun dengan token palsu, dan tiap rute khusus admin menjawab 403 untuk peran lain. Rute baru yang bisa dipanggil tanpa login membuat test ini gagal. Yang tidak dijaga test ini: rute baru yang seharusnya khusus admin tetapi lupa diberi `@Roles` (tetap wajib login), dan rute yang disembunyikan dari dokumen OpenAPI.
-  - IDOR: `test/project-access.e2e-spec.ts`, `test/transaction-read.e2e-spec.ts`, `test/transaction-edit.e2e-spec.ts`, `test/attachments.e2e-spec.ts`, `test/project-summary.e2e-spec.ts`, `test/transaction-export.e2e-spec.ts` ("never hands over rows that are not the user's to see"). Data di luar jangkauan dijawab 404, sama seperti data yang tidak ada.
-  - `test/auth-roles.e2e-spec.ts`: user yang dinonaktifkan atau dicabut dari proyek kehilangan akses pada request berikutnya.
+- **Di mana:** `src/auth/jwt-auth.guard.ts` berlaku global; rute terbuka harus ditandai `@Public()`. Edisi pribadi hanya punya satu pemilik, jadi tidak ada lagi peran, proyek, atau scoping per pengguna; `src/transactions/transaction-policy.ts` tinggal menentukan apa yang boleh dilakukan pada transaksi menurut statusnya.
+- **Bukti:** `test/route-guards.e2e-spec.ts` membaca semua rute yang terdaftar dan memastikan tiap rute di luar daftar terbuka (health, pin-status, setup-pin, login, refresh, logout) menjawab 401 tanpa token maupun dengan token palsu. Rute baru yang bisa dipanggil tanpa sesi membuat test ini gagal.
 
 ## 3. Validasi masukan
 
@@ -36,17 +33,17 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 - **Di mana:** `src/attachments/file-sniffer.ts` (jenis ditentukan dari isi berkas), `src/attachments/attachments.service.ts` (maksimal 10 MB dan 10 berkas per transaksi; kunci penyimpanan dibuat ulang sebagai UUID), `src/attachments/file-name.ts` (nama tampilan disanitasi), `src/storage/local-disk.storage.ts` (menolak kunci di luar pola). Unduhan hanya lewat `GET /attachments/:id/download` dengan token, selalu sebagai lampiran dan dengan `nosniff`.
 - **Bukti:** `src/attachments/attachment-files.spec.ts`, `test/attachments.e2e-spec.ts`.
 
-## 5. Rate limit login
+## 5. Batas percobaan PIN
 
-- **Di mana:** `src/auth/auth.controller.ts` (throttle per IP, `LOGIN_RATE_LIMIT`), dengan `TRUST_PROXY_HOPS` supaya IP klien asli terbaca di belakang reverse proxy.
-- **Bukti:** `test/auth-rate-limit.e2e-spec.ts`.
+- **Di mana:** `src/auth/pin-lockout.ts` dan `src/auth/pin.service.ts`: lima PIN salah berturut-turut menjeda masuk 15 menit untuk semua pengunjung, disimpan di database (`users.pin_failed_attempts`, `users.pin_locked_until`) sehingga tidak hilang saat API dinyalakan ulang. Di atasnya, throttle per IP (`LOGIN_RATE_LIMIT`) di `src/auth/auth.controller.ts`, dengan `TRUST_PROXY_HOPS` supaya IP klien asli terbaca di belakang reverse proxy.
+- **Bukti:** `src/auth/pin-lockout.spec.ts`, `test/auth-pin-lockout.e2e-spec.ts`, `test/auth-rate-limit.e2e-spec.ts`, dan `deploy/smoke.sh` bagian 4.
 
 ## 6. Tidak ada secret di repo
 
 - **Di mana:** `.gitignore` mengabaikan `.env` dan `.env.*` kecuali `.env.example`; semua secret dibaca dari environment dan divalidasi saat start (`src/config/env.validation.ts`).
 - **Bukti (diperiksa manual pada Fase 5a):**
-  - `git ls-files` hanya memuat `apps/api/.env.example`, yang `JWT_ACCESS_SECRET` dan `SEED_ADMIN_PASSWORD`-nya kosong.
-  - Pencarian `git grep` untuk pola `secret|password|token|api key = "<nilai>"` di luar test hanya menemukan nilai contoh `ganti-password-ini` di `src/database/seed.ts`, yang justru ditolak sebagai password (lihat `test/seed.e2e-spec.ts`).
+  - `git ls-files` hanya memuat `apps/api/.env.example`, yang `JWT_ACCESS_SECRET`-nya kosong.
+  - Pencarian `git grep` untuk pola `secret|password|token|api key = "<nilai>"` di luar test tidak menemukan nilai sungguhan. Edisi pribadi tidak lagi punya password admin awal: PIN dibuat pemilik saat aplikasi pertama dibuka.
   - `docker-compose.dev.yml` hanya untuk pengembangan; password database di dalamnya adalah bawaan lokal, bukan secret. Compose produksi (Fase 6) harus mengambilnya dari environment.
 
 ## 7. Backup dan restore
@@ -60,17 +57,17 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 
 | Aturan | Test |
 |--------|------|
-| Saldo | `test/accounts.e2e-spec.ts`, `test/transaction-approval.e2e-spec.ts`, `test/dashboard.e2e-spec.ts` |
+| Saldo | `test/accounts.e2e-spec.ts`, `test/transaction-flow.e2e-spec.ts`, `test/dashboard.e2e-spec.ts` |
 | Transfer | `test/transfers.e2e-spec.ts` |
-| Status transaksi | `test/transaction-edit.e2e-spec.ts`, `test/transaction-approval.e2e-spec.ts`, `test/transaction-flow.e2e-spec.ts` |
-| Permission | `src/transactions/transaction-policy.spec.ts`, `test/route-guards.e2e-spec.ts`, file IDOR pada butir 2 |
-| Agregasi dashboard | `test/dashboard.e2e-spec.ts`, `test/project-summary.e2e-spec.ts`, `test/report-scale.e2e-spec.ts` |
+| Status transaksi | `test/transaction-edit.e2e-spec.ts`, `test/transaction-flow.e2e-spec.ts` |
+| Permission | `src/transactions/transaction-policy.spec.ts`, `test/route-guards.e2e-spec.ts` |
+| Agregasi dashboard | `test/dashboard.e2e-spec.ts`, `test/report-scale.e2e-spec.ts` |
 
 ## Di luar bagian 13, ditambahkan pada Fase 5a
 
 - **Header keamanan** (`helmet`) dan **CORS tertutup secara bawaan** (`CORS_ORIGINS`): `src/app.setup.ts`, dibuktikan `test/security-headers.e2e-spec.ts`.
 - **Ekspor CSV aman dari rumus spreadsheet:** `src/common/csv.ts`, dibuktikan `src/common/csv.spec.ts` dan `test/transaction-export.e2e-spec.ts`.
-- **Log audit hanya bisa dibaca**, oleh admin saja: `test/audit-logs.e2e-spec.ts`.
+- **Log audit hanya bisa dibaca**: `test/audit-logs.e2e-spec.ts`.
 
 ## Yang masih terbuka
 
@@ -81,5 +78,5 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 ## Ditambahkan pada Fase 6
 
 - **Image tanpa rahasia dan tanpa hak root**, tanpa `.env`, kode sumber, test atau berkas bukti; **tidak ada port yang dibuka** di server (jalan masuk hanya Cloudflare Tunnel); Compose menolak jalan bila nilai wajib kosong. Dibuktikan `deploy/smoke.sh` bagian 1 sampai 3.
-- **Batas percobaan login tetap per pengunjung di balik dua proxy** (Cloudflare dan Caddy): `deploy/smoke.sh` bagian 4.
+- **Batas percobaan masuk tetap per pengunjung di balik dua proxy** (Cloudflare dan Caddy): `deploy/smoke.sh` bagian 4.
 - **Kebijakan keamanan browser (CSP) untuk halaman web** diuji dengan browser sungguhan: `deploy/smoke-browser.mjs`.

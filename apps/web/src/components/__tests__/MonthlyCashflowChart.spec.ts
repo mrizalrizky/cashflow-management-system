@@ -80,10 +80,10 @@ describe('MonthlyCashflowChart', () => {
       { month: '2026-11', income: '0', expense: '0', net: '0' },
     ])
 
-    expect(wrapper.text()).toBe('Belum ada transaksi yang disetujui pada periode ini')
+    expect(wrapper.text()).toBe('Belum ada transaksi pada periode ini')
     expect(wrapper.find('li').exists()).toBe(false)
 
-    expect((await render([])).text()).toBe('Belum ada transaksi yang disetujui pada periode ini')
+    expect((await render([])).text()).toBe('Belum ada transaksi pada periode ini')
   })
 
   it('keeps columns readable for a long period by scrolling inside its own box', async () => {

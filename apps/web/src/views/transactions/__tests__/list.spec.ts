@@ -271,7 +271,7 @@ describe('TransactionsView', () => {
     expect(wrapper.text()).toContain('Beli semen')
   })
 
-  it('gives an admin both actions and a switch that hides transfers', async () => {
+  it('offers both actions and a switch that hides transfers', async () => {
     const { wrapper } = await mountList()
 
     expect(wrapper.get('h1').text()).toBe('Transaksi')
@@ -341,8 +341,8 @@ describe('TransactionsView: export', () => {
     await flushPromises()
   }
 
-  it.each(['SUPER_ADMIN', 'PROJECT_MANAGER', 'STAFF'] as const)('is offered to a %s', async (role) => {
-    const { wrapper } = await mountList(role)
+  it('is offered', async () => {
+    const { wrapper } = await mountList()
 
     expect(wrapper.get('[data-testid="export-transactions"]').text()).toBe('Ekspor CSV')
   })

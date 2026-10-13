@@ -11,7 +11,7 @@ Node 24.12 atau lebih baru, Docker Desktop.
 ```bash
 npm install
 npm run db:up
-cp apps/api/.env.example apps/api/.env   # lalu isi SEED_ADMIN_PASSWORD dan JWT_ACCESS_SECRET
+cp apps/api/.env.example apps/api/.env   # lalu isi JWT_ACCESS_SECRET
 npm run db:migrate -w api
 npm run db:seed -w api
 ```
@@ -23,7 +23,7 @@ npm run dev:api     # http://localhost:3000/api/v1/health
 npm run dev:web     # http://localhost:5173
 ```
 
-Seed aman dijalankan berulang. Admin pertama hanya dibuat bila belum ada SUPER_ADMIN, dan wajib ganti password saat login pertama.
+Seed aman dijalankan berulang. Ia membuat pemilik tanpa PIN, beserta akun dan kategori awal; saat aplikasi dibuka pertama kali, Anda diminta membuat PIN (6 sampai 12 angka). Lupa PIN di pengembangan: `npm run reset-pin:dev -w api`.
 
 ## Menjalankan di server
 
@@ -37,10 +37,11 @@ deploy/dc up -d --build                       # pasang atau perbarui
 | Keperluan | Perintah |
 |---|---|
 | Memasang dan memperbarui | `deploy/dc up -d --build` |
-| Migrasi database dan seed admin pertama | otomatis tiap `deploy/dc up`, oleh layanan `migrate` |
+| Migrasi database, akun dan kategori awal | otomatis tiap `deploy/dc up`, oleh layanan `migrate` |
 | Cadangan sekarang | `deploy/dc exec backup bash deploy/backup-loop.sh --run-once` (terjadwal tiap malam oleh layanan `backup`) |
 | Memulihkan | `deploy/dc --profile tools run --rm restore /backups/<nama cadangan>` |
 | Melihat log | `deploy/dc logs -f api` |
+| Lupa PIN | `deploy/dc run --rm api npm run reset-pin` |
 
 Database produksi berada di Neon; server hanya menjalankan aplikasi dan menyimpan berkas bukti. Tidak ada port yang dibuka: lalu lintas masuk lewat Cloudflare Tunnel. Susunan yang sama bisa diuji di mesin pengembangan dengan `npm run deploy:smoke`.
 
@@ -50,7 +51,7 @@ Bukti transaksi (foto atau PDF nota) disimpan sebagai berkas di folder `STORAGE_
 
 Karena itu **cadangkan folder `STORAGE_DIR` bersama database**, dan pulihkan keduanya dari waktu yang sama. Database tanpa foldernya berarti bukti tidak bisa dibuka; folder tanpa databasenya berarti berkas tanpa pemilik.
 
-Riwayat perubahan data bisa dibaca admin di menu **Audit log**, dan daftar transaksi bisa diunduh sebagai CSV lewat tombol **Ekspor CSV** di halaman Transaksi (isinya mengikuti filter yang sedang dipakai dan hak pengguna).
+Riwayat perubahan data bisa dibaca di **Pengaturan > Buka log audit**, dan daftar transaksi bisa diunduh sebagai CSV lewat tombol **Ekspor CSV** di halaman Transaksi (isinya mengikuti filter yang sedang dipakai).
 
 Cara mencadangkan, memulihkan, dan menguji pemulihan ada di [docs/backup-restore.md](docs/backup-restore.md). Daftar periksa keamanan ada di [docs/security-checklist.md](docs/security-checklist.md).
 
@@ -64,7 +65,7 @@ Saat API berjalan di luar produksi, daftar rute bisa dibuka di http://localhost:
 npm run lint
 npm test
 npm run test:e2e       # e2e API; butuh database berjalan
-npm run test:browser   # alur login di browser sungguhan; butuh database berjalan
+npm run test:browser   # alur aplikasi di browser sungguhan; butuh database berjalan
 ```
 
 Test browser menjalankan API dan web sendiri di port 3100 dan 5174 terhadap `cashflow_test`, jadi server dan data pengembangan tidak tersentuh. Sekali saja, pasang browsernya: `npx playwright install chromium` di `apps/web`.

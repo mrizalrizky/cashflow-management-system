@@ -177,7 +177,7 @@ for _ in $(seq 1 30); do curl --silent --output "$NULL" "$alone/" && break; slee
 
 index="$(curl --silent "$alone/")"
 echo "$index" | grep -q '<div id="app"' || fail "halaman utama bukan aplikasi"
-for deep in /transaksi/abc /audit-log /proyek/x/y; do
+for deep in /transaksi/abc /pengaturan/audit-log /masuk; do
   [ "$(curl --silent "$alone$deep")" = "$index" ] || fail "alamat dalam $deep tidak menyajikan aplikasi"
 done
 [ "$(status_of curl --silent "$alone/assets/tidak-ada.js")" = "404" ] ||
@@ -238,16 +238,11 @@ docker rm -f "$STUB" "$WEB_ALONE" > /dev/null
 step "3. Konfigurasi Compose dan cadangan"
 
 smoke_secret="$(random_secret)"
-admin_email="admin@example.com"
-admin_temp="sementara-$(random_secret | cut -c1-12)"
-admin_password="tetap-$(random_secret | cut -c1-16)"
+readonly PIN="135792"
 cat > "$env_file" << EOF
 DATABASE_URL=postgresql://smoke:smoke@postgres:5432/cashflow
 JWT_ACCESS_SECRET=$smoke_secret
 TUNNEL_TOKEN=bukan-token-sungguhan
-SEED_ADMIN_NAME=Admin Uji Asap
-SEED_ADMIN_EMAIL=$admin_email
-SEED_ADMIN_PASSWORD=$admin_temp
 LOGIN_RATE_LIMIT=5
 BACKUP_HOST_DIR=$work_host/backups
 BACKUP_AT=01:30
@@ -256,7 +251,7 @@ TZ=Asia/Jakarta
 SMOKE_PORT=$STACK_PORT
 EOF
 
-for required in DATABASE_URL JWT_ACCESS_SECRET TUNNEL_TOKEN SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD BACKUP_HOST_DIR; do
+for required in DATABASE_URL JWT_ACCESS_SECRET TUNNEL_TOKEN BACKUP_HOST_DIR; do
   grep -v "^$required=" "$env_file" > "$work/env-missing"
   set +e
   # Nilai dari lingkungan pemanggil tidak boleh menambal yang hilang.
@@ -349,46 +344,47 @@ grep -q '<div id="app"' <<< "$page" || fail "halaman aplikasi tidak tersaji"
 [ "$(status_of api "$BASE/api/docs-json")" = "404" ] || fail "dokumen OpenAPI terbuka di produksi"
 ok "aplikasi tersaji, API menjawab, dokumentasi API tertutup"
 
-login() { # email password -> badan jawaban; header disimpan di $work/login-headers
+pin_post() { # rute pin -> badan jawaban; header disimpan di $work/login-headers
   api --dump-header "$work_host/login-headers" -H 'Content-Type: application/json' \
-    --data "{\"email\":\"$1\",\"password\":\"$2\"}" "$BASE/api/v1/auth/login"
+    --data "{\"pin\":\"$2\"}" "$BASE/api/v1/auth/$1"
 }
-session="$(login "$admin_email" "$admin_temp")"
+refresh_cookie_of_login() {
+  grep -i '^set-cookie: refresh_token=' "$work/login-headers" | sed -E 's/^[^:]*: ([^;]*);.*/\1/' | tr -d '\r'
+}
+[ "$(api "$BASE/api/v1/auth/pin-status" | json .pinSet)" = "false" ] || fail "pemasangan baru sudah punya PIN"
+session="$(pin_post setup-pin "$PIN")"
 token="$(echo "$session" | json .accessToken)"
-[ -n "$token" ] || fail "admin awal tidak bisa login: $session"
-[ "$(echo "$session" | json .user.mustChangePassword)" = "true" ] || fail "admin awal tidak diwajibkan ganti password"
+[ -n "$token" ] || fail "PIN pertama tidak bisa dibuat: $session"
+owner_id="$(echo "$session" | json .user.id)"
 cookie_line="$(grep -i '^set-cookie: refresh_token=' "$work/login-headers" | tr -d '\r')"
 for attribute in HttpOnly Secure 'SameSite=Strict' 'Path=/api/v1/auth'; do
   echo "$cookie_line" | grep -qi "$attribute" || fail "cookie sesi tanpa $attribute"
 done
-ok "admin awal login; cookie sesi HttpOnly, Secure, SameSite=Strict"
+[ "$(status_of pin_post setup-pin 246810)" = "409" ] || fail "PIN bisa dibuat dua kali"
+ok "PIN pertama dibuat sekali saja; cookie sesi HttpOnly, Secure, SameSite=Strict"
 
-changed="$(authed -H 'Content-Type: application/json' \
-  --data "{\"currentPassword\":\"$admin_temp\",\"newPassword\":\"$admin_password\"}" \
-  "$BASE/api/v1/auth/change-password")"
-[ "$(echo "$changed" | json .user.mustChangePassword)" = "false" ] || fail "ganti password gagal: $changed"
-session="$(login "$admin_email" "$admin_password")"
-token="$(echo "$session" | json .accessToken)"
-admin_id="$(echo "$session" | json .user.id)"
-refresh_cookie="$(grep -i '^set-cookie: refresh_token=' "$work/login-headers" | sed -E 's/^[^:]*: ([^;]*);.*/\1/' | tr -d '\r')"
+[ "$(status_of pin_post login 999999)" = "401" ] || fail "PIN salah tidak dijawab 401"
+token="$(pin_post login "$PIN" | json .accessToken)"
+[ -n "$token" ] || fail "tidak bisa masuk dengan PIN"
+refresh_cookie="$(refresh_cookie_of_login)"
 refreshed="$(api -X POST -H "Cookie: $refresh_cookie" "$BASE/api/v1/auth/refresh" | json .accessToken)"
 [ -n "$refreshed" ] || fail "sesi tidak bisa diperpanjang dengan cookie"
 token="$refreshed"
-ok "ganti password berhasil; sesi diperpanjang dengan cookie"
+ok "PIN salah ditolak, PIN benar diterima; sesi diperpanjang dengan cookie"
 
 post() { authed -H 'Content-Type: application/json' --data "$2" "$BASE/api/v1$1"; }
 account_id="$(post /accounts '{"name":"Kas Uji Asap","type":"CASH","openingBalance":"1000000"}' | json .id)"
 category_id="$(post /categories '{"name":"Bahan Uji Asap","type":"OUT"}' | json .id)"
 [ -n "$account_id" ] && [ -n "$category_id" ] || fail "akun atau kategori gagal dibuat"
-transaction_id="$(post /transactions "{\"type\":\"OUT\",\"amount\":\"125000\",\"transactionDate\":\"2026-10-01\",\"description\":\"Uji asap\",\"accountId\":\"$account_id\",\"categoryId\":\"$category_id\",\"projectId\":null}" | json .id)"
+transaction_id="$(post /transactions "{\"type\":\"OUT\",\"amount\":\"125000\",\"transactionDate\":\"2026-10-01\",\"description\":\"Uji asap\",\"accountId\":\"$account_id\",\"categoryId\":\"$category_id\"}" | json .id)"
 [ -n "$transaction_id" ] || fail "transaksi gagal dicatat"
 
 printf '%%PDF-1.4\n%% bukti uji asap\n%%%%EOF\n' > "$work/nota.pdf"
 attachment_id="$(cd "$work" && authed -F 'file=@nota.pdf;type=application/pdf' \
   "$BASE/api/v1/transactions/$transaction_id/attachments" | json .id)"
 [ -n "$attachment_id" ] || fail "bukti gagal diunggah"
-[ "$(post "/transactions/$transaction_id/approve" '{}' | json .status)" = "APPROVED" ] || fail "persetujuan gagal"
-ok "akun, kategori, transaksi, bukti dan persetujuan berjalan lewat proxy"
+[ "$(authed "$BASE/api/v1/transactions/$transaction_id" | json .status)" = "APPROVED" ] || fail "transaksi tidak langsung tercatat"
+ok "akun, kategori, transaksi dan bukti berjalan lewat proxy"
 
 (cd "$work" && { printf '%%PDF-1.4\n'; head -c 11534336 /dev/zero; } > besar.pdf)
 too_big="$(cd "$work" && authed --write-out '\n%{http_code}' -F 'file=@besar.pdf;type=application/pdf' \
@@ -402,8 +398,8 @@ ok "unggahan 11 MB ditolak oleh API sendiri, dengan pesannya, bukan oleh proxy"
 # Lima ribu baris lagi langsung di database, supaya ekspor benar-benar mengalir lewat proxy.
 compose exec -T postgres psql -U smoke -d cashflow --quiet -c "
   INSERT INTO transactions (id, type, amount, transaction_date, description, status, account_id, category_id, created_by_id, created_at, updated_at)
-  SELECT gen_random_uuid(), 'OUT'::tx_type, 1000 + g, DATE '2026-09-01', 'muatan ' || g, 'PENDING'::tx_status,
-         '$account_id', '$category_id', '$admin_id', now(), now()
+  SELECT gen_random_uuid(), 'OUT'::tx_type, 1000 + g, DATE '2026-09-01', 'muatan ' || g, 'APPROVED'::tx_status,
+         '$account_id', '$category_id', '$owner_id', now(), now()
   FROM generate_series(1, 5000) AS g" > /dev/null
 authed -H 'Accept-Encoding: gzip' --dump-header "$work_host/export-headers" --output "$work_host/export.gz" \
   "$BASE/api/v1/transactions/export"
@@ -419,15 +415,17 @@ ok "ekspor 5.001 transaksi tiba utuh dan terkompresi"
 [ "$(authed "$BASE/api/v1/audit-logs?action=EXPORT" | json .meta.total)" = "1" ] || fail "ekspor tidak tercatat di log audit"
 ok "log audit mencatat ekspor"
 
-node deploy/smoke-browser.mjs "$BASE" "$admin_email" "$admin_password" || fail "aplikasi tidak berjalan benar di browser"
-ok "di browser: login, halaman dan gaya berjalan dengan aturan keamanan produksi"
+node deploy/smoke-browser.mjs "$BASE" "$PIN" || fail "aplikasi tidak berjalan benar di browser"
+ok "di browser: masuk dengan PIN, halaman dan gaya berjalan dengan aturan keamanan produksi"
 
+# Badan yang tidak sah (bukan PIN) dijawab 400 tanpa menambah hitungan PIN salah, jadi yang teruji
+# hanya batas per pengunjung, bukan jeda 15 menit untuk semua.
 wrong_login() { status_of as_visitor "$1" -H 'Content-Type: application/json' \
-  --data '{"email":"siapa@example.com","password":"salah-salah"}' "$BASE/api/v1/auth/login"; }
-for _ in 1 2 3 4 5; do [ "$(wrong_login 203.0.113.50)" = "401" ] || fail "login salah tidak dijawab 401"; done
-[ "$(wrong_login 203.0.113.50)" = "429" ] || fail "percobaan login keenam dari satu alamat tidak dibatasi"
-[ "$(wrong_login 203.0.113.51)" = "401" ] || fail "pengunjung lain ikut terblokir: batas dihitung per proxy, bukan per pengunjung"
-ok "batas percobaan login dihitung per alamat pengunjung, menembus dua proxy"
+  --data '{"pin":"bukan"}' "$BASE/api/v1/auth/login"; }
+for _ in 1 2 3 4 5; do [ "$(wrong_login 203.0.113.50)" = "400" ] || fail "PIN tidak sah tidak dijawab 400"; done
+[ "$(wrong_login 203.0.113.50)" = "429" ] || fail "percobaan masuk keenam dari satu alamat tidak dibatasi"
+[ "$(wrong_login 203.0.113.51)" = "400" ] || fail "pengunjung lain ikut terblokir: batas dihitung per proxy, bukan per pengunjung"
+ok "batas percobaan masuk dihitung per alamat pengunjung, menembus dua proxy"
 
 # =======================================================================================
 step "5. Pembaruan dan nyala ulang"
@@ -438,10 +436,20 @@ wait_healthy api web backup
 compose restart api web > /dev/null 2>&1
 wait_healthy api web
 [ "$(docker inspect --format '{{.State.ExitCode}}' "$PROJECT-migrate-1")" = "0" ] || fail "migrate gagal saat dijalankan lagi"
-token="$(login "$admin_email" "$admin_password" | json .accessToken)"
+token="$(pin_post login "$PIN" | json .accessToken)"
+refresh_cookie="$(refresh_cookie_of_login)"
 [ "$(authed "$BASE/api/v1/transactions/$transaction_id" | json .status)" = "APPROVED" ] || fail "transaksi hilang setelah nyala ulang"
 [ "$(authed "$BASE/api/v1/attachments/$attachment_id/download" | sha256sum)" = "$before" ] || fail "bukti berubah atau hilang setelah nyala ulang"
 ok "setelah dibangun ulang dan dinyalakan ulang, transaksi dan buktinya tetap ada"
+
+compose run --rm --no-deps api npm run --silent reset-pin > "$work/reset.log" 2>&1 ||
+  { cat "$work/reset.log" >&2; fail "reset-pin gagal"; }
+grep -q 'PIN direset' "$work/reset.log" || fail "reset-pin tidak mengatakan PIN direset: $(cat "$work/reset.log")"
+[ "$(api "$BASE/api/v1/auth/pin-status" | json .pinSet)" = "false" ] || fail "PIN masih ada setelah reset-pin"
+[ "$(status_of api -X POST -H "Cookie: $refresh_cookie" "$BASE/api/v1/auth/refresh")" = "401" ] ||
+  fail "sesi lama masih berlaku setelah reset-pin"
+[ "$(status_of pin_post setup-pin "$PIN")" = "201" ] || fail "PIN baru tidak bisa dibuat setelah reset-pin"
+ok "reset-pin menghapus PIN dan mengakhiri sesi; PIN baru bisa dibuat, data tetap"
 
 # =======================================================================================
 step "6. Cadangan dan pemulihan di dalam container"

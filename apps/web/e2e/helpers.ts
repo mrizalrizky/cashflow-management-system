@@ -1,53 +1,34 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { OWNER } from './env'
 
-export interface TestAccount {
-  email: string
-  /** Password yang diberikan admin atau seed; wajib diganti saat login pertama. */
-  temporaryPassword: string
-  /** Password setelah diganti. */
-  password: string
-}
-
-export async function login(page: Page, email: string, password: string): Promise<void> {
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password', { exact: true }).fill(password)
+/** Mengisi PIN lalu menekan tombolnya, pada halaman "Masuk". */
+export async function enterPin(page: Page, pin: string): Promise<void> {
+  await page.getByLabel('PIN', { exact: true }).fill(pin)
   await page.getByRole('button', { name: 'Masuk' }).click()
 }
 
-export async function changePassword(page: Page, current: string, next: string): Promise<void> {
-  await page.getByLabel('Password saat ini').fill(current)
-  await page.getByLabel('Password baru', { exact: true }).fill(next)
-  await page.getByLabel('Ulangi password baru').fill(next)
-  await page.getByRole('button', { name: 'Simpan password' }).click()
+/** Masuk dengan PIN; pada database baru, PIN dibuat dulu. */
+export async function signIn(page: Page, pin: string = OWNER.pin): Promise<void> {
+  // Halaman "Masuk" sendiri pindah ke "Buat PIN" bila PIN belum ada; jawabannya yang menentukan.
+  const status = page.waitForResponse((response) => response.url().endsWith('/auth/pin-status'))
+  await page.goto('/masuk')
+  const { pinSet } = (await (await status).json()) as { pinSet: boolean }
+  if (!pinSet) {
+    await expect(page).toHaveURL(/\/buat-pin$/)
+    await page.getByLabel('PIN', { exact: true }).fill(pin)
+    await page.getByLabel('Ulangi PIN').fill(pin)
+    await page.getByRole('button', { name: 'Simpan PIN' }).click()
+  } else {
+    await enterPin(page, pin)
+  }
+  await page.waitForURL((url) => !PIN_PAGES.test(url.pathname))
 }
 
-/**
- * Masuk sebagai sebuah akun, apa pun keadaannya: bila password-nya masih yang sementara,
- * diganti dulu. Dengan begitu tiap file test tidak bergantung pada file lain yang jalan lebih dulu.
- */
-export async function signIn(page: Page, account: TestAccount): Promise<void> {
-  await page.goto('/login')
-  await login(page, account.email, account.password)
-
-  const outcome = await Promise.race([
-    page.waitForURL((url) => !url.pathname.startsWith('/login')).then(() => 'in' as const),
-    page
-      .getByRole('alert')
-      .first()
-      .waitFor()
-      .then(() => 'refused' as const),
-  ])
-  if (outcome === 'in') return
-
-  await login(page, account.email, account.temporaryPassword)
-  await expect(page).toHaveURL(/\/ganti-password$/)
-  await changePassword(page, account.temporaryPassword, account.password)
-  await page.waitForURL((url) => !url.pathname.startsWith('/ganti-password'))
-}
+const PIN_PAGES = /\/(masuk|buat-pin)$/
 
 export async function logout(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Keluar' }).click()
-  await expect(page).toHaveURL(/\/login$/)
+  await expect(page).toHaveURL(/\/masuk$/)
 }
 
 export function sidebarLinks(page: Page): Locator {

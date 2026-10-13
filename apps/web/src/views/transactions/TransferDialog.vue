@@ -22,7 +22,7 @@ import {
 import { collectErrors } from '@/lib/validation'
 import TransactionOptionsError from './TransactionOptionsError.vue'
 
-/** Memindahkan uang antar akun. Hanya ditawarkan kepada SUPER_ADMIN; API yang membatasi. */
+/** Memindahkan uang antar akun. */
 const props = defineProps<{ options: TransactionOptions }>()
 const emit = defineEmits<{ saved: [legs: Transaction[]] }>()
 const visible = defineModel<boolean>('visible', { required: true })

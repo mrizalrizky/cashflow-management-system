@@ -14,7 +14,7 @@ export interface AuditLogFilters {
   dateTo?: string | null
 }
 
-/** Hanya untuk SUPER_ADMIN. Log audit hanya bisa dibaca. */
+/** Log audit hanya bisa dibaca. */
 export function listAuditLogs(params: PageParams & AuditLogFilters): Promise<Paginated<AuditLog>> {
   return request('/audit-logs', { query: { ...params } })
 }

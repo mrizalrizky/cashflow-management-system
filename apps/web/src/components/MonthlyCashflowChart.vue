@@ -27,7 +27,7 @@ const columns = computed(() =>
 </script>
 
 <template>
-  <p v-if="empty" class="text-surface-500">Belum ada transaksi yang disetujui pada periode ini</p>
+  <p v-if="empty" class="text-surface-500">Belum ada transaksi pada periode ini</p>
   <div v-else>
     <div class="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm" data-testid="legend">
       <span class="flex items-center gap-1.5">

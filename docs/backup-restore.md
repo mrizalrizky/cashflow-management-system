@@ -4,7 +4,7 @@
 
 Data aplikasi ada di dua tempat, dan keduanya harus selalu dicadangkan dan dipulihkan **bersama**:
 
-1. **Database PostgreSQL**: transaksi, akun, proyek, pengguna, log audit.
+1. **Database PostgreSQL**: transaksi, akun, kategori, PIN pemilik (sebagai hash), log audit.
 2. **Folder berkas bukti** (`STORAGE_DIR`): foto dan PDF nota. Database hanya menyimpan nama berkasnya.
 
 Database tanpa foldernya berarti bukti tidak bisa dibuka. Folder tanpa databasenya berarti berkas tanpa pemilik. Karena itu satu cadangan selalu berisi keduanya, dari waktu yang sama.
@@ -32,7 +32,7 @@ scripts/backup.sh
 ```
 
 - Boleh dijalankan selagi aplikasi berjalan, tetapi jadwalkan saat sepi (malam hari). Database dicadangkan lebih dulu, baru berkas, sehingga bukti yang diunggah di antaranya tetap utuh. Dua hal yang bisa terjadi bila ada yang bekerja tepat saat itu: bukti yang **dihapus** di antara kedua langkah akan punya baris di cadangan tanpa berkasnya, dan `tar` bisa gagal bila sebuah berkas sedang ditulis (cadangan itu batal, tanpa meninggalkan apa pun; jalankan lagi).
-- Folder cadangan hanya bisa dibaca pemiliknya (`umask 077`): isinya seluruh data keuangan dan hash password.
+- Folder cadangan hanya bisa dibaca pemiliknya (`umask 077`): isinya seluruh data keuangan dan hash PIN.
 - Password di `DATABASE_URL` terlihat di daftar proses selagi skrip berjalan. Di server bersama, simpan password di `~/.pgpass` dan tulis `DATABASE_URL` tanpa password.
 - Bila gagal di tengah jalan, tidak ada folder cadangan setengah jadi yang tertinggal, dan skrip keluar dengan kode bukan nol.
 - Cadangan yang lebih tua dari `BACKUP_KEEP_DAYS` hari (bawaan 14) dihapus. Yang dihapus hanya subfolder `cashflow-...` buatan skrip ini di dalam `BACKUP_DIR`. Isi `0` untuk tidak pernah menghapus.
@@ -80,7 +80,7 @@ Langkah demi langkah:
 2. Jalankan perintah di atas **sebagai user database yang dipakai aplikasi** dan dengan `STORAGE_DIR` berupa jalur lengkap. Skrip memeriksa `SHA256SUMS`, memastikan cadangan bisa dibaca dan tidak berada di dalam folder tujuan, lalu mencetak cadangan mana yang dipakai dan database serta folder mana yang menjadi tujuan. Semua pemeriksaan itu terjadi sebelum ada yang diubah.
 3. Bila database tujuan sudah berisi tabel atau folder tujuan sudah berisi berkas, skrip **menolak**. Periksa tujuan yang dicetak. Bila memang itu yang hendak diganti, ulangi dengan `--force` di akhir: database dan folder tujuan **dikosongkan** lalu diisi dari cadangan.
 4. Jalankan `npx prisma migrate deploy` di `apps/api` bila versi aplikasi lebih baru daripada cadangan (migrasi yang belum ada di cadangan akan diterapkan).
-5. Jalankan lagi aplikasi, login, dan buka satu transaksi yang punya bukti untuk memastikan buktinya bisa diunduh.
+5. Jalankan lagi aplikasi, masuk dengan PIN, dan buka satu transaksi yang punya bukti untuk memastikan buktinya bisa diunduh.
 
 ## Uji pulih
 

@@ -2,8 +2,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 
 /** Satu nomor kunci advisory PostgreSQL per bagian kritis. Jangan pakai ulang sebuah nomor. */
 export const LOCKS = {
-  /** Perubahan peran dan status aktif user (menjaga SUPER_ADMIN aktif terakhir). */
-  userAccess: 7301,
+  // 7301 dulu dipakai perubahan peran user (edisi perusahaan); jangan dipakai ulang.
   /** Pengecekan nama akun kembar sebelum simpan. */
   accountName: 7303,
   /** Pengecekan nama kategori kembar sebelum simpan. */

@@ -1,92 +1,90 @@
-import { expect, test } from '@playwright/test'
-import { ADMIN } from './env'
-import { changePassword, horizontalOverflow, login, sidebarLinks } from './helpers'
+import { expect, test, type Page } from '@playwright/test'
+import { OWNER } from './env'
+import { enterPin, horizontalOverflow, logout, openFromMenu, sidebarLinks, signIn } from './helpers'
 
-const STAFF = {
-  name: 'Siti Lapangan',
-  email: 'siti@example.com',
-  temporaryPassword: 'sementara-siti-1',
-  password: 'password-siti-1',
+// Nama berkas ini sengaja urut paling awal: ia mengharapkan database baru yang belum punya PIN.
+
+async function changePin(page: Page, current: string, next: string): Promise<void> {
+  await openFromMenu(page, 'Pengaturan')
+  await page.getByLabel('PIN saat ini').fill(current)
+  await page.getByLabel('PIN baru', { exact: true }).fill(next)
+  await page.getByLabel('Ulangi PIN baru').fill(next)
+  await page.getByRole('button', { name: 'Simpan PIN' }).click()
+  await expect(page.getByText('PIN diganti. Perangkat lain sudah dikeluarkan.')).toBeVisible()
 }
 
-test('login, forced password change, user management and role limits', async ({ page }) => {
-  await test.step('a protected page sends a visitor to login', async () => {
-    await page.goto('/pengguna')
-    await expect(page).toHaveURL(/\/login\?redirect=\/pengguna$/)
+test('creating the PIN, signing in with it, and changing it', async ({ page }) => {
+  await test.step('a protected page sends a visitor to the PIN entry', async () => {
+    await page.goto('/transaksi')
+    await expect(page).toHaveURL(/\/(masuk\?redirect=\/transaksi|buat-pin)$/)
   })
 
-  await test.step('the seeded admin must change the temporary password first', async () => {
-    await login(page, ADMIN.email, ADMIN.temporaryPassword)
-    await expect(page).toHaveURL(/\/ganti-password$/)
-    await expect(page.getByText('wajib mengganti password')).toBeVisible()
+  await test.step('on the first visit the owner creates a PIN and lands on the dashboard', async () => {
+    await page.goto('/masuk')
+    await expect(page).toHaveURL(/\/buat-pin$/)
+    await expect(page.getByRole('heading', { name: 'Buat PIN' })).toBeVisible()
 
-    await page.goto('/dashboard')
-    await expect(page).toHaveURL(/\/ganti-password$/)
-  })
+    await page.getByLabel('PIN', { exact: true }).fill(OWNER.pin)
+    await page.getByLabel('Ulangi PIN').fill(OWNER.pin)
+    await page.getByRole('button', { name: 'Simpan PIN' }).click()
 
-  await test.step('after the change the admin lands on the dashboard with the full menu', async () => {
-    await changePassword(page, ADMIN.temporaryPassword, ADMIN.password)
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(sidebarLinks(page)).toHaveText(['Dashboard', 'Transaksi', 'Proyek', 'Master data', 'Pengguna', 'Audit log'])
-    await expect(page.getByRole('banner')).toContainText(ADMIN.name)
+    await expect(sidebarLinks(page)).toHaveText(['Dashboard', 'Transaksi', 'Master data', 'Pengaturan'])
   })
 
   await test.step('a reload keeps the session and the page', async () => {
     await page.reload()
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(sidebarLinks(page)).toHaveCount(6)
-    await expect(page.getByRole('button', { name: 'Masuk' })).toHaveCount(0)
-  })
-
-  await test.step('the admin creates a staff user', async () => {
-    await sidebarLinks(page).filter({ hasText: 'Pengguna' }).click()
-    await expect(page.getByRole('heading', { name: 'Pengguna' })).toBeVisible()
-    await page.getByRole('button', { name: 'Tambah pengguna' }).click()
-
-    const dialog = page.getByRole('dialog')
-    await dialog.getByLabel('Nama').fill(STAFF.name)
-    await dialog.getByLabel('Email').fill(STAFF.email)
-    await dialog.getByRole('combobox', { name: 'Peran' }).click()
-    await page.getByRole('option', { name: 'Staf' }).click()
-    await dialog.getByLabel('Password sementara').fill(STAFF.temporaryPassword)
-    await dialog.getByRole('button', { name: 'Simpan' }).click()
-
-    await expect(dialog).toBeHidden()
-    const row = page.getByRole('row').filter({ hasText: STAFF.email })
-    await expect(row).toContainText(STAFF.name)
-    await expect(row).toContainText('Staf')
-    await expect(row).toContainText('Aktif')
+    await expect(sidebarLinks(page)).toHaveCount(4)
   })
 
   await test.step('logging out closes the app, even through the Back button', async () => {
-    await page.getByRole('button', { name: 'Keluar' }).click()
-    await expect(page).toHaveURL(/\/login$/)
-
+    await logout(page)
     await page.goBack()
-    await expect(page).toHaveURL(/\/login/)
     await expect(page.getByTestId('sidebar')).toHaveCount(0)
   })
 
-  await test.step('the staff user is confined to their own pages', async () => {
-    await page.goto('/login')
-    await login(page, STAFF.email, STAFF.temporaryPassword)
-    await expect(page).toHaveURL(/\/ganti-password$/)
-    await changePassword(page, STAFF.temporaryPassword, STAFF.password)
+  await test.step('"Buat PIN" is not offered again', async () => {
+    await page.goto('/buat-pin')
+    await page.getByLabel('PIN', { exact: true }).fill('111111')
+    await page.getByLabel('Ulangi PIN').fill('111111')
+    await page.getByRole('button', { name: 'Simpan PIN' }).click()
+    await expect(page).toHaveURL(/\/masuk$/)
+  })
 
-    await expect(page).toHaveURL(/\/transaksi$/)
-    await expect(sidebarLinks(page)).toHaveText(['Transaksi'])
+  await test.step('a wrong PIN is refused; the right one opens the dashboard', async () => {
+    await page.goto('/masuk')
+    await enterPin(page, '999999')
+    await expect(page.getByText('PIN salah')).toBeVisible()
+    await expect(page).toHaveURL(/\/masuk$/)
 
-    await page.goto('/pengguna')
-    await expect(page).toHaveURL(/\/transaksi$/)
+    await enterPin(page, OWNER.pin)
+    await expect(page).toHaveURL(/\/dashboard$/)
+  })
+
+  await test.step('the owner changes the PIN in Pengaturan; the old one stops working', async () => {
+    await changePin(page, OWNER.pin, OWNER.newPin)
+    await logout(page)
+
+    await enterPin(page, OWNER.pin)
+    await expect(page.getByText('PIN salah')).toBeVisible()
+    await enterPin(page, OWNER.newPin)
+    await expect(page).toHaveURL(/\/dashboard$/)
+  })
+
+  await test.step('and changes it back, so the other files can sign in', async () => {
+    await changePin(page, OWNER.newPin, OWNER.pin)
+    await logout(page)
+    await signIn(page)
+    await expect(page).toHaveURL(/\/dashboard$/)
   })
 
   await test.step('on a phone the page does not scroll sideways and the menu is a drawer', async () => {
     await page.setViewportSize({ width: 360, height: 740 })
     await expect(page.getByTestId('sidebar')).toBeHidden()
-
     expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
 
     await page.getByRole('button', { name: 'Buka menu' }).click()
-    await expect(page.getByTestId('drawer-nav').getByRole('link', { name: 'Transaksi' })).toBeVisible()
+    await expect(page.getByTestId('drawer-nav').getByRole('link', { name: 'Pengaturan' })).toBeVisible()
   })
 })

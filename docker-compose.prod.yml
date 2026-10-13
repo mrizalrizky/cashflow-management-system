@@ -41,9 +41,6 @@ services:
       target: build
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL wajib diisi di berkas env}
-      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Administrator}
-      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:?SEED_ADMIN_EMAIL wajib diisi di berkas env}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD wajib diisi di berkas env}
     restart: "no"
     networks: [app]
 

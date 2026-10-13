@@ -1,33 +1,24 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
 
-export interface SeedOptions {
-  adminName?: string;
-  adminEmail?: string;
-  adminPassword?: string;
-}
-
 const ACCOUNTS = [
-  { name: 'Kas Kecil', type: 'CASH' },
-  { name: 'Rekening Bank Utama', type: 'BANK' },
+  { name: 'Dompet', type: 'CASH' },
+  { name: 'Rekening Bank', type: 'BANK' },
 ] as const;
 
-const CATEGORIES_IN = ['DP Proyek', 'Termin Proyek', 'Pelunasan Proyek', 'Pendapatan Lain'];
+const CATEGORIES_IN = ['Gaji', 'Bonus', 'Pendapatan Lain'];
 
 const CATEGORIES_OUT = [
-  'Material',
-  'Upah Tukang',
-  'Subkontraktor',
-  'Peralatan',
+  'Makan & Minum',
+  'Belanja',
   'Transportasi',
-  'Perizinan',
-  'Gaji Staf',
-  'Sewa Kantor',
-  'Utilitas',
-  'Pajak',
-  'Operasional Lain',
+  'Tagihan & Utilitas',
+  'Kesehatan',
+  'Hiburan',
+  'Pendidikan',
+  'Lain-lain',
 ];
 
-/** Kategori awal yang boleh diubah admin; hanya dibuat pada pemasangan pertama. */
+/** Kategori awal yang boleh diubah pemilik; hanya dibuat pada pemasangan pertama. */
 const DEFAULT_CATEGORIES = [
   ...CATEGORIES_IN.map((name) => ({ name, type: 'IN', is_system: false }) as const),
   ...CATEGORIES_OUT.map((name) => ({ name, type: 'OUT', is_system: false }) as const),
@@ -39,10 +30,13 @@ const SYSTEM_CATEGORIES = [
   { name: 'Transfer Keluar', type: 'OUT', is_system: true } as const,
 ];
 
-/** Sementara (diganti pada tugas berikutnya): satu pemilik, hanya nama. */
-async function ensureAdmin(prisma: PrismaClient, options: SeedOptions): Promise<boolean> {
+/**
+ * Membuat pemilik (tanpa PIN: PIN dibuat pada kunjungan pertama). Bila sudah ada, tidak
+ * melakukan apa pun. Mengembalikan true pada pemasangan pertama.
+ */
+async function ensureOwner(prisma: PrismaClient): Promise<boolean> {
   if (await prisma.user.findFirst()) return false;
-  await prisma.user.create({ data: { name: options.adminName?.trim() || 'Pemilik' } });
+  await prisma.user.create({ data: { name: 'Pemilik' } });
   return true;
 }
 
@@ -72,11 +66,11 @@ async function ensureCategories(
 
 /**
  * Aman dijalankan berulang (dan memang dijalankan tiap deploy): tidak menggandakan data dan
- * tidak menimpa password admin. Akun dan kategori awal hanya dibuat pada pemasangan pertama,
- * supaya yang sudah diganti namanya atau dinonaktifkan admin tidak muncul lagi.
+ * tidak menyentuh PIN. Akun dan kategori awal hanya dibuat pada pemasangan pertama, supaya
+ * yang sudah diganti namanya atau dinonaktifkan pemilik tidak muncul lagi.
  */
-export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): Promise<void> {
-  const firstInstall = await ensureAdmin(prisma, options);
+export async function seedDatabase(prisma: PrismaClient): Promise<void> {
+  const firstInstall = await ensureOwner(prisma);
   if (firstInstall) {
     await ensureAccounts(prisma);
     await ensureCategories(prisma, DEFAULT_CATEGORIES);

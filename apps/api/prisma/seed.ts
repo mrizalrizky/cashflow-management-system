@@ -11,11 +11,7 @@ if (!connectionString) {
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 try {
-  await seedDatabase(prisma, {
-    adminName: process.env.SEED_ADMIN_NAME,
-    adminEmail: process.env.SEED_ADMIN_EMAIL,
-    adminPassword: process.env.SEED_ADMIN_PASSWORD,
-  });
+  await seedDatabase(prisma);
   console.log('Seed selesai.');
 } finally {
   await prisma.$disconnect();

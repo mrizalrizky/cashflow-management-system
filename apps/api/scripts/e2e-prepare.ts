@@ -1,5 +1,5 @@
 /**
- * Menyiapkan database untuk test browser: mengosongkan semua tabel lalu membuat admin awal.
+ * Menyiapkan database untuk test browser: mengosongkan semua tabel lalu membuat pemilik (tanpa PIN).
  * Menolak jalan kecuali pada database yang namanya diakhiri `_test`.
  */
 import { seedDatabase } from '../src/database/seed.js';
@@ -9,11 +9,7 @@ const prisma = createTestPrisma();
 
 try {
   await resetDb(prisma);
-  await seedDatabase(prisma, {
-    adminName: process.env.SEED_ADMIN_NAME,
-    adminEmail: process.env.SEED_ADMIN_EMAIL,
-    adminPassword: process.env.SEED_ADMIN_PASSWORD,
-  });
+  await seedDatabase(prisma);
 } finally {
   await prisma.$disconnect();
 }

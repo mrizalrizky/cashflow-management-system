@@ -24,7 +24,7 @@ import {
 import { formatCalendarDate, formatDate } from '@/lib/format'
 import { txTypeLabel } from '@/lib/labels'
 import { MAX_PROOFS } from '@/lib/proof-files'
-import { PATHS } from '@/router/paths'
+import { installmentPath, PATHS } from '@/router/paths'
 import TransactionFormDialog from './TransactionFormDialog.vue'
 
 // 404: tidak ada atau bukan haknya. 400: id di alamat bukan id yang sah (salah ketik).
@@ -182,6 +182,14 @@ function openForm(): void {
         <dt class="text-sm text-surface-500">{{ fact.label }}</dt>
         <dd class="font-medium break-words whitespace-pre-line" :data-testid="`tx-${fact.id}`">
           {{ fact.value }}
+        </dd>
+      </div>
+      <div v-if="transaction.installment" class="min-w-0">
+        <dt class="text-sm text-surface-500">Cicilan</dt>
+        <dd class="font-medium" data-testid="tx-installment">
+          <RouterLink :to="installmentPath(transaction.installment.id)" class="text-primary-700 hover:underline">
+            {{ transaction.installment.name }}
+          </RouterLink>
         </dd>
       </div>
     </dl>

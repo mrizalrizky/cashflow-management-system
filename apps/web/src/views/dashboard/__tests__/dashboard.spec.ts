@@ -3,6 +3,7 @@ import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import Select from 'primevue/select'
 import * as accountsApi from '@/api/accounts'
 import * as categoriesApi from '@/api/categories'
+import * as installmentsApi from '@/api/installments'
 import { ApiError } from '@/api/http'
 import * as reportsApi from '@/api/reports'
 import type { CompanyDashboard } from '@/api/types'
@@ -13,13 +14,14 @@ import { PERIOD_PRESETS } from '@/lib/periods'
 import { routes } from '@/router/routes'
 import { freshPinia, mountView } from '@/test/mount'
 import { signIn } from '@/test/session'
-import { KAS, makeTransaction, MATERIAL } from '@/test/transactions'
+import { installmentList, KAS, makeTransaction, MATERIAL } from '@/test/transactions'
 import TransactionFormDialog from '@/views/transactions/TransactionFormDialog.vue'
 import DashboardView from '../DashboardView.vue'
 
 vi.mock('@/api/reports')
 vi.mock('@/api/accounts')
 vi.mock('@/api/categories')
+vi.mock('@/api/installments')
 vi.mock('@/api/transactions')
 vi.mock('@/lib/calendar', () => ({ todayInJakarta: () => '2026-10-07' }))
 
@@ -372,6 +374,7 @@ describe('DashboardView: recording an expense', () => {
   beforeEach(() => {
     vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS])
     vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL])
+    vi.mocked(installmentsApi.listInstallments).mockResolvedValue(installmentList())
   })
 
   function typeSelect(wrapper: VueWrapper) {

@@ -6,6 +6,7 @@ import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import * as accountsApi from '@/api/accounts'
 import * as categoriesApi from '@/api/categories'
+import * as installmentsApi from '@/api/installments'
 import { ApiError, type DownloadedFile } from '@/api/http'
 import * as transactionsApi from '@/api/transactions'
 import type { Transaction } from '@/api/types'
@@ -16,6 +17,7 @@ import { fill, freshPinia, mountView } from '@/test/mount'
 import { signIn } from '@/test/session'
 import {
   BANK,
+  installmentList,
   KAS,
   makeTransaction,
   MATERIAL,
@@ -31,6 +33,7 @@ import TransactionTable from '../TransactionTable.vue'
 vi.mock('@/api/transactions')
 vi.mock('@/api/accounts')
 vi.mock('@/api/categories')
+vi.mock('@/api/installments')
 vi.mock('@/lib/download')
 
 const SEMEN = makeTransaction({ status: 'VOID' })
@@ -57,6 +60,7 @@ const TRANSFER = makeTransaction({
 function stubOptions(): void {
   vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS, BANK])
   vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL, UPAH, TERMIN, TRANSFER_KELUAR])
+  vi.mocked(installmentsApi.listInstallments).mockResolvedValue(installmentList())
 }
 
 function lastListParams() {

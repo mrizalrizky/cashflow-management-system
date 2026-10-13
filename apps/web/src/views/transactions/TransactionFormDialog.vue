@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type ComputedRef } from 'vue'
 import { useRouter } from 'vue-router'
 import Textarea from 'primevue/textarea'
 import { createTransaction, updateTransaction, type TransactionInput } from '@/api/transactions'
@@ -19,6 +19,7 @@ import {
 } from '@/composables/useProofUpload'
 import type { TransactionOptions } from '@/composables/useTransactionOptions'
 import { todayInJakarta } from '@/lib/calendar'
+import { installmentOptionLabel } from '@/lib/installments'
 import { TX_TYPE_OPTIONS, type Option } from '@/lib/labels'
 import { MAX_PROOFS } from '@/lib/proof-files'
 import {
@@ -49,6 +50,7 @@ interface Form {
   transactionDate: string | null
   accountId: string | null
   categoryId: string | null
+  installmentId: string | null
   description: string
 }
 
@@ -61,6 +63,7 @@ function validate(values: Form): Record<string, string> {
     transactionDate: transactionDateRules(),
     accountId: [chosen('Akun')],
     categoryId: [chosen('Kategori')],
+    installmentId: needsInstallment.value ? [chosen('Cicilan')] : [],
     description: descriptionRules(),
   })
 }
@@ -105,6 +108,7 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     transactionDate: todayInJakarta(),
     accountId: null,
     categoryId: null,
+    installmentId: null,
     description: '',
   }),
   fromEntity: (transaction) => ({
@@ -113,6 +117,7 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     transactionDate: transaction.transactionDate,
     accountId: transaction.account.id,
     categoryId: transaction.category.id,
+    installmentId: transaction.installment?.id ?? null,
     description: transaction.description,
   }),
   toInput: (values) => ({
@@ -122,6 +127,8 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
     description: values.description.trim(),
     accountId: values.accountId ?? '',
     categoryId: values.categoryId ?? '',
+    // Dikosongkan oleh watcher di bawah begitu kategorinya bukan kategori cicilan.
+    installmentId: values.installmentId,
   }),
   validate,
   create: createWithProof,
@@ -164,6 +171,43 @@ const categoryOptions = computed(() =>
   ),
 )
 const title = computed(() => (editing.value ? 'Ubah transaksi' : 'Catat transaksi'))
+
+/** Kategori cicilan: transaksinya wajib memilih cicilan yang dibayar. */
+const needsInstallment: ComputedRef<boolean> = computed(
+  () =>
+    form.type === 'OUT' &&
+    props.options.categories.value.some((category) => category.id === form.categoryId && category.isInstallment),
+)
+
+/** Cicilan yang belum lunas, ditambah yang sudah dibayar transaksi ini (boleh sudah lunas). */
+const installmentChoices = computed(() =>
+  props.options.installments.value.filter(
+    (installment) => installment.status !== 'PAID_OFF' || installment.id === props.transaction?.installment?.id,
+  ),
+)
+const installmentOptions = computed(() =>
+  installmentChoices.value.map((installment) => ({
+    value: installment.id,
+    label: installmentOptionLabel(installment),
+  })),
+)
+
+function onInstallmentChange(id: string | null): void {
+  form.installmentId = id
+  // Nominal diisi dari cicilan hanya selama masih kosong.
+  const picked = props.options.installments.value.find((installment) => installment.id === id)
+  if (picked && form.amount === '') form.amount = picked.monthlyAmount
+}
+
+watch(needsInstallment, (needed) => {
+  if (!needed) {
+    form.installmentId = null
+    return
+  }
+  if (form.installmentId === null && installmentChoices.value.length === 1) {
+    onInstallmentChange(installmentChoices.value[0]!.id)
+  }
+})
 </script>
 
 <template>
@@ -216,6 +260,16 @@ const title = computed(() => (editing.value ? 'Ubah transaksi' : 'Catat transaks
       placeholder="Pilih kategori"
       :options="categoryOptions"
       :error="fieldErrors.categoryId"
+    />
+    <SelectField
+      v-if="needsInstallment"
+      id="tx-installment"
+      :model-value="form.installmentId"
+      label="Cicilan yang dibayar"
+      placeholder="Pilih cicilan"
+      :options="installmentOptions"
+      :error="fieldErrors.installmentId"
+      @update:model-value="onInstallmentChange"
     />
     <FormField
       id="tx-description"

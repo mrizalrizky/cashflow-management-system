@@ -21,6 +21,8 @@ export interface TransactionInput {
   description: string
   accountId: string
   categoryId: string
+  /** Wajib untuk kategori cicilan; null untuk yang lain. */
+  installmentId: string | null
 }
 
 export interface TransferInput {

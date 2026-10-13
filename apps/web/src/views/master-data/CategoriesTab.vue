@@ -97,6 +97,7 @@ const toggleActive = useToggleActive<Category>({
             <span class="font-medium" :data-testid="`category-${category.id}`">
               {{ category.name }}
               <Tag v-if="category.isSystem" class="ml-2" severity="info" value="Sistem" />
+              <Tag v-if="category.isInstallment" class="ml-2" severity="warn" value="Cicilan" />
             </span>
           </template>
         </Column>

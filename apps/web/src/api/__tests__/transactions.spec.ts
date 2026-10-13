@@ -16,6 +16,7 @@ const INPUT = {
   description: 'Beli semen',
   accountId: 'a1',
   categoryId: 'c1',
+  installmentId: null,
 } as const
 
 const TRANSFER = {

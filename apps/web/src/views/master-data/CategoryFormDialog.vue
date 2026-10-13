@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Checkbox from 'primevue/checkbox'
 import { createCategory, updateCategory, type CreateCategoryInput } from '@/api/categories'
 import type { Category, TxType } from '@/api/types'
 import FormDialog from '@/components/FormDialog.vue'
@@ -20,6 +21,7 @@ const visible = defineModel<boolean>('visible', { required: true })
 interface Form {
   name: string
   type: TxType | null
+  isInstallment: boolean
 }
 
 const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntityDialog<
@@ -29,9 +31,14 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
 >({
   visible,
   entity: () => props.category,
-  blank: () => ({ name: '', type: null }),
-  fromEntity: (category) => ({ name: category.name, type: category.type }),
-  toInput: (values) => ({ name: values.name.trim(), type: values.type! }),
+  blank: () => ({ name: '', type: null, isInstallment: false }),
+  fromEntity: (category) => ({ name: category.name, type: category.type, isInstallment: category.isInstallment }),
+  toInput: (values) => ({
+    name: values.name.trim(),
+    type: values.type!,
+    // Hanya kategori pengeluaran yang bisa menjadi kategori cicilan.
+    isInstallment: values.type === 'OUT' && values.isInstallment,
+  }),
   validate: (values) =>
     collectErrors(values, {
       name: [required('Nama')],
@@ -74,5 +81,13 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
       placeholder="Pilih tipe"
       :error="fieldErrors.type"
     />
+
+    <label v-if="form.type === 'OUT'" class="flex items-start gap-2 text-sm">
+      <Checkbox v-model="form.isInstallment" input-id="category-installment" binary />
+      <span>
+        <span class="font-medium">Kategori cicilan</span><br />
+        <span class="text-surface-500">Transaksinya wajib memilih cicilan yang dibayar.</span>
+      </span>
+    </label>
   </FormDialog>
 </template>

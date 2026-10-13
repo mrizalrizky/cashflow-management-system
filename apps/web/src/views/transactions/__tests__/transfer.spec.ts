@@ -3,6 +3,7 @@ import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import Select from 'primevue/select'
 import * as accountsApi from '@/api/accounts'
 import * as categoriesApi from '@/api/categories'
+import * as installmentsApi from '@/api/installments'
 import { ApiError } from '@/api/http'
 import * as transactionsApi from '@/api/transactions'
 import type { Transaction } from '@/api/types'
@@ -10,13 +11,14 @@ import DateField from '@/components/DateField.vue'
 import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
 import { signIn } from '@/test/session'
-import { BANK, KAS, makeTransaction, pageOf } from '@/test/transactions'
+import { BANK, installmentList, KAS, makeTransaction, pageOf } from '@/test/transactions'
 import TransactionsView from '../TransactionsView.vue'
 import TransferDialog from '../TransferDialog.vue'
 
 vi.mock('@/api/transactions')
 vi.mock('@/api/accounts')
 vi.mock('@/api/categories')
+vi.mock('@/api/installments')
 vi.mock('@/lib/calendar', () => ({ todayInJakarta: () => '2026-10-07' }))
 
 const TABUNGAN = { id: 'a-tabungan', name: 'Tabungan', type: 'BANK' } as const
@@ -64,6 +66,7 @@ beforeEach(() => {
   document.body.innerHTML = ''
   vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS, BANK, TABUNGAN])
   vi.mocked(categoriesApi.listCategories).mockResolvedValue([])
+  vi.mocked(installmentsApi.listInstallments).mockResolvedValue(installmentList())
   vi.mocked(transactionsApi.createTransfer).mockResolvedValue(LEGS)
 })
 

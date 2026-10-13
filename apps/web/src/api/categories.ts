@@ -9,10 +9,12 @@ export interface CategoryFilters {
 export interface CreateCategoryInput {
   name: string
   type: TxType
+  /** Bawaan false. Hanya untuk kategori pengeluaran. */
+  isInstallment?: boolean
 }
 
 /** Tipe kategori tidak bisa diubah. */
-export type UpdateCategoryInput = Partial<{ name: string; isActive: boolean }>
+export type UpdateCategoryInput = Partial<{ name: string; isActive: boolean; isInstallment: boolean }>
 
 export function listCategories(filters: CategoryFilters = {}): Promise<Category[]> {
   return request('/categories', { query: { ...filters } })

@@ -2,6 +2,8 @@ import type {
   AccountOption,
   Attachment,
   Category,
+  Installment,
+  InstallmentList,
   Paginated,
   Transaction,
   TransactionPermissions,
@@ -11,15 +13,17 @@ import type {
 export const KAS: AccountOption = { id: 'a-kas', name: 'Kas Kecil', type: 'CASH' }
 export const BANK: AccountOption = { id: 'a-bank', name: 'Bank Utama', type: 'BANK' }
 
-export const MATERIAL: Category = { id: 'c-material', name: 'Material', type: 'OUT', isSystem: false, isActive: true }
-export const UPAH: Category = { id: 'c-upah', name: 'Upah Tukang', type: 'OUT', isSystem: false, isActive: true }
-export const TERMIN: Category = { id: 'c-termin', name: 'Termin Klien', type: 'IN', isSystem: false, isActive: true }
+export const MATERIAL: Category = { id: 'c-material', name: 'Material', type: 'OUT', isSystem: false, isActive: true, isInstallment: false }
+export const UPAH: Category = { id: 'c-upah', name: 'Upah Tukang', type: 'OUT', isSystem: false, isActive: true, isInstallment: false }
+export const KREDIT: Category = { id: 'c-kredit', name: 'Kredit', type: 'OUT', isSystem: false, isActive: true, isInstallment: true }
+export const TERMIN: Category = { id: 'c-termin', name: 'Termin Klien', type: 'IN', isSystem: false, isActive: true, isInstallment: false }
 export const TRANSFER_KELUAR: Category = {
   id: 'c-transfer-out',
   name: 'Transfer Keluar',
   type: 'OUT',
   isSystem: true,
   isActive: true,
+  isInstallment: false,
 }
 
 export const NO_PERMISSIONS: TransactionPermissions = {
@@ -55,6 +59,7 @@ export function makeTransaction(
     status: 'APPROVED',
     account: { id: KAS.id, name: KAS.name },
     category: { id: MATERIAL.id, name: MATERIAL.name },
+    installment: null,
     isTransfer: false,
     transferGroupId: null,
     createdBy: { id: 'u-staf', name: 'Sari' },
@@ -71,4 +76,28 @@ export function makeTransaction(
 
 export function pageOf<T>(items: T[], total = items.length): Paginated<T> {
   return { data: items, meta: { page: 1, pageSize: 20, total } }
+}
+
+/** Jawaban daftar cicilan untuk dropdown form transaksi. */
+export function installmentList(items: Installment[] = []): InstallmentList {
+  return { items, summary: { month: '2026-10', activeMonthlyTotal: '0', unpaid: [], unpaidTotal: '0' } }
+}
+
+export function makeInstallment(overrides: Partial<Installment> = {}): Installment {
+  return {
+    id: 'i-motor',
+    name: 'Motor',
+    monthlyAmount: '1500000',
+    startMonth: '2026-08',
+    endMonth: '2026-10',
+    months: 3,
+    paid: 1,
+    due: 3,
+    behindMonths: 2,
+    status: 'BEHIND',
+    notes: null,
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+    ...overrides,
+  }
 }

@@ -45,6 +45,8 @@ export interface Category {
   type: TxType
   isSystem: boolean
   isActive: boolean
+  /** Transaksi pengeluaran berkategori ini wajib memilih cicilan yang dibayar. */
+  isInstallment: boolean
 }
 
 /** Pilihan akun untuk input transaksi; sengaja tanpa saldo. */
@@ -85,6 +87,8 @@ export interface Transaction {
   status: TxStatus
   account: NamedRef
   category: NamedRef
+  /** Cicilan yang dibayar transaksi ini. */
+  installment: NamedRef | null
   isTransfer: boolean
   transferGroupId: string | null
   createdBy: NamedRef

@@ -3,6 +3,7 @@ import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import * as accountsApi from '@/api/accounts'
 import * as attachmentsApi from '@/api/attachments'
 import * as categoriesApi from '@/api/categories'
+import * as installmentsApi from '@/api/installments'
 import { ApiError } from '@/api/http'
 import * as transactionsApi from '@/api/transactions'
 import type { Transaction } from '@/api/types'
@@ -10,7 +11,7 @@ import ProofList from '@/components/ProofList.vue'
 import ProofPicker from '@/components/ProofPicker.vue'
 import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
 import { signIn } from '@/test/session'
-import { KAS, makeAttachment, makeTransaction, MATERIAL } from '@/test/transactions'
+import { installmentList, KAS, makeAttachment, makeTransaction, MATERIAL } from '@/test/transactions'
 import TransactionDetailView from '../TransactionDetailView.vue'
 import TransactionFormDialog from '../TransactionFormDialog.vue'
 
@@ -18,12 +19,25 @@ vi.mock('@/api/transactions')
 vi.mock('@/api/attachments')
 vi.mock('@/api/accounts')
 vi.mock('@/api/categories')
+vi.mock('@/api/installments')
 
 const PATH = '/transaksi/t-semen'
 const ACTIONS = ['edit', 'void'] as const
 
 const WITH_PROOF = makeTransaction({ attachments: [makeAttachment()] })
 const VOIDABLE = makeTransaction({ attachments: [makeAttachment()], permissions: { canVoid: true } })
+
+describe('installment link', () => {
+  it('links to the installment a transaction pays', async () => {
+    const { wrapper } = await mountDetail(makeTransaction({ installment: { id: 'i-motor', name: 'Motor' } }))
+    expect(wrapper.get('a[href="/cicilan/i-motor"]').text()).toBe('Motor')
+  })
+
+  it('shows no installment row for an ordinary transaction', async () => {
+    const { wrapper } = await mountDetail(makeTransaction())
+    expect(wrapper.find('[data-testid="tx-installment"]').exists()).toBe(false)
+  })
+})
 
 async function mountDetail(transaction: Transaction = WITH_PROOF, path = PATH) {
   signIn()
@@ -55,6 +69,7 @@ beforeEach(() => {
   document.body.innerHTML = ''
   vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS])
   vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL])
+  vi.mocked(installmentsApi.listInstallments).mockResolvedValue(installmentList())
 })
 
 describe('TransactionDetailView', () => {

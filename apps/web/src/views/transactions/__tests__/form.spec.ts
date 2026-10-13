@@ -5,6 +5,7 @@ import Select from 'primevue/select'
 import * as accountsApi from '@/api/accounts'
 import * as attachmentsApi from '@/api/attachments'
 import * as categoriesApi from '@/api/categories'
+import * as installmentsApi from '@/api/installments'
 import { ApiError } from '@/api/http'
 import * as transactionsApi from '@/api/transactions'
 import type { Transaction } from '@/api/types'
@@ -15,8 +16,11 @@ import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
 import { signIn } from '@/test/session'
 import {
   BANK,
+  installmentList,
   KAS,
+  KREDIT,
   makeAttachment,
+  makeInstallment,
   makeTransaction,
   MATERIAL,
   TERMIN,
@@ -29,6 +33,7 @@ vi.mock('@/api/transactions')
 vi.mock('@/api/attachments')
 vi.mock('@/api/accounts')
 vi.mock('@/api/categories')
+vi.mock('@/api/installments')
 vi.mock('@/lib/calendar', () => ({ todayInJakarta: () => '2026-10-07' }))
 
 const NOTA = new File(['x'], 'nota.jpg', { type: 'image/jpeg' })
@@ -85,6 +90,7 @@ beforeEach(() => {
   document.body.innerHTML = ''
   vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS, BANK])
   vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL, UPAH, TERMIN, TRANSFER_KELUAR])
+  vi.mocked(installmentsApi.listInstallments).mockResolvedValue(installmentList())
   vi.mocked(transactionsApi.createTransaction).mockResolvedValue(CREATED)
   vi.mocked(attachmentsApi.uploadAttachment).mockResolvedValue(makeAttachment())
 })
@@ -165,6 +171,7 @@ describe('TransactionFormDialog: recording', () => {
       description: 'Beli semen',
       accountId: KAS.id,
       categoryId: MATERIAL.id,
+      installmentId: null,
     })
     expect(attachmentsApi.uploadAttachment).toHaveBeenCalledExactlyOnceWith('t-baru', NOTA)
     expect(onVisible).toHaveBeenLastCalledWith(false)
@@ -355,5 +362,86 @@ describe('TransactionFormDialog: editing', () => {
 
     expect(wrapper.text()).not.toContain('Transaksi tidak bisa diubah pada status ini')
     expect((wrapper.get('#tx-amount').element as HTMLInputElement).value).toBe('150.000')
+  })
+})
+
+describe('TransactionFormDialog: installments', () => {
+  const MOTOR = makeInstallment()
+  const HP = makeInstallment({ id: 'i-hp', name: 'HP', monthlyAmount: '300000', paid: 1, months: 1, status: 'PAID_OFF' })
+
+  beforeEach(() => {
+    vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL, KREDIT, TERMIN])
+    vi.mocked(installmentsApi.listInstallments).mockResolvedValue(installmentList([MOTOR, HP]))
+  })
+
+  it('asks which installment is paid once an installment category is chosen, listing unpaid ones', async () => {
+    const { wrapper } = await mountForm()
+    expect(wrapper.find('#tx-installment-label').exists()).toBe(false)
+    await choose(wrapper, 'tx-category', KREDIT.id)
+    expect(optionLabels(wrapper, 'tx-installment')).toEqual(['Motor · Rp 1.500.000 · 1/3'])
+  })
+
+  it('picks the only unpaid installment by itself and fills the amount while it is empty', async () => {
+    const { wrapper } = await mountForm()
+    await choose(wrapper, 'tx-category', KREDIT.id)
+    expect(select(wrapper, 'tx-installment').props('modelValue')).toBe('i-motor')
+    expect((wrapper.get('#tx-amount').element as HTMLInputElement).value).toBe('1.500.000')
+  })
+
+  it('keeps an amount already typed when an installment is picked', async () => {
+    const { wrapper } = await mountForm()
+    await fill(wrapper, '#tx-amount', '1400000')
+    await choose(wrapper, 'tx-category', KREDIT.id)
+    expect((wrapper.get('#tx-amount').element as HTMLInputElement).value).toBe('1.400.000')
+  })
+
+  it('sends the installment it pays', async () => {
+    const { wrapper } = await mountForm()
+    await fill(wrapper, '#tx-amount', '150000')
+    await choose(wrapper, 'tx-account', KAS.id)
+    await choose(wrapper, 'tx-category', KREDIT.id)
+    await fill(wrapper, '#tx-description', 'Bayar motor')
+    await submitForm(wrapper)
+    expect(transactionsApi.createTransaction).toHaveBeenLastCalledWith(
+      expect.objectContaining({ categoryId: KREDIT.id, installmentId: 'i-motor' }),
+    )
+  })
+
+  it('drops the installment when the category changes away', async () => {
+    const { wrapper } = await mountForm()
+    await fill(wrapper, '#tx-amount', '150000')
+    await choose(wrapper, 'tx-account', KAS.id)
+    await choose(wrapper, 'tx-category', KREDIT.id)
+    await choose(wrapper, 'tx-category', MATERIAL.id)
+    expect(wrapper.find('#tx-installment-label').exists()).toBe(false)
+    await fill(wrapper, '#tx-description', 'Beli semen')
+    await submitForm(wrapper)
+    expect(transactionsApi.createTransaction).toHaveBeenLastCalledWith(expect.objectContaining({ installmentId: null }))
+  })
+
+  it('requires an installment when there is more than one to choose from', async () => {
+    vi.mocked(installmentsApi.listInstallments).mockResolvedValue(
+      installmentList([MOTOR, makeInstallment({ id: 'i-laptop', name: 'Laptop' })]),
+    )
+    const { wrapper } = await mountForm()
+    await fill(wrapper, '#tx-amount', '150000')
+    await choose(wrapper, 'tx-account', KAS.id)
+    await choose(wrapper, 'tx-category', KREDIT.id)
+    expect(select(wrapper, 'tx-installment').props('modelValue')).toBeNull()
+    await fill(wrapper, '#tx-description', 'Bayar')
+    await submitForm(wrapper)
+    expect(errorOf(wrapper, 'tx-installment')).toBe('Cicilan wajib dipilih')
+    expect(transactionsApi.createTransaction).not.toHaveBeenCalled()
+  })
+
+  it('still offers the paid-off installment a transaction already pays when editing', async () => {
+    const linked = makeTransaction({
+      category: { id: KREDIT.id, name: KREDIT.name },
+      installment: { id: 'i-hp', name: 'HP' },
+      permissions: { canEdit: true },
+    })
+    const { wrapper } = await mountForm(linked)
+    expect(optionLabels(wrapper, 'tx-installment')).toEqual(['Motor · Rp 1.500.000 · 1/3', 'HP · Rp 300.000 · 1/1'])
+    expect(select(wrapper, 'tx-installment').props('modelValue')).toBe('i-hp')
   })
 })

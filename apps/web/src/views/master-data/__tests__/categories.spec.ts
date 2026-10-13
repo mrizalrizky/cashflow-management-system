@@ -12,7 +12,15 @@ import CategoryFormDialog from '../CategoryFormDialog.vue'
 vi.mock('@/api/categories')
 
 function makeCategory(overrides: Partial<Category> = {}): Category {
-  return { id: 'c-material', name: 'Material', type: 'OUT', isSystem: false, isActive: true, ...overrides }
+  return {
+    id: 'c-material',
+    name: 'Material',
+    type: 'OUT',
+    isSystem: false,
+    isActive: true,
+    isInstallment: false,
+    ...overrides,
+  }
 }
 
 const MATERIAL = makeCategory()
@@ -20,6 +28,7 @@ const UPAH = makeCategory({ id: 'c-upah', name: 'Upah Tukang' })
 const OLD = makeCategory({ id: 'c-lama', name: 'Lama', isActive: false })
 const TERMIN = makeCategory({ id: 'c-termin', name: 'Termin Proyek', type: 'IN' })
 const TRANSFER = makeCategory({ id: 'c-transfer', name: 'Transfer Masuk', type: 'IN', isSystem: true })
+const KREDIT = makeCategory({ id: 'c-kredit', name: 'Kredit', isInstallment: true })
 
 function lastFilters() {
   const calls = vi.mocked(categoriesApi.listCategories).mock.calls
@@ -69,6 +78,12 @@ describe('CategoriesTab', () => {
     expect(lastFilters()).toEqual({ type: 'OUT', isActive: undefined })
     expect(group(wrapper, 'OUT').text()).toContain('Nonaktif')
     expect(wrapper.find('[data-testid="group-IN"]').exists()).toBe(false)
+  })
+
+  it('marks installment categories', async () => {
+    const { wrapper } = await mountTab([MATERIAL, KREDIT])
+    expect(wrapper.get('[data-testid="category-c-kredit"]').text()).toContain('Cicilan')
+    expect(wrapper.get('[data-testid="category-c-material"]').text()).not.toContain('Cicilan')
   })
 
   it('marks system categories and offers no way to change them', async () => {
@@ -154,8 +169,32 @@ describe('CategoryFormDialog', () => {
     await flushPromises()
     await submitForm(wrapper)
 
-    expect(categoriesApi.createCategory).toHaveBeenCalledWith({ name: 'Material', type: 'OUT' })
+    expect(categoriesApi.createCategory).toHaveBeenCalledWith({ name: 'Material', type: 'OUT', isInstallment: false })
     expect(wrapper.emitted('saved')?.[0]).toEqual([MATERIAL])
+  })
+
+  it('flags an expense category as an installment category, offered for expenses only', async () => {
+    vi.mocked(categoriesApi.createCategory).mockResolvedValue(KREDIT)
+    const { wrapper } = await mountForm()
+    await fill(wrapper, '#category-name', 'Kredit')
+    wrapper.findComponent(Select).vm.$emit('update:modelValue', 'IN')
+    await flushPromises()
+    expect(wrapper.find('#category-installment').exists()).toBe(false)
+
+    wrapper.findComponent(Select).vm.$emit('update:modelValue', 'OUT')
+    await flushPromises()
+    await wrapper.get('#category-installment').setValue(true)
+    await submitForm(wrapper)
+
+    expect(categoriesApi.createCategory).toHaveBeenCalledWith({ name: 'Kredit', type: 'OUT', isInstallment: true })
+  })
+
+  it('turns the flag off on an existing category, sending only that change', async () => {
+    vi.mocked(categoriesApi.updateCategory).mockResolvedValue({ ...KREDIT, isInstallment: false })
+    const { wrapper } = await mountForm(KREDIT)
+    await wrapper.get('#category-installment').setValue(false)
+    await submitForm(wrapper)
+    expect(categoriesApi.updateCategory).toHaveBeenCalledWith('c-kredit', { isInstallment: false })
   })
 
   it('shows a duplicate under the name field', async () => {

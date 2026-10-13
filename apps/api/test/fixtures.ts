@@ -7,11 +7,13 @@ import type {
   AccountType,
   Category,
   Installment,
+  Prisma,
   PrismaClient,
   Transaction,
   TxStatus,
   TxType,
   User,
+  WishlistItem,
 } from '../src/generated/prisma/client.js';
 import { api, E2eContext } from './e2e-context.js';
 import { LOGIN, SETUP_PIN } from './routes.js';
@@ -187,3 +189,30 @@ export function createInstallment(
     },
   });
 }
+
+export function createWishlistItem(
+  prisma: PrismaClient,
+  overrides: Partial<Prisma.WishlistItemUncheckedCreateInput> = {},
+): Promise<WishlistItem> {
+  sequence += 1;
+  return prisma.wishlistItem.create({
+    data: {
+      name: `Barang ${sequence}`,
+      price: 2_500_000n,
+      reason: 'Laptop lama lambat',
+      similar_owned: 'Ya, laptop 2018',
+      value_added: 'Kerja lebih cepat',
+      usage_duration: '4 tahun, untuk kerja',
+      ...overrides,
+    },
+  });
+}
+
+/** Penilaian AI yang sudah tersimpan, untuk ditulis langsung ke barang. */
+export const REVIEWED = {
+  ai_verdict: 'PLANNED',
+  ai_reasons: ['Kebutuhan kerja jelas', 'Barang lama sudah lambat'],
+  ai_suggestion: 'Bandingkan dua toko dulu.',
+  ai_reviewed_at: new Date('2026-10-10T03:00:00.000Z'),
+  ai_model: 'claude-opus-5-5',
+} as const;

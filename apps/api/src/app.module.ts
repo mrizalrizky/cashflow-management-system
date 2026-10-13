@@ -14,6 +14,7 @@ import { InstallmentsModule } from './installments/installments.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
+import { WishlistModule } from './wishlist/wishlist.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { TransactionsModule } from './transactions/transactions.module.js';
     CategoriesModule,
     TransactionsModule,
     InstallmentsModule,
+    WishlistModule,
     AttachmentsModule,
     ReportsModule,
   ],

@@ -19,3 +19,4 @@ export const DASHBOARD = `${API}/dashboard/company`;
 export const AUDIT_LOGS = `${API}/audit-logs`;
 export const TRANSACTION_EXPORT = `${API}/transactions/export`;
 export const INSTALLMENTS = `${API}/installments`;
+export const WISHLIST = `${API}/wishlist`;

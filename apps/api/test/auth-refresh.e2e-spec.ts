@@ -1,9 +1,14 @@
-/* eslint-disable */
-// @ts-nocheck
-// Diganti test PIN di Task 4.
 import { api, E2eContext, setupE2e } from './e2e-context.js';
-import { bearer, createUser, DEFAULT_PASSWORD, login, loginAs, refreshCookie } from './fixtures.js';
-import { CHANGE_PASSWORD, LOGOUT, ME, REFRESH } from './routes.js';
+import {
+  bearer,
+  createOwner,
+  loginWithPin,
+  OWNER_PIN,
+  refreshCookie,
+  setupPin,
+  TestSession,
+} from './fixtures.js';
+import { CHANGE_PIN, LOGOUT, ME, REFRESH } from './routes.js';
 
 const SESSION_ENDED = { statusCode: 401, message: 'Sesi berakhir, silakan login kembali' };
 
@@ -20,11 +25,22 @@ async function ageRevocations(ctx: E2eContext, seconds: number): Promise<void> {
   });
 }
 
-describe.skip('POST /auth/refresh', () => {
+/** Pemilik dengan PIN, dan sesi dari pembuatan PIN itu. */
+async function owner(ctx: E2eContext): Promise<TestSession> {
+  await createOwner(ctx.prisma);
+  return setupPin(ctx);
+}
+
+async function anotherDevice(ctx: E2eContext): Promise<TestSession> {
+  const res = await loginWithPin(ctx, OWNER_PIN).expect(200);
+  return { accessToken: res.body.accessToken, cookie: refreshCookie(res), body: res.body };
+}
+
+describe('POST /auth/refresh', () => {
   const ctx = setupE2e();
 
   it('rotates the refresh token and returns a working access token', async () => {
-    const session = await loginAs(ctx);
+    const session = await owner(ctx);
 
     const res = await refresh(ctx, session.cookie).expect(200);
 
@@ -35,8 +51,8 @@ describe.skip('POST /auth/refresh', () => {
 
     const rows = await ctx.prisma.refreshToken.findMany({ orderBy: { created_at: 'asc' } });
     expect(rows).toHaveLength(2);
-    expect(rows[0].revoked_at).not.toBeNull();
-    expect(rows[1].revoked_at).toBeNull();
+    expect(rows[0]!.revoked_at).not.toBeNull();
+    expect(rows[1]!.revoked_at).toBeNull();
   });
 
   it.each([
@@ -44,14 +60,14 @@ describe.skip('POST /auth/refresh', () => {
     ['an unknown token', 'refresh_token=tidak-dikenal'],
     ['an empty cookie', 'refresh_token='],
   ])('rejects %s with 401', async (_label, cookie) => {
-    await loginAs(ctx);
+    await owner(ctx);
     const res = await refresh(ctx, cookie).expect(401);
     expect(res.body).toEqual(SESSION_ENDED);
   });
 
   it('revokes every session when an old token is replayed after the grace period', async () => {
-    const session = await loginAs(ctx);
-    const otherDevice = await login(ctx, session.user.email);
+    const session = await owner(ctx);
+    const otherDevice = await anotherDevice(ctx);
     const rotated = refreshCookie(await refresh(ctx, session.cookie).expect(200));
     await ageRevocations(ctx, 11);
 
@@ -60,13 +76,11 @@ describe.skip('POST /auth/refresh', () => {
     expect(res.body).toEqual(SESSION_ENDED);
     await refresh(ctx, rotated).expect(401);
     await refresh(ctx, otherDevice.cookie).expect(401);
-    const reuse = await ctx.prisma.auditLog.findMany({ where: { action: 'TOKEN_REUSE' } });
-    expect(reuse).toHaveLength(1);
-    expect(reuse[0].user_id).toBe(session.user.id);
+    expect(await ctx.prisma.auditLog.count({ where: { action: 'TOKEN_REUSE' } })).toBe(1);
   });
 
   it('does not punish a second tab that refreshes at the same moment', async () => {
-    const session = await loginAs(ctx);
+    const session = await owner(ctx);
     const rotated = refreshCookie(await refresh(ctx, session.cookie).expect(200));
 
     const loser = await refresh(ctx, session.cookie).expect(401);
@@ -78,12 +92,9 @@ describe.skip('POST /auth/refresh', () => {
   });
 
   it('lets only one of two simultaneous refreshes succeed', async () => {
-    const session = await loginAs(ctx);
+    const session = await owner(ctx);
 
-    const results = await Promise.all([
-      refresh(ctx, session.cookie),
-      refresh(ctx, session.cookie),
-    ]);
+    const results = await Promise.all([refresh(ctx, session.cookie), refresh(ctx, session.cookie)]);
 
     expect(results.map((r) => r.status).sort()).toEqual([200, 401]);
     const loser = results.find((r) => r.status === 401)!;
@@ -91,13 +102,13 @@ describe.skip('POST /auth/refresh', () => {
     expect(await ctx.prisma.refreshToken.count({ where: { revoked_at: null } })).toBe(1);
   });
 
-  it('treats a session ended by a password change as ended, not as stolen', async () => {
-    const laptop = await loginAs(ctx);
-    const phone = await login(ctx, laptop.user.email);
+  it('treats a session ended by a PIN change as ended, not as stolen', async () => {
+    const laptop = await owner(ctx);
+    const phone = await anotherDevice(ctx);
     const changed = await api(ctx)
-      .post(CHANGE_PASSWORD)
+      .post(CHANGE_PIN)
       .set(...bearer(laptop.accessToken))
-      .send({ currentPassword: DEFAULT_PASSWORD, newPassword: 'password-baru-456' })
+      .send({ currentPin: OWNER_PIN, newPin: '246810' })
       .expect(200);
     await ageRevocations(ctx, 11);
 
@@ -108,7 +119,7 @@ describe.skip('POST /auth/refresh', () => {
   });
 
   it('ignores a rotated token that has since expired', async () => {
-    const session = await loginAs(ctx);
+    const session = await owner(ctx);
     const rotated = refreshCookie(await refresh(ctx, session.cookie).expect(200));
     await ageRevocations(ctx, 11);
     await ctx.prisma.refreshToken.updateMany({
@@ -128,25 +139,18 @@ describe.skip('POST /auth/refresh', () => {
   });
 
   it('rejects an expired refresh token', async () => {
-    const session = await loginAs(ctx);
+    const session = await owner(ctx);
     await ctx.prisma.refreshToken.updateMany({ data: { expires_at: new Date(Date.now() - 1000) } });
-
-    await refresh(ctx, session.cookie).expect(401);
-  });
-
-  it('rejects a user who was deactivated after logging in', async () => {
-    const session = await loginAs(ctx);
-    await ctx.prisma.user.update({ where: { id: session.user.id }, data: { is_active: false } });
 
     await refresh(ctx, session.cookie).expect(401);
   });
 });
 
-describe.skip('POST /auth/logout', () => {
+describe('POST /auth/logout', () => {
   const ctx = setupE2e();
 
   it('revokes the session, clears the cookie and records the logout', async () => {
-    const session = await loginAs(ctx);
+    const session = await owner(ctx);
 
     const res = await api(ctx).post(LOGOUT).set('Cookie', session.cookie).expect(204);
 
@@ -155,14 +159,12 @@ describe.skip('POST /auth/logout', () => {
     expect(cleared).toContain('Path=/api/v1/auth');
     expect(cleared).toMatch(/Expires=Thu, 01 Jan 1970/);
     await refresh(ctx, session.cookie).expect(401);
-    const logouts = await ctx.prisma.auditLog.findMany({ where: { action: 'LOGOUT' } });
-    expect(logouts.map((l) => l.user_id)).toEqual([session.user.id]);
+    expect(await ctx.prisma.auditLog.count({ where: { action: 'LOGOUT' } })).toBe(1);
   });
 
-  it('leaves other sessions of the same user alone', async () => {
-    const user = await createUser(ctx.prisma);
-    const first = await login(ctx, user.email);
-    const second = await login(ctx, user.email);
+  it('leaves the sessions of other devices alone', async () => {
+    const first = await owner(ctx);
+    const second = await anotherDevice(ctx);
 
     await api(ctx).post(LOGOUT).set('Cookie', first.cookie).expect(204);
 

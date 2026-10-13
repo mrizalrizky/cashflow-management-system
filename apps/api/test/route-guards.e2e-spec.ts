@@ -13,6 +13,9 @@ interface Route {
 const PUBLIC = [
   'GET /api/v1/health',
   'GET /api/v1/health/live',
+  'GET /api/v1/auth/pin-status',
+  'POST /api/v1/auth/setup-pin',
+  'POST /api/v1/auth/login',
   'POST /api/v1/auth/refresh',
   'POST /api/v1/auth/logout',
 ];

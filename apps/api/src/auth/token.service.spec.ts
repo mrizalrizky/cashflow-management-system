@@ -49,9 +49,9 @@ describe('TokenService', () => {
     expect(first.hash).not.toBe(first.token);
   });
 
-  it('expires refresh tokens after 7 days', () => {
+  it('expires refresh tokens after 30 days', () => {
     expect(tokens.refreshExpiry(new Date('2026-01-01T00:00:00Z'))).toEqual(
-      new Date('2026-01-08T00:00:00Z'),
+      new Date('2026-01-31T00:00:00Z'),
     );
   });
 });

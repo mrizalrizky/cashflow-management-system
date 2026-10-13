@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { PasswordService } from './password.service.js';
+import { PinService } from './pin.service.js';
 import { SessionService } from './session.service.js';
 import { TokenService } from './token.service.js';
 
@@ -14,7 +15,7 @@ import { TokenService } from './token.service.js';
 @Module({
   imports: [
     JwtModule.register({}),
-    // Hanya dipakai rute yang memasang ThrottlerGuard (login).
+    // Hanya dipakai rute yang memasang ThrottlerGuard (buat PIN dan masuk).
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -27,10 +28,11 @@ import { TokenService } from './token.service.js';
   providers: [
     AuthService,
     PasswordService,
+    PinService,
     TokenService,
     SessionService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
-  exports: [PasswordService, SessionService],
+  exports: [PasswordService, PinService, SessionService],
 })
 export class AuthModule {}

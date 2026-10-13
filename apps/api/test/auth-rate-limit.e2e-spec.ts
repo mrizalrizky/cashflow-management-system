@@ -1,11 +1,10 @@
-/* eslint-disable */
-// @ts-nocheck
-// Diganti test PIN di Task 4.
 import { api, setupE2e } from './e2e-context.js';
-import { createUser, DEFAULT_PASSWORD } from './fixtures.js';
-import { HEALTH, LOGIN, REFRESH } from './routes.js';
+import { createOwner, loginWithPin, OWNER_PIN, setupPin } from './fixtures.js';
+import { HEALTH, REFRESH } from './routes.js';
 
 // Batas e2e bawaan sengaja tinggi; file ini menurunkannya sebelum modul aplikasi dimuat.
+// Tiga: lebih kecil dari lima PIN salah yang memicu jeda, supaya yang diuji di sini adalah
+// batas per pengunjung, bukan jeda PIN.
 vi.hoisted(() => {
   process.env.LOGIN_RATE_LIMIT = '3';
 });
@@ -15,21 +14,22 @@ const TOO_MANY = {
   message: 'Terlalu banyak percobaan login. Coba lagi nanti.',
 };
 
-describe.skip('login rate limit', () => {
+describe('PIN rate limit per visitor', () => {
   const ctx = setupE2e();
 
   it('refuses further attempts from the same address once the limit is reached', async () => {
-    const user = await createUser(ctx.prisma);
-    const wrong = { email: user.email, password: 'salah-salah' };
+    await createOwner(ctx.prisma);
+    // Batasnya dihitung per rute: membuat PIN tidak mengurangi jatah masuk.
+    await setupPin(ctx);
 
     for (let attempt = 1; attempt <= 3; attempt += 1) {
-      await api(ctx).post(LOGIN).send(wrong).expect(401);
+      await loginWithPin(ctx, '999999').expect(401);
     }
-    const limited = await api(ctx).post(LOGIN).send(wrong).expect(429);
+    const limited = await loginWithPin(ctx, '999999').expect(429);
     expect(limited.body).toEqual(TOO_MANY);
 
-    // Password yang benar pun ditolak selama masih dibatasi.
-    await api(ctx).post(LOGIN).send({ email: user.email, password: DEFAULT_PASSWORD }).expect(429);
+    // PIN yang benar pun ditolak selama masih dibatasi.
+    await loginWithPin(ctx, OWNER_PIN).expect(429);
 
     // Rute lain tidak ikut dibatasi.
     for (let call = 1; call <= 10; call += 1) {

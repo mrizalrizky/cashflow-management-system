@@ -4,9 +4,9 @@ describe('sanitizeForAudit', () => {
   it('removes secret fields at any depth', () => {
     const input = {
       id: '1',
-      password_hash: 'secret',
-      nested: { token_hash: 'secret', keep: 'yes' },
-      list: [{ password_hash: 'secret', name: 'a' }],
+      pin_hash: 'secret',
+      nested: { token_hash: 'secret', keep: 'yes', pin: '135792' },
+      list: [{ currentPin: '135792', newPin: '246810', name: 'a' }],
     };
     expect(sanitizeForAudit(input)).toEqual({
       id: '1',

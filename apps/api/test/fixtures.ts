@@ -12,6 +12,7 @@ import type {
   User,
 } from '../src/generated/prisma/client.js';
 import { api, E2eContext } from './e2e-context.js';
+import { LOGIN, SETUP_PIN } from './routes.js';
 
 let sequence = 0;
 
@@ -37,6 +38,19 @@ export interface TestSession {
   accessToken: string;
   cookie: string;
   body: { accessToken: string; user: Record<string, unknown> };
+}
+
+/** PIN yang dipakai test bila tidak menyebut yang lain. */
+export const OWNER_PIN = '135792';
+
+/** Membuat PIN lewat API, seperti pada kunjungan pertama. Pemiliknya harus sudah ada. */
+export async function setupPin(ctx: E2eContext, pin: string = OWNER_PIN): Promise<TestSession> {
+  const res = await api(ctx).post(SETUP_PIN).send({ pin }).expect(201);
+  return { accessToken: res.body.accessToken, cookie: refreshCookie(res), body: res.body };
+}
+
+export function loginWithPin(ctx: E2eContext, pin: unknown) {
+  return api(ctx).post(LOGIN).send({ pin });
 }
 
 export function bearer(accessToken: string): [string, string] {

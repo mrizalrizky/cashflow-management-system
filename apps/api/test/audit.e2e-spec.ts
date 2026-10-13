@@ -1,11 +1,8 @@
-/* eslint-disable */
-// @ts-nocheck
-// Diganti test PIN di Task 4.
 import { AuditService } from '../src/audit/audit.service.js';
 import type { PrismaClient } from '../src/generated/prisma/client.js';
 import { createTestPrisma, resetDb } from './test-db.js';
 
-describe.skip('AuditService', () => {
+describe('AuditService', () => {
   let prisma: PrismaClient;
   const audit = new AuditService();
 
@@ -50,7 +47,7 @@ describe.skip('AuditService', () => {
       action: 'UPDATE',
       entityType: 'user',
       entityId: 'abc',
-      before: { name: 'A', password_hash: 'secret' },
+      before: { name: 'A', pin_hash: 'secret', pin: '135792', currentPin: '135792', newPin: '246810' },
     });
 
     const row = await prisma.auditLog.findFirstOrThrow();

@@ -7,6 +7,10 @@ export type AuditAction =
   | 'LOGIN_FAILED'
   | 'LOGOUT'
   | 'TOKEN_REUSE'
+  | 'LOGIN_LOCKED'
+  | 'PIN_SETUP'
+  | 'PIN_CHANGE'
+  | 'PIN_RESET'
   | 'CREATE'
   | 'UPDATE'
   | 'VOID'
@@ -26,11 +30,11 @@ export interface AuditEntry {
 }
 
 const SECRET_FIELDS = new Set([
-  'password_hash',
+  'pin_hash',
+  'pin',
+  'currentPin',
+  'newPin',
   'token_hash',
-  'password',
-  'currentPassword',
-  'newPassword',
   'refreshToken',
 ]);
 

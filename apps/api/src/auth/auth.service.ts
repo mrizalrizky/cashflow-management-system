@@ -4,6 +4,7 @@ import type { Db } from '../database/db.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
 import { Session, toAuthUser } from './auth.types.js';
+import { PinService, pinLocked } from './pin.service.js';
 import { SessionService } from './session.service.js';
 import { TokenService } from './token.service.js';
 
@@ -30,10 +31,50 @@ export class ConcurrentRefreshException extends UnauthorizedException {
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly pins: PinService,
     private readonly tokens: TokenService,
     private readonly sessions: SessionService,
     private readonly audit: AuditService,
   ) {}
+
+  pinStatus(): Promise<{ pinSet: boolean }> {
+    return this.pins.isSet(this.prisma).then((pinSet) => ({ pinSet }));
+  }
+
+  /** PIN pertama; langsung membuka sesi. */
+  async setupPin(pin: string, ip: string | null): Promise<Session> {
+    const { owner, refreshToken } = await this.prisma.$transaction(async (tx) => {
+      const owner = await this.pins.setup(tx, pin, ip);
+      return { owner, refreshToken: await this.sessions.create(tx, owner.id) };
+    });
+    return this.buildSession(owner, refreshToken);
+  }
+
+  async login(pin: string, ip: string | null): Promise<Session> {
+    // Penolakan dilempar setelah transaksi selesai, supaya hitungan salah dan auditnya tersimpan.
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const check = await this.pins.verify(tx, pin, ip);
+      if (check.kind !== 'ok') return check;
+      await this.logUserEvent(tx, 'LOGIN', check.owner.id, ip);
+      return { ...check, refreshToken: await this.sessions.create(tx, check.owner.id) };
+    });
+    if (outcome.kind === 'wrong') throw new UnauthorizedException('PIN salah');
+    if (outcome.kind === 'locked') throw pinLocked(outcome.minutes);
+    return this.buildSession(outcome.owner, outcome.refreshToken);
+  }
+
+  /** Mengganti PIN, mengakhiri semua sesi lain, dan membuka sesi baru untuk pemanggil. */
+  async changePin(ownerId: string, currentPin: string, newPin: string, ip: string | null): Promise<Session> {
+    const { owner, refreshToken } = await this.prisma.$transaction(async (tx) => {
+      await this.pins.change(tx, ownerId, currentPin, newPin, ip);
+      await this.sessions.endAll(tx, ownerId);
+      return {
+        owner: await tx.user.findUniqueOrThrow({ where: { id: ownerId } }),
+        refreshToken: await this.sessions.create(tx, ownerId),
+      };
+    });
+    return this.buildSession(owner, refreshToken);
+  }
 
   /** Menukar refresh token dengan yang baru. Token lama langsung tidak berlaku. */
   async refresh(rawToken: string | undefined, ip: string | null): Promise<Session> {

@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
-export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Satu perangkat tetap masuk 30 hari; diperpanjang tiap kali token ditukar. */
+export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const ALGORITHM = 'HS256';
 

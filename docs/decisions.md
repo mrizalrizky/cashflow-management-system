@@ -174,3 +174,14 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **PIN saat ini di formulir Ganti PIN dihitung seperti masuk**: salah lima kali memulai jeda yang sama, supaya formulir itu bukan jalan menebak PIN.
 - **Lupa PIN lewat perintah server `reset-pin`**, bukan lewat aplikasi, supaya tidak ada jalan masuk tanpa PIN. Reset menghapus PIN dan semua sesi; data tidak tersentuh.
 - **Log audit pindah ke Pengaturan** (`/pengaturan/audit-log`); filter dan kolom pengguna dihapus karena hanya ada satu pengguna.
+
+## Cicilan (P2)
+
+- **Kemajuan cicilan dihitung dari transaksi pengeluaran tertaut yang tidak VOID**, tidak disimpan. Bulan selesai, "seharusnya", dan status juga dihitung, dari bulan berjalan menurut kalender Jakarta (berganti tepat tengah malam WIB).
+- **Satu transaksi = satu bulan**, apa pun nominalnya; nominal boleh berbeda dari nominal per bulan.
+- **Kategori diberi tanda "Kategori cicilan"**; transaksi pengeluaran berkategori itu wajib memilih cicilan, transaksi lain tidak boleh. Mengganti ke kategori lain melepas tautannya.
+- **Dua pembayaran bulan terakhir yang datang bersamaan**: baris cicilan dikunci sebelum menghitung, jadi hanya satu yang tercatat.
+- **Transaksi lama pada kategori yang baru ditandai** tidak diubah; baru saat diubah, transaksi itu diminta memilih cicilan.
+- **Cicilan boleh dihapus** (bukan transaksi) selama belum ada transaksi tertaut, termasuk yang VOID; penghapusan tercatat di log audit dengan isi sebelumnya.
+- **"Total cicilan aktif per bulan"** menjumlahkan cicilan yang periodenya mencakup bulan berjalan, lunas atau tidak. **"Belum dibayar bulan ini"** menjumlahkan `(seharusnya - kemajuan) × nominal per bulan` untuk tiap cicilan yang tertinggal.
+- **Dropdown "Cicilan yang dibayar"** berisi cicilan yang belum lunas, ditambah cicilan yang sudah dibayar transaksi yang sedang diubah. Bila hanya ada satu, langsung terpilih; nominal diisi dari nominal per bulan selama masih kosong.

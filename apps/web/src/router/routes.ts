@@ -1,5 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
-import { PATHS, TRANSACTION_DETAIL_ROUTE } from './paths'
+import { INSTALLMENT_DETAIL_ROUTE, PATHS, TRANSACTION_DETAIL_ROUTE } from './paths'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -40,6 +40,16 @@ export const routes: RouteRecordRaw[] = [
     path: TRANSACTION_DETAIL_ROUTE,
     component: () => import('@/views/transactions/TransactionDetailView.vue'),
     meta: { title: 'Transaksi' },
+  },
+  {
+    path: PATHS.installments,
+    component: () => import('@/views/installments/InstallmentsView.vue'),
+    meta: { title: 'Cicilan' },
+  },
+  {
+    path: INSTALLMENT_DETAIL_ROUTE,
+    component: () => import('@/views/installments/InstallmentDetailView.vue'),
+    meta: { title: 'Cicilan' },
   },
   {
     path: PATHS.masterData,

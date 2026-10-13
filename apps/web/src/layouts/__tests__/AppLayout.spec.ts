@@ -30,6 +30,7 @@ describe('AppLayout', () => {
     expect(sidebarLinks(wrapper).map((link) => link.text())).toEqual([
       'Dashboard',
       'Transaksi',
+      'Cicilan',
       'Master data',
       'Pengaturan',
     ])
@@ -68,10 +69,11 @@ describe('AppLayout', () => {
     expect(drawerLinks.map((link) => link.textContent?.trim())).toEqual([
       'Dashboard',
       'Transaksi',
+      'Cicilan',
       'Master data',
       'Pengaturan',
     ])
-    drawerLinks[3]!.click()
+    drawerLinks[4]!.click()
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/pengaturan')

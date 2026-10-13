@@ -97,6 +97,37 @@ export interface Transaction {
   updatedAt: string
 }
 
+export type InstallmentStatus = 'NOT_STARTED' | 'ON_TRACK' | 'BEHIND' | 'PAID_OFF'
+
+/** Bulan `YYYY-MM`; nominal string digit. Kemajuan, bulan selesai dan status dihitung API. */
+export interface Installment {
+  id: string
+  name: string
+  monthlyAmount: string
+  startMonth: string
+  endMonth: string
+  months: number
+  paid: number
+  due: number
+  behindMonths: number
+  status: InstallmentStatus
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InstallmentList {
+  items: Installment[]
+  summary: {
+    month: string
+    activeMonthlyTotal: string
+    unpaid: { id: string; name: string; months: number; amount: string }[]
+    unpaidTotal: string
+  }
+}
+
+export type InstallmentDetail = Installment & { transactions: Transaction[] }
+
 /** Rentang tanggal kalender `YYYY-MM-DD`; kedua ujungnya ikut dihitung. */
 export interface Period {
   from: string

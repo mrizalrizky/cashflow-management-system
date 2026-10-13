@@ -48,6 +48,7 @@ describe('formatDateTime', () => {
 describe('audit labels', () => {
   const ACTIONS = [
     'LOGIN',
+    'DELETE',
     'LOGIN_FAILED',
     'LOGOUT',
     'TOKEN_REUSE',
@@ -63,7 +64,7 @@ describe('audit labels', () => {
     'DETACH',
     'EXPORT',
   ]
-  const ENTITIES = ['transaction', 'account', 'category', 'user']
+  const ENTITIES = ['transaction', 'account', 'category', 'installment', 'user']
 
   it('names every action the API writes, in Indonesian', () => {
     for (const action of ACTIONS) expect(auditActionLabel(action)).not.toBe(action)

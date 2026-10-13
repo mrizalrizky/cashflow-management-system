@@ -59,6 +59,7 @@ const auditActions = openLabelSet({
   PIN_RESET: 'PIN direset',
   CREATE: 'Membuat',
   UPDATE: 'Mengubah',
+  DELETE: 'Menghapus',
   VOID: 'Void',
   TRANSFER: 'Transfer antar akun',
   ATTACH: 'Menambah bukti',
@@ -72,6 +73,7 @@ const auditEntities = openLabelSet({
   transaction: 'Transaksi',
   account: 'Akun',
   category: 'Kategori',
+  installment: 'Cicilan',
   user: 'Pemilik',
 })
 export const auditEntityLabel = auditEntities.label

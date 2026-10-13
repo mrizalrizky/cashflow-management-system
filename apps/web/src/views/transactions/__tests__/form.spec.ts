@@ -482,3 +482,32 @@ describe('TransactionFormDialog: installments', () => {
     expect(select(wrapper, 'tx-installment').props('modelValue')).toBe('i-hp')
   })
 })
+
+describe('TransactionFormDialog: starting values', () => {
+  async function mountWith(transaction: Transaction | null) {
+    signIn()
+    const options = useTransactionOptions()
+    await flushPromises()
+    return mountView(TransactionFormDialog, {
+      props: {
+        visible: true,
+        transaction,
+        options,
+        initial: { amount: '15000000', description: 'Laptop' },
+        onSaved,
+        'onUpdate:visible': onVisible,
+      },
+    })
+  }
+
+  it('fills the amount and description of a new expense, e.g. from a bought wishlist item', async () => {
+    const { wrapper } = await mountWith(null)
+    expect((wrapper.get('#tx-amount').element as HTMLInputElement).value).toBe('15.000.000')
+    expect((wrapper.get('#tx-description').element as HTMLTextAreaElement).value).toBe('Laptop')
+  })
+
+  it('ignores them when editing a transaction', async () => {
+    const { wrapper } = await mountWith(makeTransaction({ permissions: { canEdit: true } }))
+    expect((wrapper.get('#tx-description').element as HTMLTextAreaElement).value).toBe('Beli semen')
+  })
+})

@@ -6,6 +6,7 @@ import { fill, freshPinia, mountView, submitForm } from '@/test/mount'
 import { signIn } from '@/test/session'
 import { makeTransaction } from '@/test/transactions'
 import InstallmentDetailView from '../InstallmentDetailView.vue'
+import InstallmentFormDialog from '../InstallmentFormDialog.vue'
 import InstallmentsView from '../InstallmentsView.vue'
 
 vi.mock('@/api/installments')
@@ -145,5 +146,16 @@ describe('InstallmentDetailView', () => {
     vi.mocked(installmentsApi.getInstallment).mockRejectedValue(new ApiError(404, 'Cicilan tidak ditemukan'))
     const { wrapper } = await mountView(InstallmentDetailView, { path: '/cicilan/i-x', withOverlays: true })
     expect(wrapper.text()).toContain('Cicilan tidak ditemukan')
+  })
+})
+
+describe('InstallmentFormDialog: starting values', () => {
+  it('fills the name and notes of a new installment', async () => {
+    const { wrapper } = await mountView(InstallmentFormDialog, {
+      props: { visible: true, installment: null, initial: { name: 'Laptop', notes: 'Harga barang Rp 15.000.000' } },
+    })
+    expect((wrapper.get('#installment-name').element as HTMLInputElement).value).toBe('Laptop')
+    expect((wrapper.get('#installment-notes').element as HTMLTextAreaElement).value).toBe('Harga barang Rp 15.000.000')
+    expect((wrapper.get('#installment-amount').element as HTMLInputElement).value).toBe('')
   })
 })

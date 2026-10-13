@@ -18,6 +18,8 @@ import { collectErrors, required } from '@/lib/validation'
 const props = defineProps<{
   /** Cicilan yang diubah; null berarti menambah cicilan baru. */
   installment: Installment | null
+  /** Isian awal untuk cicilan baru, mis. dari barang wishlist yang dibeli. */
+  initial?: { name?: string; notes?: string } | null
 }>()
 const emit = defineEmits<{ saved: [installment: Installment] }>()
 const visible = defineModel<boolean>('visible', { required: true })
@@ -45,7 +47,13 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
 >({
   visible,
   entity: () => props.installment,
-  blank: () => ({ name: '', monthlyAmount: '', startMonth: null, months: '', notes: '' }),
+  blank: () => ({
+    name: props.initial?.name ?? '',
+    monthlyAmount: '',
+    startMonth: null,
+    months: '',
+    notes: props.initial?.notes ?? '',
+  }),
   fromEntity: (installment) => ({
     name: installment.name,
     monthlyAmount: installment.monthlyAmount,

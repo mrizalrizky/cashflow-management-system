@@ -36,6 +36,8 @@ const props = defineProps<{
   /** Transaksi yang diubah; null berarti mencatat transaksi baru. */
   transaction: Transaction | null
   options: TransactionOptions
+  /** Isian awal untuk transaksi baru, mis. dari barang wishlist yang dibeli. */
+  initial?: { amount?: string; description?: string } | null
 }>()
 const emit = defineEmits<{ saved: [transaction: Transaction] }>()
 const visible = defineModel<boolean>('visible', { required: true })
@@ -104,12 +106,12 @@ const { form, editing, submitting, fieldErrors, formError, onSubmit } = useEntit
   entity: () => props.transaction,
   blank: () => ({
     type: 'OUT',
-    amount: '',
+    amount: props.initial?.amount ?? '',
     transactionDate: todayInJakarta(),
     accountId: null,
     categoryId: null,
     installmentId: null,
-    description: '',
+    description: props.initial?.description ?? '',
   }),
   fromEntity: (transaction) => ({
     type: transaction.type,

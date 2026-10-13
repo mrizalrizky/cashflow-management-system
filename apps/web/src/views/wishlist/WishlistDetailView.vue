@@ -13,6 +13,7 @@ import { useAsyncData } from '@/composables/useAsyncData'
 import { useNotify } from '@/composables/useNotify'
 import { WISHLIST_STATUS_SEVERITY, wishlistStatusLabel } from '@/lib/wishlist'
 import { PATHS } from '@/router/paths'
+import BoughtShortcutsDialog from './BoughtShortcutsDialog.vue'
 import WishlistFormDialog from './WishlistFormDialog.vue'
 import WishlistReviewCard from './WishlistReviewCard.vue'
 
@@ -49,6 +50,10 @@ const answers = computed(() =>
 
 const editing = ref(false)
 const changingStatus = ref(false)
+/** Setelah ditandai "Dibeli": tawarkan mencatat pengeluaran atau membuat cicilan. */
+const offerShortcuts = ref(false)
+/** Dipasang baru saat pertama kali dibutuhkan, supaya halaman ini tidak memuat pilihan akun dan kategori. */
+const shortcutsMounted = ref(false)
 
 function show(latest: WishlistItem): void {
   item.value = latest
@@ -64,6 +69,8 @@ async function setStatus(status: WishlistStatus): Promise<void> {
   changingStatus.value = true
   try {
     show(await updateWishlistItem(item.value.id, { status }))
+    offerShortcuts.value = status === 'BOUGHT'
+    if (offerShortcuts.value) shortcutsMounted.value = true
   } catch (failure) {
     notify.error(failure, 'Status gagal diubah')
   } finally {
@@ -138,5 +145,6 @@ async function setStatus(status: WishlistStatus): Promise<void> {
     </div>
 
     <WishlistFormDialog v-model:visible="editing" :item="item" @saved="onSaved" />
+    <BoughtShortcutsDialog v-if="shortcutsMounted" v-model:visible="offerShortcuts" :item="item" />
   </template>
 </template>

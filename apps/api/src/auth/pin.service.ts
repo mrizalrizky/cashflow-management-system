@@ -83,7 +83,9 @@ export class PinService {
    */
   private async check(tx: Prisma.TransactionClient, pin: string, ip: string | null, now: Date): Promise<PinCheck> {
     const owner = await ownerFor(tx);
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${owner.id} FOR UPDATE`;
+    // NO KEY UPDATE: pemeriksaan PIN tetap antre satu per satu, tetapi baris yang merujuk pemilik
+    // (sesi, catatan audit) tetap bisa ditulis transaksi lain, jadi keluar dan masuk tidak saling mengunci.
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${owner.id} FOR NO KEY UPDATE`;
     const current = await tx.user.findUniqueOrThrow({ where: { id: owner.id } });
     if (current.pin_hash === null) throw new ConflictException('PIN belum dibuat');
 

@@ -1,4 +1,5 @@
 import { PIN_LOCK_MS } from '../src/auth/pin-lockout.js';
+import { PinService } from '../src/auth/pin.service.js';
 import { createTestApp } from './app-factory.js';
 import { api, setupE2e } from './e2e-context.js';
 import { createOwner, loginWithPin, OWNER_PIN, setupPin } from './fixtures.js';
@@ -62,6 +63,24 @@ describe('PIN lockout', () => {
 
     expect(results.filter((r) => r.status === 429)).toHaveLength(2);
     expect(results.filter((r) => r.status === 401)).toHaveLength(4);
+  });
+
+  it('does not hold up a logout or a new audit entry while a PIN is being checked', async () => {
+    const owner = await ctx.prisma.user.findFirstOrThrow();
+    const pins = ctx.app.get(PinService);
+    // Sambil pemeriksaan PIN memegang kuncinya, sambungan lain menulis baris yang merujuk pemilik
+    // (seperti audit saat keluar). Kunci yang terlalu keras membuat tulisan itu menunggu, dan
+    // dua transaksi seperti itu bisa saling mengunci.
+    const elsewhere = await ctx.prisma.$transaction(async (tx) => {
+      await pins.verify(tx, WRONG, null);
+      return Promise.race([
+        ctx.prisma.auditLog
+          .create({ data: { user_id: owner.id, action: 'LOGOUT', entity_type: 'user', entity_id: owner.id } })
+          .then(() => 'written'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 2_000)),
+      ]);
+    });
+    expect(elsewhere).toBe('written');
   });
 
   it('keeps the pause after the application restarts', async () => {

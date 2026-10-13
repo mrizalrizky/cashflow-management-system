@@ -187,7 +187,7 @@ Untuk memulihkan ke database Neon yang baru (mis. cabang atau proyek Neon lain),
 
 ## Terakhir diverifikasi
 
-VERIFIED_LINE
+Edisi pribadi: belum diverifikasi ulang dengan `npm run deploy:smoke`. Verifikasi terakhir (edisi perusahaan): 7 Oktober 2026, dengan Docker 29.1.3 dan Docker Compose v5.0.0 (34 pemeriksaan lulus).
 
 Empat hal di panduan ini bergantung pada akun Anda sendiri dan belum bisa diuji otomatis; pastikan pada pemasangan pertama:
 

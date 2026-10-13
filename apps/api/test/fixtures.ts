@@ -1,10 +1,12 @@
 import type { Response } from 'supertest';
 import { SessionService } from '../src/auth/session.service.js';
+import { addMonths, currentMonthInJakarta, parseCalendarMonth } from '../src/common/calendar-date.js';
 import { TokenService } from '../src/auth/token.service.js';
 import type {
   Account,
   AccountType,
   Category,
+  Installment,
   PrismaClient,
   Transaction,
   TxStatus,
@@ -139,6 +141,7 @@ export function createTransaction(
     /** Waktu pencatatan, untuk test yang bergantung pada urutan. */
     createdAt?: Date;
     transferGroupId?: string;
+    installmentId?: string;
   },
 ): Promise<Transaction> {
   return prisma.transaction.create({
@@ -153,6 +156,34 @@ export function createTransaction(
       created_by_id: input.createdById,
       created_at: input.createdAt,
       transfer_group_id: input.transferGroupId,
+      installment_id: input.installmentId ?? null,
+    },
+  });
+}
+
+/** Bulan relatif terhadap bulan berjalan di Jakarta, mis. `monthFromNow(-2)`. */
+export function monthFromNow(offset: number): string {
+  return addMonths(currentMonthInJakarta(), offset);
+}
+
+export function createInstallment(
+  prisma: PrismaClient,
+  overrides: Partial<{
+    name: string;
+    monthlyAmount: bigint;
+    startMonth: string;
+    months: number;
+    notes: string | null;
+  }> = {},
+): Promise<Installment> {
+  sequence += 1;
+  return prisma.installment.create({
+    data: {
+      name: overrides.name ?? `Cicilan ${sequence}`,
+      monthly_amount: overrides.monthlyAmount ?? 1_500_000n,
+      start_month: parseCalendarMonth(overrides.startMonth ?? monthFromNow(0)),
+      months: overrides.months ?? 3,
+      notes: overrides.notes ?? null,
     },
   });
 }

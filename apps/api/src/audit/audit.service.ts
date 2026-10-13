@@ -13,6 +13,7 @@ export type AuditAction =
   | 'PIN_RESET'
   | 'CREATE'
   | 'UPDATE'
+  | 'DELETE'
   | 'VOID'
   | 'TRANSFER'
   | 'ATTACH'

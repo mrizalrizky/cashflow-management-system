@@ -80,3 +80,10 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 - **Image tanpa rahasia dan tanpa hak root**, tanpa `.env`, kode sumber, test atau berkas bukti; **tidak ada port yang dibuka** di server (jalan masuk hanya Cloudflare Tunnel); Compose menolak jalan bila nilai wajib kosong. Dibuktikan `deploy/smoke.sh` bagian 1 sampai 3.
 - **Batas percobaan masuk tetap per pengunjung di balik dua proxy** (Cloudflare dan Caddy): `deploy/smoke.sh` bagian 4.
 - **Kebijakan keamanan browser (CSP) untuk halaman web** diuji dengan browser sungguhan: `deploy/smoke-browser.mjs`.
+
+## Ditambahkan pada P3 (Wishlist dan penilaian AI)
+
+- **Kunci Claude hanya di server** (`ANTHROPIC_API_KEY` di `deploy/.env`), tidak pernah dikirim ke browser; tanpa kunci, penilaian menjawab 503 dan tidak memanggil apa pun. Test tidak pernah memakai kunci sungguhan: `vitest.config.e2e.ts` dan `apps/web/e2e/env.ts` mengosongkannya, dan panggilan ke Claude diganti tiruan (`test/fake-ai.ts`).
+- **Jawaban pemilik dikirim sebagai data**: di dalam satu tag, sebagai JSON dengan `<` dan `>` di-escape, dan instruksi sistem menyatakan isinya bukan perintah. Keluaran AI dicek ketat (`src/wishlist/ai/review-output.ts`) sebelum disimpan. Bukti: `src/wishlist/ai/review-prompt.spec.ts`, `review-output.spec.ts`.
+- **Ringkasan keuangan hanya berisi total**, tanpa nama akun, kategori, keterangan, atau bukti. Bukti: `test/finance-summary.e2e-spec.ts` dan `test/wishlist-review.e2e-spec.ts` ("never sends account names, categories or descriptions").
+- **Batas harian** (`AI_REVIEW_DAILY_LIMIT`) dihitung dari penilaian yang berhasil per hari Jakarta; kegagalan tidak dihitung dan tidak mengubah barang. Isi permintaan dan kunci tidak pernah dicatat di log.

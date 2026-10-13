@@ -61,8 +61,11 @@ Buka `deploy/.env` dan isi:
 | `JWT_ACCESS_SECRET` | Hasil `openssl rand -base64 48`. Jangan dipakai ulang dari tempat lain. |
 | `TUNNEL_TOKEN` | Token dari Langkah 1. |
 | `BACKUP_HOST_DIR` | Folder cadangan di server, mis. `/srv/backup/cashflow`. |
+| `ANTHROPIC_API_KEY` | Opsional. Kunci Claude dari console.anthropic.com untuk "Minta pendapat AI" di Wishlist. Kosong: fitur itu saja yang tidak aktif. |
 
-Sisanya (`LOGIN_RATE_LIMIT`, `BACKUP_AT`, `BACKUP_KEEP_DAYS`, `TZ`) boleh dibiarkan.
+Sisanya (`LOGIN_RATE_LIMIT`, `AI_REVIEW_DAILY_LIMIT`, `BACKUP_AT`, `BACKUP_KEEP_DAYS`, `TZ`) boleh dibiarkan.
+
+Kunci Claude hanya ada di server, tidak pernah dikirim ke browser. Saat pemilik menekan "Minta pendapat AI", yang dikirim ke Anthropic hanyalah jawaban enam pertanyaan barang itu dan, bila dipilih, ringkasan keuangan berisi angka total saja (saldo, rata-rata pemasukan dan pengeluaran tiga bulan, dan jumlah cicilan berjalan). Tiap penilaian ditagihkan ke akun Anthropic pemilik kunci; `AI_REVIEW_DAILY_LIMIT` membatasi jumlahnya per hari.
 
 Nilai yang memuat tanda `$`, `#` atau spasi harus diapit kutip tunggal, mis. `DATABASE_URL='postgresql://...'`.
 

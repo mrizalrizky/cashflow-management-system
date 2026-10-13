@@ -185,3 +185,14 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Cicilan boleh dihapus** (bukan transaksi) selama belum ada transaksi tertaut, termasuk yang VOID; penghapusan tercatat di log audit dengan isi sebelumnya.
 - **"Total cicilan aktif per bulan"** menjumlahkan cicilan yang periodenya mencakup bulan berjalan, lunas atau tidak. **"Belum dibayar bulan ini"** menjumlahkan `(seharusnya - kemajuan) × nominal per bulan` untuk tiap cicilan yang tertinggal.
 - **Dropdown "Cicilan yang dibayar"** berisi cicilan yang belum lunas, ditambah cicilan yang sudah dibayar transaksi yang sedang diubah. Bila hanya ada satu, langsung terpilih; nominal diisi dari nominal per bulan selama masih kosong.
+
+## Wishlist (P3)
+
+- **Menyimpan barang tidak memanggil AI**; hanya tombol "Minta pendapat AI" yang memanggil Claude (`claude-opus-5-5`, effort `low`, keluaran terstruktur, fallback server `default`), dengan batas waktu 60 detik tanpa ulangan otomatis.
+- **Panggilan ke Claude lewat satu port** (`AI_MESSAGES`), supaya test memakai tiruan: tanpa biaya dan hasilnya tetap.
+- **Batas harian dihitung dari baris audit `AI_REVIEW`** sejak tengah malam Jakarta. Hanya penilaian yang berhasil menulis baris itu, jadi kegagalan tidak memakai jatah.
+- **Jumlah dan panjang alasan dicek di kode** (2 sampai 4 alasan, maks. 500 karakter; saran maks. 1.000), karena skema JSON keluaran tidak menyatakan batas itu. Keluaran yang tidak sesuai dianggap gagal.
+- **Rata-rata pemasukan dan pengeluaran** memakai tiga bulan kalender penuh sebelum bulan berjalan, dibulatkan ke bawah ke rupiah utuh.
+- **"Jawaban sudah diubah"** muncul bila jawaban atau harga berubah setelah penilaian terakhir; status dan pilihan ringkasan tidak dihitung.
+- **Status barang bebas berpindah** (termasuk kembali ke Menunggu), supaya salah pilih bisa dibetulkan.
+- **Jalan pintas Dibeli**: "Catat pengeluaran" mengisi nominal dan keterangan dengan harga dan nama barang; "Buat cicilan" mengisi nama dan mencatat harga di catatan, karena nominal per bulan tidak bisa diturunkan dari harga.

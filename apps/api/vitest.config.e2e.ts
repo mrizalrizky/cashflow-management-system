@@ -14,6 +14,8 @@ const testEnv = {
   LOGIN_RATE_LIMIT: '1000',
   // Berkas bukti dari test tidak boleh bercampur dengan milik pengembangan.
   STORAGE_DIR: join(tmpdir(), 'cashflow-e2e-storage'),
+  // Kosong: test tidak pernah memakai kunci Claude dari .env pengembangan (biaya sungguhan).
+  ANTHROPIC_API_KEY: '',
 };
 Object.assign(process.env, testEnv);
 

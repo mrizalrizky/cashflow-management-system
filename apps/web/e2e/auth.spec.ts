@@ -29,13 +29,13 @@ test('creating the PIN, signing in with it, and changing it', async ({ page }) =
     await page.getByRole('button', { name: 'Simpan PIN' }).click()
 
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(sidebarLinks(page)).toHaveText(['Dashboard', 'Transaksi', 'Cicilan', 'Master data', 'Pengaturan'])
+    await expect(sidebarLinks(page)).toHaveText(['Dashboard', 'Transaksi', 'Cicilan', 'Wishlist', 'Master data', 'Pengaturan'])
   })
 
   await test.step('a reload keeps the session and the page', async () => {
     await page.reload()
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(sidebarLinks(page)).toHaveCount(5)
+    await expect(sidebarLinks(page)).toHaveCount(6)
   })
 
   await test.step('logging out closes the app, even through the Back button', async () => {

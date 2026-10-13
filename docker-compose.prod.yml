@@ -57,6 +57,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL wajib diisi di berkas env}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET wajib diisi di berkas env}
       LOGIN_RATE_LIMIT: ${LOGIN_RATE_LIMIT:-5}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_REVIEW_DAILY_LIMIT: ${AI_REVIEW_DAILY_LIMIT:-20}
       # Dua proxy di depan API: Cloudflare (lewat tunnel), lalu Caddy. Dengan angka ini batas
       # percobaan login menghitung alamat pengunjung, bukan alamat proxy.
       TRUST_PROXY_HOPS: "2"

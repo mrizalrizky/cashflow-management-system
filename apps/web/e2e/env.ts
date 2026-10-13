@@ -26,4 +26,6 @@ export const apiEnv: Record<string, string> = {
   JWT_ACCESS_SECRET: 'browser-test-secret-browser-test-secret-1234',
   LOGIN_RATE_LIMIT: '1000',
   STORAGE_DIR: join(tmpdir(), 'cashflow-browser-test-storage'),
+  // Kosong: test browser tidak pernah memanggil Claude, walau .env pengembangan berisi kunci.
+  ANTHROPIC_API_KEY: '',
 }

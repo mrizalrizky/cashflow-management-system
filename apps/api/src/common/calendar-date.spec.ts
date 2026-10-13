@@ -1,6 +1,12 @@
 import 'reflect-metadata';
 import {
+  addMonths,
+  currentMonthInJakarta,
   currentYearInJakarta,
+  formatCalendarMonth,
+  isCalendarMonth,
+  monthsBetween,
+  parseCalendarMonth,
   IsCalendarDate,
   formatCalendarDate,
   formatJakartaTimestamp,
@@ -74,5 +80,32 @@ describe('formatJakartaTimestamp', () => {
     expect(formatJakartaTimestamp(new Date('2026-10-06T03:05:00.000Z'))).toBe('2026-10-06 10:05');
     expect(formatJakartaTimestamp(new Date('2026-10-06T17:30:00.000Z'))).toBe('2026-10-07 00:30');
     expect(formatJakartaTimestamp(new Date('2026-12-31T17:00:00.000Z'))).toBe('2027-01-01 00:00');
+  });
+});
+
+describe('months', () => {
+  it('reads the current month on the Jakarta calendar, switching at Jakarta midnight', () => {
+    expect(currentMonthInJakarta(new Date('2026-10-31T16:30:00.000Z'))).toBe('2026-10'); // 23:30 WIB
+    expect(currentMonthInJakarta(new Date('2026-10-31T17:30:00.000Z'))).toBe('2026-11'); // 00:30 WIB
+    expect(currentMonthInJakarta(new Date('2026-12-31T17:00:00.000Z'))).toBe('2027-01');
+  });
+
+  it('accepts only real months as YYYY-MM', () => {
+    for (const ok of ['2026-01', '2026-12', '1900-01', '2999-12']) expect(isCalendarMonth(ok)).toBe(true);
+    for (const bad of ['2026-13', '2026-00', '2026-1', '2026-10-01', '1899-12', '', 202610, null]) {
+      expect(isCalendarMonth(bad)).toBe(false);
+    }
+  });
+
+  it('stores a month as its first day and reads it back', () => {
+    expect(parseCalendarMonth('2026-02').toISOString()).toBe('2026-02-01T00:00:00.000Z');
+    expect(formatCalendarMonth(new Date('2026-02-01T00:00:00.000Z'))).toBe('2026-02');
+  });
+
+  it('adds months across years and counts the months between two months', () => {
+    expect(addMonths('2026-11', 2)).toBe('2027-01');
+    expect(addMonths('2026-01', -1)).toBe('2025-12');
+    expect(monthsBetween('2026-11', '2027-02')).toBe(3);
+    expect(monthsBetween('2027-02', '2026-11')).toBe(-3);
   });
 });

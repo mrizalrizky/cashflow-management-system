@@ -72,6 +72,8 @@ model Category {
   type      TxType
   is_system Boolean @default(false) // mis. Transfer Masuk/Keluar; tidak bisa diubah atau dinonaktifkan
   is_active Boolean @default(true)
+  /// Transaksi pengeluaran berkategori ini wajib memilih cicilan yang dibayar.
+  is_installment Boolean @default(false)
 
   transactions Transaction[]
 
@@ -93,6 +95,7 @@ model Transaction {
   voided_by_id      String?
   voided_at         DateTime?
   void_reason       String?
+  installment_id    String? // terisi = pembayaran satu bulan sebuah cicilan
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
 
@@ -100,6 +103,7 @@ model Transaction {
   category    Category     @relation(fields: [category_id], references: [id])
   created_by  User         @relation("transaction_created_by", fields: [created_by_id], references: [id])
   voided_by   User?        @relation("transaction_voided_by", fields: [voided_by_id], references: [id], onDelete: Restrict)
+  installment Installment? @relation(fields: [installment_id], references: [id], onDelete: Restrict)
   attachments Attachment[]
 
   @@index([transaction_date], map: "idx_transactions_transaction_date")
@@ -107,7 +111,24 @@ model Transaction {
   @@index([account_id, status], map: "idx_transactions_account_id_status")
   @@index([created_by_id], map: "idx_transactions_created_by_id")
   @@index([transfer_group_id], map: "idx_transactions_transfer_group_id")
+  @@index([installment_id, status], map: "idx_transactions_installment_id_status")
   @@map("transactions")
+}
+
+/// Cicilan yang sedang berjalan. Bulan selesai, kemajuan dan status dihitung, tidak disimpan.
+model Installment {
+  id             String   @id @default(uuid())
+  name           String
+  monthly_amount BigInt // > 0, rupiah; CHECK constraint di migrasi
+  start_month    DateTime @db.Date // hari pertama bulan mulai; CHECK constraint di migrasi
+  months         Int // 1 sampai 120; CHECK constraint di migrasi
+  notes          String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  transactions Transaction[]
+
+  @@map("installments")
 }
 
 model Attachment {

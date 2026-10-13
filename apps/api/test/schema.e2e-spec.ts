@@ -26,6 +26,7 @@ describe('database schema', () => {
       'attachments',
       'audit_logs',
       'categories',
+      'installments',
       'refresh_tokens',
       'transactions',
       'users',
@@ -43,6 +44,7 @@ describe('database schema', () => {
       'pin_failed_attempts',
       'pin_hash',
       'pin_locked_until',
+      'session_version',
       'updated_at',
     ]);
   });
@@ -130,5 +132,35 @@ describe('database schema', () => {
     await prisma.transaction.update({ where: { id: tx.id }, data: { voided_by_id: voider.id } });
 
     await expect(prisma.user.delete({ where: { id: voider.id } })).rejects.toThrow();
+  });
+
+  it('has the installments table with its checks, and the two link columns', async () => {
+    const columns = await prisma.$queryRaw<{ table_name: string; column_name: string }[]>`
+      SELECT table_name, column_name FROM information_schema.columns
+      WHERE (table_name = 'installments')
+         OR (table_name = 'categories' AND column_name = 'is_installment')
+         OR (table_name = 'transactions' AND column_name = 'installment_id')`;
+    expect(columns.map((c) => `${c.table_name}.${c.column_name}`).sort()).toEqual([
+      'categories.is_installment',
+      'installments.created_at',
+      'installments.id',
+      'installments.monthly_amount',
+      'installments.months',
+      'installments.name',
+      'installments.notes',
+      'installments.start_month',
+      'installments.updated_at',
+      'transactions.installment_id',
+    ]);
+
+    const insert = (amount: bigint, start: string, months: number) =>
+      prisma.$executeRaw`
+        INSERT INTO installments (id, name, monthly_amount, start_month, months, updated_at)
+        VALUES (gen_random_uuid(), 'x', ${amount}, ${start}::date, ${months}, now())`;
+    await expect(insert(0n, '2026-10-01', 3)).rejects.toThrow();
+    await expect(insert(1n, '2026-10-02', 3)).rejects.toThrow();
+    await expect(insert(1n, '2026-10-01', 0)).rejects.toThrow();
+    await expect(insert(1n, '2026-10-01', 121)).rejects.toThrow();
+    await expect(insert(1n, '2026-10-01', 120)).resolves.toBe(1);
   });
 });

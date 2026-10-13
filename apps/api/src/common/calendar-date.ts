@@ -86,3 +86,58 @@ export function formatJakartaTimestamp(value: Date): string {
   );
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
+
+const MONTH_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+/** Bulan kalender di JSON: `YYYY-MM`, tahun 1900 sampai 2999. */
+export function isCalendarMonth(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const match = MONTH_PATTERN.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  return year >= MIN_YEAR && year <= MAX_YEAR;
+}
+
+export function IsCalendarMonth(options?: ValidationOptions): PropertyDecorator {
+  return (target, propertyName) => {
+    registerDecorator({
+      name: 'isCalendarMonth',
+      target: target.constructor,
+      propertyName: String(propertyName),
+      options: { message: '$property harus berupa bulan berformat YYYY-MM', ...options },
+      validator: { validate: isCalendarMonth },
+    });
+  };
+}
+
+/** Bulan disimpan sebagai tanggal hari pertamanya (kolom DATE). */
+export function parseCalendarMonth(month: string): Date {
+  return parseCalendarDate(`${month}-01`);
+}
+
+export function formatCalendarMonth(value: Date): string {
+  return formatCalendarDate(value).slice(0, 7);
+}
+
+/** Bulan berjalan menurut kalender Jakarta, sebagai `YYYY-MM`. */
+export function currentMonthInJakarta(now: Date = new Date()): string {
+  return todayInJakarta(now).slice(0, 7);
+}
+
+function monthIndex(month: string): number {
+  return Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7)) - 1;
+}
+
+function fromMonthIndex(index: number): string {
+  const year = Math.floor(index / 12);
+  return `${String(year).padStart(4, '0')}-${String((index % 12) + 1).padStart(2, '0')}`;
+}
+
+export function addMonths(month: string, count: number): string {
+  return fromMonthIndex(monthIndex(month) + count);
+}
+
+/** Selisih bulan `to - from`, mis. Nov 2026 ke Feb 2027 = 3. */
+export function monthsBetween(from: string, to: string): number {
+  return monthIndex(to) - monthIndex(from);
+}

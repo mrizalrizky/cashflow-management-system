@@ -90,6 +90,16 @@ describe('PinLoginView', () => {
     expect(wrapper.text()).toContain('PIN dikunci. Coba lagi dalam 15 menit.')
   })
 
+  it('opens "Buat PIN" when the server answers that no PIN exists yet', async () => {
+    vi.mocked(authApi.login).mockRejectedValue(new ApiError(409, 'PIN belum dibuat'))
+    const { wrapper, router } = await mountView(PinLoginView, { path: '/masuk' })
+
+    await fill(wrapper, '#pin', '135792')
+    await submitForm(wrapper)
+
+    expect(router.currentRoute.value.path).toBe('/buat-pin')
+  })
+
   it('opens "Buat PIN" when no PIN exists yet', async () => {
     vi.mocked(authApi.pinStatus).mockResolvedValue({ pinSet: false })
     const { router } = await mountView(PinLoginView, { path: '/masuk' })

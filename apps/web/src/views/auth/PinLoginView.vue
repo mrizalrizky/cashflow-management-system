@@ -3,6 +3,7 @@ import { onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { pinStatus } from '@/api/auth'
+import { ApiError } from '@/api/http'
 import FormAlert from '@/components/FormAlert.vue'
 import PinField from '@/components/PinField.vue'
 import { useFormSubmit } from '@/composables/useFormSubmit'
@@ -30,7 +31,12 @@ onMounted(async () => {
 
 async function onSubmit(): Promise<void> {
   const result = await submit(collectErrors(form, { pin: pinRules('PIN') }))
-  if (result.ok) await router.replace(postLoginPath(route.query.redirect))
+  if (result.ok) {
+    await router.replace(postLoginPath(route.query.redirect))
+  } else if (result.error instanceof ApiError && result.error.statusCode === 409) {
+    // PIN belum ada (mis. baru direset di server setelah halaman ini dibuka): buat dulu.
+    await router.replace(PATHS.setupPin)
+  }
 }
 </script>
 

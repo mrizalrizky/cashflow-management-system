@@ -30,6 +30,7 @@ describe('database schema', () => {
       'refresh_tokens',
       'transactions',
       'users',
+      'wishlist_items',
     ]);
   });
 
@@ -76,7 +77,7 @@ describe('database schema', () => {
       JOIN pg_namespace n ON n.oid = t.typnamespace
       WHERE n.nspname = 'public' AND t.typtype = 'e'
       ORDER BY t.typname`;
-    expect(rows.map((r) => r.typname)).toEqual(['account_type', 'tx_status', 'tx_type']);
+    expect(rows.map((r) => r.typname)).toEqual(['account_type', 'ai_verdict', 'tx_status', 'tx_type', 'wishlist_status']);
   });
 
   it('indexes transactions for the reports', async () => {
@@ -162,5 +163,39 @@ describe('database schema', () => {
     await expect(insert(1n, '2026-10-01', 0)).rejects.toThrow();
     await expect(insert(1n, '2026-10-01', 121)).rejects.toThrow();
     await expect(insert(1n, '2026-10-01', 120)).resolves.toBe(1);
+  });
+
+  it('has the wishlist table with its checks and enums', async () => {
+    const columns = await prisma.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns WHERE table_name = 'wishlist_items' ORDER BY column_name`;
+    expect(columns.map((c) => c.column_name)).toEqual([
+      'ai_finance_snapshot',
+      'ai_model',
+      'ai_reasons',
+      'ai_reviewed_at',
+      'ai_suggestion',
+      'ai_verdict',
+      'answers_changed_at',
+      'created_at',
+      'id',
+      'include_finance',
+      'name',
+      'price',
+      'reason',
+      'similar_owned',
+      'status',
+      'updated_at',
+      'usage_duration',
+      'value_added',
+    ]);
+    const insert = (price: bigint, reason: string) =>
+      prisma.$executeRaw`
+        INSERT INTO wishlist_items (id, name, price, reason, similar_owned, value_added, usage_duration, updated_at)
+        VALUES (gen_random_uuid(), 'x', ${price}, ${reason}, 'a', 'b', 'c', now())`;
+    await expect(insert(0n, 'a')).rejects.toThrow();
+    await expect(insert(1n, 'x'.repeat(1001))).rejects.toThrow();
+    await expect(insert(1n, 'x'.repeat(1000))).resolves.toBe(1);
+    const row = await prisma.wishlistItem.findFirstOrThrow();
+    expect(row).toMatchObject({ status: 'WAITING', include_finance: true, ai_verdict: null });
   });
 });

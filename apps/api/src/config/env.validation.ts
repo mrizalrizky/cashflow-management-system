@@ -4,6 +4,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   Max,
@@ -67,6 +68,18 @@ export class EnvVars {
     message: 'CORS_ORIGINS harus berisi alamat seperti https://kas.example.com, tanpa path dan tanpa *',
   })
   CORS_ORIGINS: string[] = [];
+
+  /** Kunci Claude untuk penilaian wishlist. Kosong: "Minta pendapat AI" menjawab belum diaktifkan. */
+  @Transform(({ value }: { value: unknown }) => (value === '' ? undefined : value))
+  @IsOptional()
+  @IsString()
+  ANTHROPIC_API_KEY?: string;
+
+  /** Penilaian AI yang berhasil per hari (waktu Jakarta). */
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  AI_REVIEW_DAILY_LIMIT: number = 20;
 }
 
 export function validateEnv(raw: Record<string, unknown>): EnvVars {

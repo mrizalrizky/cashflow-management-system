@@ -37,3 +37,23 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...valid, ...override })).toThrow(pattern);
   });
 });
+
+describe('AI settings', () => {
+  it('runs without an Anthropic key and allows 20 reviews a day by default', () => {
+    const env = validateEnv(valid);
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(env.AI_REVIEW_DAILY_LIMIT).toBe(20);
+  });
+
+  it('treats an empty key as not set', () => {
+    expect(validateEnv({ ...valid, ANTHROPIC_API_KEY: '' }).ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it('reads the key and the limit, and refuses a limit below 1', () => {
+    expect(validateEnv({ ...valid, ANTHROPIC_API_KEY: 'sk-ant-x', AI_REVIEW_DAILY_LIMIT: '5' })).toMatchObject({
+      ANTHROPIC_API_KEY: 'sk-ant-x',
+      AI_REVIEW_DAILY_LIMIT: 5,
+    });
+    expect(() => validateEnv({ ...valid, AI_REVIEW_DAILY_LIMIT: '0' })).toThrow('AI_REVIEW_DAILY_LIMIT');
+  });
+});

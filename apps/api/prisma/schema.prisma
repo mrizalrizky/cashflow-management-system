@@ -179,3 +179,47 @@ model RefreshToken {
   @@index([user_id], map: "idx_refresh_tokens_user_id")
   @@map("refresh_tokens")
 }
+
+enum WishlistStatus {
+  WAITING
+  BOUGHT
+  CANCELLED
+
+  @@map("wishlist_status")
+}
+
+enum AiVerdict {
+  IMPULSIVE
+  NEEDS_THOUGHT
+  PLANNED
+
+  @@map("ai_verdict")
+}
+
+/// Barang yang diinginkan, dengan jawaban enam pertanyaan dan penilaian AI terakhir.
+model WishlistItem {
+  id                  String         @id @default(uuid())
+  name                String
+  price               BigInt // > 0, rupiah; CHECK constraint di migrasi
+  reason              String // maks. 1.000 karakter; CHECK di migrasi, juga tiga kolom berikut
+  similar_owned       String
+  value_added         String
+  usage_duration      String
+  include_finance     Boolean        @default(true)
+  status              WishlistStatus @default(WAITING)
+  ai_verdict          AiVerdict?
+  /// 2 sampai 4 alasan, teks.
+  ai_reasons          Json?
+  ai_suggestion       String?
+  /// Ringkasan keuangan (hanya total) yang dikirim saat penilaian; null bila tidak dikirim.
+  ai_finance_snapshot Json?
+  ai_reviewed_at      DateTime?
+  ai_model            String?
+  /// Jawaban atau harga diubah setelah penilaian terakhir.
+  answers_changed_at  DateTime?
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  @@index([status, created_at], map: "idx_wishlist_items_status_created_at")
+  @@map("wishlist_items")
+}

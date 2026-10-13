@@ -17,6 +17,18 @@ beforeEach(() => {
 })
 
 describe('SetupPinView', () => {
+  beforeEach(() => {
+    vi.mocked(authApi.pinStatus).mockResolvedValue({ pinSet: false })
+  })
+
+  it('goes to the PIN entry at once, saying why, when a PIN already exists', async () => {
+    vi.mocked(authApi.pinStatus).mockResolvedValue({ pinSet: true })
+    const { router } = await mountView(SetupPinView, { path: '/buat-pin', withOverlays: true })
+
+    expect(router.currentRoute.value.path).toBe('/masuk')
+    expect(document.body.textContent).toContain('PIN sudah dibuat. Masuk dengan PIN itu.')
+  })
+
   it('creates the PIN after it is typed twice the same, then opens the dashboard', async () => {
     vi.mocked(authApi.setupPin).mockResolvedValue(SESSION)
     const { wrapper, router } = await mountView(SetupPinView, { path: '/buat-pin' })
@@ -52,12 +64,13 @@ describe('SetupPinView', () => {
 
   it('sends the visitor to the PIN entry when another tab already created the PIN', async () => {
     vi.mocked(authApi.setupPin).mockRejectedValue(new ApiError(409, 'PIN sudah dibuat'))
-    const { wrapper, router } = await mountView(SetupPinView, { path: '/buat-pin' })
+    const { wrapper, router } = await mountView(SetupPinView, { path: '/buat-pin', withOverlays: true })
     await fill(wrapper, '#pin', '123456')
     await fill(wrapper, '#pin-confirm', '123456')
     await submitForm(wrapper)
 
     expect(router.currentRoute.value.path).toBe('/masuk')
+    expect(document.body.textContent).toContain('PIN sudah dibuat. Masuk dengan PIN itu.')
   })
 })
 

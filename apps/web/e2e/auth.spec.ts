@@ -46,10 +46,8 @@ test('creating the PIN, signing in with it, and changing it', async ({ page }) =
 
   await test.step('"Buat PIN" is not offered again', async () => {
     await page.goto('/buat-pin')
-    await page.getByLabel('PIN', { exact: true }).fill('111111')
-    await page.getByLabel('Ulangi PIN').fill('111111')
-    await page.getByRole('button', { name: 'Simpan PIN' }).click()
     await expect(page).toHaveURL(/\/masuk$/)
+    await expect(page.getByText('PIN sudah dibuat. Masuk dengan PIN itu.')).toBeVisible()
   })
 
   await test.step('a wrong PIN is refused; the right one opens the dashboard', async () => {

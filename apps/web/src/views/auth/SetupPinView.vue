@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import { pinStatus } from '@/api/auth'
 import { ApiError } from '@/api/http'
 import FormAlert from '@/components/FormAlert.vue'
 import PinField from '@/components/PinField.vue'
 import { useFormSubmit } from '@/composables/useFormSubmit'
+import { useNotify } from '@/composables/useNotify'
 import { pinRules } from '@/lib/pin'
 import { collectErrors } from '@/lib/validation'
 import { postLoginPath } from '@/router/guards'
@@ -14,6 +16,21 @@ import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
 const router = useRouter()
+const notify = useNotify()
+
+/** PIN sudah ada (dibuat di tab atau perangkat lain): ke halaman masuk, dengan alasannya. */
+async function toPinEntry(): Promise<void> {
+  notify.warn('PIN sudah dibuat. Masuk dengan PIN itu.')
+  await router.replace(PATHS.login)
+}
+
+onMounted(async () => {
+  try {
+    if ((await pinStatus()).pinSet) await toPinEntry()
+  } catch {
+    // Server tidak terjangkau: form tetap tampil; pesannya muncul saat mencoba menyimpan.
+  }
+})
 
 const form = reactive({ pin: '', pinConfirm: '' })
 const { submitting, fieldErrors, formError, submit } = useFormSubmit(() => session.setupPin(form.pin))
@@ -26,7 +43,7 @@ async function onSubmit(): Promise<void> {
     await router.replace(postLoginPath())
   } else if (result.error instanceof ApiError && result.error.statusCode === 409) {
     // Tab lain sudah membuat PIN lebih dulu.
-    await router.replace(PATHS.login)
+    await toPinEntry()
   }
 }
 </script>

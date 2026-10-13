@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsIn,
+  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -38,6 +39,11 @@ export class CreateTransactionDto {
 
   @IsUUID()
   categoryId: string;
+
+  /** Cicilan yang dibayar; wajib untuk kategori cicilan, dilarang untuk yang lain. */
+  @IsOptional()
+  @IsUUID()
+  installmentId?: string | null;
 }
 
 export class UpdateTransactionDto {
@@ -64,6 +70,11 @@ export class UpdateTransactionDto {
   @IsOptionalNotNull()
   @IsUUID()
   categoryId?: string;
+
+  /** Cicilan yang dibayar; wajib untuk kategori cicilan, dilarang untuk yang lain. */
+  @IsOptional()
+  @IsUUID()
+  installmentId?: string | null;
 }
 
 /** Alasan pembatalan (void). */

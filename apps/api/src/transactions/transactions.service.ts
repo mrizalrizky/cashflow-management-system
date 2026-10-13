@@ -19,6 +19,7 @@ import {
   TRANSACTION_INCLUDE,
   TransactionResponse,
 } from './transaction.mapper.js';
+import { resolveInstallmentLink } from './installment-link.js';
 import { EDITABLE_STATUSES } from './transaction-policy.js';
 import { ALL_REFERENCES, assertReferencesValid } from './transaction-references.js';
 import { TransactionWorkflowService } from './transaction-workflow.service.js';
@@ -62,7 +63,7 @@ export class TransactionsService {
     ip: string | null,
   ): Promise<TransactionResponse> {
     return this.prisma.$transaction(async (tx) => {
-      await assertReferencesValid(
+      const category = await assertReferencesValid(
         tx,
         {
           type: dto.type,
@@ -72,6 +73,12 @@ export class TransactionsService {
         },
         ALL_REFERENCES,
       );
+      const installmentId = await resolveInstallmentLink(tx, {
+        type: dto.type,
+        category,
+        requested: dto.installmentId,
+        current: null,
+      });
 
       const created = await tx.transaction.create({
         data: {
@@ -81,6 +88,7 @@ export class TransactionsService {
           description: dto.description,
           account_id: dto.accountId,
           category_id: dto.categoryId,
+          installment_id: installmentId,
           status: 'APPROVED',
           created_by_id: user.id,
         },
@@ -116,10 +124,11 @@ export class TransactionsService {
       });
 
       // Aturan yang sama dengan saat membuat, diterapkan pada hasil akhirnya.
-      await assertReferencesValid(
+      const type = dto.type ?? before.type;
+      const category = await assertReferencesValid(
         tx,
         {
-          type: dto.type ?? before.type,
+          type,
           transactionDate: dto.transactionDate ?? formatCalendarDate(before.transaction_date),
           accountId: dto.accountId ?? before.account_id,
           categoryId: dto.categoryId ?? before.category_id,
@@ -129,6 +138,13 @@ export class TransactionsService {
           category: dto.categoryId !== undefined && dto.categoryId !== before.category_id,
         },
       );
+      const installmentId = await resolveInstallmentLink(tx, {
+        type,
+        category,
+        requested: dto.installmentId,
+        current: before.installment_id,
+        transactionId: id,
+      });
 
       await this.workflow.transition(tx, { id }, 'APPROVED', {
         type: dto.type,
@@ -138,6 +154,7 @@ export class TransactionsService {
         description: dto.description,
         account_id: dto.accountId,
         category_id: dto.categoryId,
+        installment_id: installmentId,
       });
 
       const after = await this.access.load(tx, id);

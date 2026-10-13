@@ -9,6 +9,7 @@ const PERSON = { select: { id: true, name: true } } as const;
 export const TRANSACTION_INCLUDE = {
   account: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
+  installment: { select: { id: true, name: true } },
   created_by: PERSON,
   voided_by: PERSON,
   attachments: { orderBy: { created_at: 'asc' } },
@@ -40,6 +41,8 @@ export interface TransactionResponse {
   status: TxStatus;
   account: Named;
   category: Named;
+  /** Cicilan yang dibayar transaksi ini. */
+  installment: Named | null;
   isTransfer: boolean;
   transferGroupId: string | null;
   createdBy: Named;
@@ -73,6 +76,7 @@ export function toAuditSnapshot(tx: TransactionWithRelations): Record<string, un
     status: tx.status,
     account_id: tx.account_id,
     category_id: tx.category_id,
+    installment_id: tx.installment_id,
     transfer_group_id: tx.transfer_group_id,
     voided_by_id: tx.voided_by_id,
     void_reason: tx.void_reason,
@@ -99,6 +103,7 @@ export function toTransactionResponse(tx: TransactionWithRelations): Transaction
     status: tx.status,
     account: tx.account,
     category: tx.category,
+    installment: tx.installment,
     isTransfer: tx.transfer_group_id !== null,
     transferGroupId: tx.transfer_group_id,
     createdBy: tx.created_by,

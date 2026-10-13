@@ -38,6 +38,7 @@ export interface TransactionBody {
   description: string;
   accountId: string;
   categoryId: string;
+  installmentId?: string | null;
 }
 
 /** Isi permintaan untuk sebuah pengeluaran yang sah; timpa bagian yang sedang diuji. */

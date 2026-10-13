@@ -1,6 +1,6 @@
 import { todayInJakarta } from '../common/calendar-date.js';
 import { FieldError, validationFailed } from '../common/validation.js';
-import type { Prisma, TxType } from '../generated/prisma/client.js';
+import type { Category, Prisma, TxType } from '../generated/prisma/client.js';
 
 /** Isi transaksi yang merujuk data lain, setelah perubahan diterapkan. */
 export interface TransactionReferences {
@@ -24,13 +24,13 @@ function fieldError(field: string, message: string): FieldError {
 
 /**
  * Memeriksa bahwa akun dan kategori yang dipilih sah. Data yang sudah terpasang sebelumnya tidak ditolak hanya karena
- * kini nonaktif; yang selalu dicek adalah kecocokan tipe dengan kategori.
+ * kini nonaktif; yang selalu dicek adalah kecocokan tipe dengan kategori. Mengembalikan kategorinya.
  */
 export async function assertReferencesValid(
   tx: Prisma.TransactionClient,
   refs: TransactionReferences,
   changed: ChangedReferences,
-): Promise<void> {
+): Promise<Category> {
   const errors: FieldError[] = [];
   if (refs.transactionDate > todayInJakarta()) {
     errors.push(fieldError('transactionDate', 'Tanggal transaksi tidak boleh di masa depan'));
@@ -54,5 +54,7 @@ export async function assertReferencesValid(
   }
 
   if (errors.length > 0) throw validationFailed(errors);
+  // Tanpa kategori, `errors` sudah berisi dan fungsi ini sudah melempar.
+  return category!;
 }
 

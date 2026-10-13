@@ -46,6 +46,7 @@ describe('POST /transactions', () => {
       status: 'APPROVED',
       account: { id: world.account.id, name: 'Kas Uji' },
       category: { id: world.expense.id, name: 'Material Uji' },
+      installment: null,
       isTransfer: false,
       transferGroupId: null,
       createdBy: { id: world.owner.user.id, name: 'Pemilik' },

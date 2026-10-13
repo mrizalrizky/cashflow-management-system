@@ -5,7 +5,6 @@ import { formatCalendarDate, parseCalendarDate } from '../common/calendar-date.j
 import { toMoney } from '../common/money.js';
 import { Paginated, paginated, toSkipTake } from '../common/pagination.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Prisma } from '../generated/prisma/client.js';
 import type {
   CreateTransactionDto,
   ListTransactionsQueryDto,
@@ -37,11 +36,7 @@ export class TransactionsService {
     user: AuthUser,
     query: ListTransactionsQueryDto,
   ): Promise<Paginated<TransactionResponse>> {
-    const actor = await this.access.actorFor(this.prisma, user);
-    // Filter dari klien hanya bisa mempersempit: scope selalu ikut di-AND-kan.
-    const where: Prisma.TransactionWhereInput = {
-      AND: [this.access.scope(actor), toTransactionWhere(query)],
-    };
+    const where = toTransactionWhere(query);
 
     const [transactions, total] = await Promise.all([
       this.prisma.transaction.findMany({
@@ -52,13 +47,12 @@ export class TransactionsService {
       }),
       this.prisma.transaction.count({ where }),
     ]);
-    const items = transactions.map((transaction) => toTransactionResponse(transaction, actor));
+    const items = transactions.map((transaction) => toTransactionResponse(transaction));
     return paginated(items, total, query);
   }
 
   async get(user: AuthUser, id: string): Promise<TransactionResponse> {
-    const actor = await this.access.actorFor(this.prisma, user);
-    return toTransactionResponse(await this.access.loadForUser(this.prisma, actor, id), actor);
+    return toTransactionResponse(await this.access.load(this.prisma, id));
   }
 
   /** Transaksi baru langsung tercatat dan dihitung. */
@@ -68,10 +62,8 @@ export class TransactionsService {
     ip: string | null,
   ): Promise<TransactionResponse> {
     return this.prisma.$transaction(async (tx) => {
-      const actor = await this.access.actorFor(tx, user);
       await assertReferencesValid(
         tx,
-        actor,
         {
           type: dto.type,
           transactionDate: dto.transactionDate,
@@ -93,7 +85,7 @@ export class TransactionsService {
           created_by_id: user.id,
         },
       });
-      const transaction = await this.access.loadForUser(tx, actor, created.id);
+      const transaction = await this.access.load(tx, created.id);
       await this.audit.log(tx, {
         userId: user.id,
         action: 'CREATE',
@@ -102,7 +94,7 @@ export class TransactionsService {
         after: toAuditSnapshot(transaction),
         ip,
       });
-      return toTransactionResponse(transaction, actor);
+      return toTransactionResponse(transaction);
     });
   }
 
@@ -114,10 +106,9 @@ export class TransactionsService {
     ip: string | null,
   ): Promise<TransactionResponse> {
     return this.prisma.$transaction(async (tx) => {
-      const actor = await this.access.actorFor(tx, user);
-      const before = await this.access.loadForUpdate(tx, actor, id);
+      const before = await this.access.loadForUpdate(tx, id);
 
-      assertPermitted(actor, before, {
+      assertPermitted(before, {
         permission: 'canEdit',
         statuses: EDITABLE_STATUSES,
         verb: 'diubah',
@@ -127,7 +118,6 @@ export class TransactionsService {
       // Aturan yang sama dengan saat membuat, diterapkan pada hasil akhirnya.
       await assertReferencesValid(
         tx,
-        actor,
         {
           type: dto.type ?? before.type,
           transactionDate: dto.transactionDate ?? formatCalendarDate(before.transaction_date),
@@ -150,7 +140,7 @@ export class TransactionsService {
         category_id: dto.categoryId,
       });
 
-      const after = await this.access.loadForUser(tx, actor, id);
+      const after = await this.access.load(tx, id);
       await this.audit.log(tx, {
         userId: user.id,
         action: 'UPDATE',
@@ -160,7 +150,7 @@ export class TransactionsService {
         after: toAuditSnapshot(after),
         ip,
       });
-      return toTransactionResponse(after, actor);
+      return toTransactionResponse(after);
     });
   }
 }

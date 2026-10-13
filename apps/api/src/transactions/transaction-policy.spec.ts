@@ -1,6 +1,4 @@
-import { permissionsFor, PolicyActor, PolicySubject } from './transaction-policy.js';
-
-const ADMIN: PolicyActor = { id: 'u-1', role: 'SUPER_ADMIN' };
+import { permissionsFor, PolicySubject } from './transaction-policy.js';
 
 function subject(overrides: Partial<PolicySubject> = {}): PolicySubject {
   return { status: 'APPROVED', createdById: 'u-1', isTransfer: false, ...overrides };
@@ -8,11 +6,11 @@ function subject(overrides: Partial<PolicySubject> = {}): PolicySubject {
 
 describe('permissionsFor', () => {
   it('lets a recorded transaction be edited, given proof and voided', () => {
-    expect(permissionsFor(ADMIN, subject())).toEqual({ canEdit: true, canAttach: true, canVoid: true });
+    expect(permissionsFor(subject())).toEqual({ canEdit: true, canAttach: true, canVoid: true });
   });
 
   it('allows nothing on a voided transaction', () => {
-    expect(permissionsFor(ADMIN, subject({ status: 'VOID' }))).toEqual({
+    expect(permissionsFor(subject({ status: 'VOID' }))).toEqual({
       canEdit: false,
       canAttach: false,
       canVoid: false,
@@ -20,7 +18,7 @@ describe('permissionsFor', () => {
   });
 
   it('only lets a transfer side be voided, together with its pair', () => {
-    expect(permissionsFor(ADMIN, subject({ isTransfer: true }))).toEqual({
+    expect(permissionsFor(subject({ isTransfer: true }))).toEqual({
       canEdit: false,
       canAttach: false,
       canVoid: true,

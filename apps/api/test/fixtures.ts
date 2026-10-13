@@ -1,55 +1,27 @@
 import type { Response } from 'supertest';
-import { PasswordService } from '../src/auth/password.service.js';
+import { SessionService } from '../src/auth/session.service.js';
+import { TokenService } from '../src/auth/token.service.js';
 import type {
   Account,
   AccountType,
   Category,
   PrismaClient,
-  Role,
   Transaction,
   TxStatus,
   TxType,
   User,
 } from '../src/generated/prisma/client.js';
 import { api, E2eContext } from './e2e-context.js';
-import { LOGIN } from './routes.js';
-
-export const DEFAULT_PASSWORD = 'password-123';
-
-export interface UserOverrides {
-  email?: string;
-  name?: string;
-  role?: Role;
-  password?: string;
-  isActive?: boolean;
-  mustChangePassword?: boolean;
-}
-
-// Hashing argon2 sengaja lambat; hash untuk password yang sama dipakai ulang antar test.
-const passwords = new PasswordService();
-const hashCache = new Map<string, Promise<string>>();
-function hashOnce(password: string): Promise<string> {
-  let hash = hashCache.get(password);
-  if (!hash) {
-    hash = passwords.hash(password);
-    hashCache.set(password, hash);
-  }
-  return hash;
-}
 
 let sequence = 0;
 
-export async function createUser(prisma: PrismaClient, overrides: UserOverrides = {}): Promise<User> {
-  sequence += 1;
+/** Pemilik edisi pribadi, langsung di database; `pinHash` null berarti PIN belum dibuat. */
+export function createOwner(
+  prisma: PrismaClient,
+  overrides: { name?: string; pinHash?: string | null } = {},
+): Promise<User> {
   return prisma.user.create({
-    data: {
-      name: overrides.name ?? `Pengguna ${sequence}`,
-      email: overrides.email ?? `user${sequence}@example.com`,
-      password_hash: await hashOnce(overrides.password ?? DEFAULT_PASSWORD),
-      role: overrides.role ?? 'STAFF',
-      is_active: overrides.isActive ?? true,
-      must_change_password: overrides.mustChangePassword ?? false,
-    },
+    data: { name: overrides.name ?? 'Pemilik', pin_hash: overrides.pinHash ?? null },
   });
 }
 
@@ -65,25 +37,6 @@ export interface TestSession {
   accessToken: string;
   cookie: string;
   body: { accessToken: string; user: Record<string, unknown> };
-}
-
-export async function login(
-  ctx: E2eContext,
-  email: string,
-  password: string = DEFAULT_PASSWORD,
-): Promise<TestSession> {
-  const res = await api(ctx).post(LOGIN).send({ email, password }).expect(200);
-  return { accessToken: res.body.accessToken, cookie: refreshCookie(res), body: res.body };
-}
-
-/** Membuat user lalu login; dipakai test yang hanya butuh sesi dengan peran tertentu. */
-export async function loginAs(
-  ctx: E2eContext,
-  overrides: UserOverrides = {},
-): Promise<TestSession & { user: User }> {
-  const user = await createUser(ctx.prisma, overrides);
-  const session = await login(ctx, user.email, overrides.password);
-  return { ...session, user };
 }
 
 export function bearer(accessToken: string): [string, string] {
@@ -102,43 +55,17 @@ export function call(ctx: E2eContext, session: TestSession, method: Method, path
   return api(ctx)[method](path).set(...bearer(session.accessToken));
 }
 
-/**
- * Memastikan sebuah rute menolak request tanpa token (401) dan menjawab tiap peran
- * dengan status yang diharapkan. Tiap peran memakai user baru.
- */
-export async function expectAccess(
-  ctx: E2eContext,
-  request: { method: Method; path: string; body?: object },
-  expected: Record<Role, number>,
-): Promise<void> {
-  const send = (session?: TestSession) => {
-    const req = session
-      ? call(ctx, session, request.method, request.path)
-      : api(ctx)[request.method](request.path);
-    return request.body ? req.send(request.body) : req;
+/** Sesi pemilik tanpa lewat layar PIN; dipakai test yang tidak menguji cara masuk. */
+export async function asOwner(ctx: E2eContext): Promise<TestSession & { user: User }> {
+  const user = (await ctx.prisma.user.findFirst({ orderBy: { created_at: 'asc' } })) ?? (await createOwner(ctx.prisma));
+  const accessToken = await ctx.app.get(TokenService).signAccessToken(user.id);
+  const refreshToken = await ctx.app.get(SessionService).create(ctx.prisma, user.id);
+  return {
+    accessToken,
+    cookie: `refresh_token=${refreshToken}`,
+    body: { accessToken, user: { id: user.id, name: user.name } },
+    user,
   };
-
-  await send().expect(401);
-  for (const [role, status] of Object.entries(expected) as [Role, number][]) {
-    const res = await send(await loginAs(ctx, { role }));
-    if (res.status !== status) {
-      throw new Error(
-        `${request.method.toUpperCase()} ${request.path} sebagai ${role}: ` +
-          `diharapkan ${status}, didapat ${res.status} ${JSON.stringify(res.body)}`,
-      );
-    }
-  }
-}
-
-const ADMIN_ONLY = { SUPER_ADMIN: 200, PROJECT_MANAGER: 403, STAFF: 403 } as const;
-
-/** Status yang diharapkan untuk rute khusus SUPER_ADMIN; `ok` adalah status saat berhasil. */
-export function adminOnly(ok = 200): Record<Role, number> {
-  return { ...ADMIN_ONLY, SUPER_ADMIN: ok };
-}
-
-export function asAdmin(ctx: E2eContext) {
-  return loginAs(ctx, { role: 'SUPER_ADMIN', email: 'admin@example.com', name: 'Admin' });
 }
 
 export function createAccount(

@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthUser } from '../auth/auth.types.js';
-import { CurrentUser, Roles } from '../auth/decorators.js';
+import { CurrentUser } from '../auth/decorators.js';
 import type { Paginated } from '../common/pagination.js';
 import {
   CreateTransactionDto,
@@ -30,10 +30,7 @@ import { TransactionsService } from './transactions.service.js';
 import { TransactionExportService } from './transaction-export.service.js';
 import { TransfersService } from './transfers.service.js';
 
-/**
- * Semua peran boleh memanggil rute ini; yang membatasi adalah scope (apa yang terlihat)
- * dan policy (apa yang boleh dilakukan), keduanya di sisi service.
- */
+/** Yang boleh dilakukan pada tiap transaksi diputuskan policy di sisi service. */
 @Controller('transactions')
 export class TransactionsController {
   private readonly logger = new Logger(TransactionsController.name);
@@ -102,8 +99,6 @@ export class TransactionsController {
     return this.transactions.create(user, dto, ip);
   }
 
-  /** Transfer antar akun menyentuh saldo, jadi hanya untuk SUPER_ADMIN. */
-  @Roles('SUPER_ADMIN')
   @Post('transfer')
   transfer(
     @CurrentUser() user: AuthUser,

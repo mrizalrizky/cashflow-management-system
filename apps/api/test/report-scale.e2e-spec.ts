@@ -1,7 +1,7 @@
 import type { Prisma, TxStatus } from '../src/generated/prisma/client.js';
 import type { CompanyDashboardResponse } from '../src/reports/report.mapper.js';
 import { E2eContext, setupE2e } from './e2e-context.js';
-import { asAdmin, call, createAccount, createCategory, TestSession } from './fixtures.js';
+import { asOwner, call, createAccount, createCategory, TestSession } from './fixtures.js';
 import { DASHBOARD } from './routes.js';
 
 const ROWS = 10_000;
@@ -86,7 +86,7 @@ describe('reports on 10,000 transactions', () => {
   const ctx = setupE2e();
 
   it('stay correct and answer quickly', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const expected = await seedMany(ctx, admin);
 
     const dashboard = await timed<CompanyDashboardResponse>(() =>

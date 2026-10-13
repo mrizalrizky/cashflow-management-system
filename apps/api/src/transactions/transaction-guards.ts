@@ -1,7 +1,7 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { TxStatus } from '../generated/prisma/client.js';
 import { toPolicySubject, TransactionWithRelations } from './transaction.mapper.js';
-import { permissionsFor, PolicyActor, TransactionPermissions } from './transaction-policy.js';
+import { permissionsFor, TransactionPermissions } from './transaction-policy.js';
 
 /** Nama entitas transaksi di log audit. */
 export const TRANSACTION_ENTITY = 'transaction';
@@ -34,11 +34,10 @@ export interface GuardedAction {
  * soal keadaan transaksi (409), selebihnya soal hak pelaku (403).
  */
 export function assertPermitted(
-  actor: PolicyActor,
   transaction: TransactionWithRelations,
   action: GuardedAction,
 ): void {
-  if (permissionsFor(actor, toPolicySubject(transaction))[action.permission]) return;
+  if (permissionsFor(toPolicySubject(transaction))[action.permission]) return;
   throw action.statuses.includes(transaction.status)
     ? notAllowed(action.activeVerb)
     : wrongStatus(action.verb);

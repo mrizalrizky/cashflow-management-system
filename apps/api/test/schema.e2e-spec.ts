@@ -16,22 +16,48 @@ describe('database schema', () => {
     await prisma.$disconnect();
   });
 
-  it('creates exactly the expected tables', async () => {
+  it('keeps only the personal-edition tables', async () => {
     const rows = await prisma.$queryRaw<{ table_name: string }[]>`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public' AND table_name <> '_prisma_migrations'
       ORDER BY table_name`;
-    expect(rows.map((r) => r.table_name)).toEqual([
+    expect(rows.map((row) => row.table_name)).toEqual([
       'accounts',
       'attachments',
       'audit_logs',
       'categories',
-      'project_members',
-      'projects',
       'refresh_tokens',
       'transactions',
       'users',
     ]);
+  });
+
+  it('stores the owner with a PIN and a lockout counter, and no email, password or role', async () => {
+    const columns = await prisma.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'users' ORDER BY column_name`;
+    expect(columns.map((column) => column.column_name)).toEqual([
+      'created_at',
+      'id',
+      'name',
+      'pin_failed_attempts',
+      'pin_hash',
+      'pin_locked_until',
+      'updated_at',
+    ]);
+  });
+
+  it('knows only recorded and voided transactions, without reviewer or project columns', async () => {
+    const values = await prisma.$queryRaw<{ value: string }[]>`
+      SELECT unnest(enum_range(NULL::tx_status))::text AS value`;
+    expect(values.map((row) => row.value)).toEqual(['APPROVED', 'VOID']);
+
+    const columns = await prisma.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns WHERE table_name = 'transactions'`;
+    const names = columns.map((column) => column.column_name);
+    for (const removed of ['project_id', 'reviewed_by_id', 'reviewed_at', 'reject_reason']) {
+      expect(names).not.toContain(removed);
+    }
   });
 
   it('names every column in snake_case', async () => {
@@ -48,13 +74,7 @@ describe('database schema', () => {
       JOIN pg_namespace n ON n.oid = t.typnamespace
       WHERE n.nspname = 'public' AND t.typtype = 'e'
       ORDER BY t.typname`;
-    expect(rows.map((r) => r.typname)).toEqual([
-      'account_type',
-      'project_status',
-      'role',
-      'tx_status',
-      'tx_type',
-    ]);
+    expect(rows.map((r) => r.typname)).toEqual(['account_type', 'tx_status', 'tx_type']);
   });
 
   it('indexes transactions for the reports', async () => {
@@ -67,9 +87,7 @@ describe('database schema', () => {
   });
 
   async function createTransactionWithAmount(amount: bigint) {
-    const user = await prisma.user.create({
-      data: { name: 'A', email: 'a@example.com', password_hash: 'x', role: 'SUPER_ADMIN' },
-    });
+    const user = await prisma.user.create({ data: { name: 'Pemilik' } });
     const account = await prisma.account.create({ data: { name: 'Kas', type: 'CASH' } });
     const category = await prisma.category.create({ data: { name: 'Material', type: 'OUT' } });
     return prisma.transaction.create({
@@ -85,11 +103,10 @@ describe('database schema', () => {
     });
   }
 
-  it('stores an amount larger than 2^53 exactly', async () => {
+  it('stores an amount larger than 2^53 exactly, recorded by default', async () => {
     const tx = await createTransactionWithAmount(9007199254740993n);
     expect(tx.amount).toBe(9007199254740993n);
-    expect(tx.status).toBe('PENDING');
-    expect(tx.project_id).toBeNull();
+    expect(tx.status).toBe('APPROVED');
   });
 
   it('rejects a zero amount', async () => {
@@ -107,32 +124,11 @@ describe('database schema', () => {
     ).rejects.toThrow();
   });
 
-  it('refuses to delete a project that has transactions', async () => {
+  it('refuses to delete a user who voided a transaction', async () => {
     const tx = await createTransactionWithAmount(1000n);
-    const project = await prisma.project.create({
-      data: { code: 'PRJ-2026-001', name: 'Rumah A', client_name: 'Klien A' },
-    });
-    await prisma.transaction.update({ where: { id: tx.id }, data: { project_id: project.id } });
+    const voider = await prisma.user.create({ data: { name: 'Lain' } });
+    await prisma.transaction.update({ where: { id: tx.id }, data: { voided_by_id: voider.id } });
 
-    await expect(prisma.project.delete({ where: { id: project.id } })).rejects.toThrow();
-    const after = await prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
-    expect(after.project_id).toBe(project.id);
-  });
-
-  it('refuses to delete a user who reviewed or voided a transaction', async () => {
-    const tx = await createTransactionWithAmount(1000n);
-    const reviewer = await prisma.user.create({
-      data: { name: 'B', email: 'b@example.com', password_hash: 'x', role: 'SUPER_ADMIN' },
-    });
-    const voider = await prisma.user.create({
-      data: { name: 'C', email: 'c@example.com', password_hash: 'x', role: 'SUPER_ADMIN' },
-    });
-    await prisma.transaction.update({
-      where: { id: tx.id },
-      data: { reviewed_by_id: reviewer.id, voided_by_id: voider.id },
-    });
-
-    await expect(prisma.user.delete({ where: { id: reviewer.id } })).rejects.toThrow();
     await expect(prisma.user.delete({ where: { id: voider.id } })).rejects.toThrow();
   });
 });

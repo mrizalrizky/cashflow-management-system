@@ -1,6 +1,3 @@
-import { PasswordService } from '../auth/password.service.js';
-import { normalizeEmail } from '../common/email.js';
-import { PASSWORD_MIN_LENGTH } from '../common/password-policy.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 
 export interface SeedOptions {
@@ -8,9 +5,6 @@ export interface SeedOptions {
   adminEmail?: string;
   adminPassword?: string;
 }
-
-/** Nilai contoh di .env.example; tidak boleh dipakai sebagai password sungguhan. */
-const PLACEHOLDER_PASSWORD = 'ganti-password-ini';
 
 const ACCOUNTS = [
   { name: 'Kas Kecil', type: 'CASH' },
@@ -45,34 +39,10 @@ const SYSTEM_CATEGORIES = [
   { name: 'Transfer Keluar', type: 'OUT', is_system: true } as const,
 ];
 
-/**
- * Membuat admin pertama. Bila sudah ada SUPER_ADMIN, tidak melakukan apa pun.
- * Mengembalikan true bila admin baru dibuat, yaitu pada pemasangan pertama.
- */
+/** Sementara (diganti pada tugas berikutnya): satu pemilik, hanya nama. */
 async function ensureAdmin(prisma: PrismaClient, options: SeedOptions): Promise<boolean> {
-  const existing = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
-  if (existing) return false;
-
-  const email = options.adminEmail ? normalizeEmail(options.adminEmail) : '';
-  if (!email) {
-    throw new Error('SEED_ADMIN_EMAIL wajib diisi');
-  }
-  const password = options.adminPassword ?? '';
-  if (password.length < PASSWORD_MIN_LENGTH || password === PLACEHOLDER_PASSWORD) {
-    throw new Error(
-      `SEED_ADMIN_PASSWORD wajib diisi, minimal ${PASSWORD_MIN_LENGTH} karakter, dan bukan nilai contoh`,
-    );
-  }
-
-  await prisma.user.create({
-    data: {
-      name: options.adminName?.trim() || 'Administrator',
-      email,
-      password_hash: await new PasswordService().hash(password),
-      role: 'SUPER_ADMIN',
-      must_change_password: true,
-    },
-  });
+  if (await prisma.user.findFirst()) return false;
+  await prisma.user.create({ data: { name: options.adminName?.trim() || 'Pemilik' } });
   return true;
 }
 

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AccountBalanceService } from '../accounts/account-balance.service.js';
 import type { AccountWithBalance } from '../accounts/account.mapper.js';
-import type { AuthUser } from '../auth/auth.types.js';
 import { todayInJakarta } from '../common/calendar-date.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { TransactionAccessService } from '../transactions/transaction-access.service.js';
@@ -26,10 +25,7 @@ export class DashboardService {
     private readonly access: TransactionAccessService,
   ) {}
 
-  async company(
-    user: AuthUser,
-    query: { from?: string; to?: string },
-  ): Promise<CompanyDashboardResponse> {
+  async company(query: { from?: string; to?: string }): Promise<CompanyDashboardResponse> {
     const period = resolvePeriod(query, todayInJakarta());
     const filter = { period, excludeTransfers: true };
 
@@ -39,7 +35,7 @@ export class DashboardService {
         this.report.totals(this.prisma, filter),
         this.report.monthly(this.prisma, period),
         this.report.expenseByCategory(this.prisma, filter),
-        this.recentTransactions(user),
+        this.recentTransactions(),
       ]);
 
     return toCompanyDashboard({
@@ -62,14 +58,12 @@ export class DashboardService {
   }
 
   /** Yang terakhir dicatat, apa pun status dan tanggal transaksinya. */
-  private async recentTransactions(user: AuthUser): Promise<TransactionResponse[]> {
-    const actor = await this.access.actorFor(this.prisma, user);
+  private async recentTransactions(): Promise<TransactionResponse[]> {
     const transactions = await this.prisma.transaction.findMany({
-      where: this.access.scope(actor),
       include: TRANSACTION_INCLUDE,
       orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       take: RECENT_COUNT,
     });
-    return transactions.map((transaction) => toTransactionResponse(transaction, actor));
+    return transactions.map((transaction) => toTransactionResponse(transaction));
   }
 }

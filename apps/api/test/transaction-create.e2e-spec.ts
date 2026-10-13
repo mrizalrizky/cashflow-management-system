@@ -16,7 +16,7 @@ describe('POST /transactions', () => {
 
   it('counts a new transaction at once', async () => {
     const world = await setupWorld(ctx);
-    const res = await call(ctx, world.admin, 'post', TRANSACTIONS).send(expenseBody(world)).expect(201);
+    const res = await call(ctx, world.owner, 'post', TRANSACTIONS).send(expenseBody(world)).expect(201);
     expect(res.body.status).toBe('APPROVED');
     expect(res.body).not.toHaveProperty('reviewedBy');
     expect(res.body.permissions).toEqual({ canEdit: true, canAttach: true, canVoid: true });
@@ -24,7 +24,7 @@ describe('POST /transactions', () => {
 
   it('refuses a projectId as an unknown field', async () => {
     const world = await setupWorld(ctx);
-    const res = await call(ctx, world.admin, 'post', TRANSACTIONS)
+    const res = await call(ctx, world.owner, 'post', TRANSACTIONS)
       .send({ ...expenseBody(world), projectId: randomUUID() })
       .expect(400);
     expect(errorFields(res.body)).toContain('projectId');
@@ -33,7 +33,7 @@ describe('POST /transactions', () => {
   it('records a transaction and returns it with its relations and permissions', async () => {
     const world = await setupWorld(ctx);
 
-    const res = await call(ctx, world.staff, 'post', TRANSACTIONS)
+    const res = await call(ctx, world.owner, 'post', TRANSACTIONS)
       .send(expenseBody(world, { description: '  Beli semen  ' }))
       .expect(201);
 
@@ -48,7 +48,7 @@ describe('POST /transactions', () => {
       category: { id: world.expense.id, name: 'Material Uji' },
       isTransfer: false,
       transferGroupId: null,
-      createdBy: { id: world.staff.user.id, name: 'Staf Satu' },
+      createdBy: { id: world.owner.user.id, name: 'Pemilik' },
       voidedBy: null,
       voidedAt: null,
       voidReason: null,
@@ -58,7 +58,7 @@ describe('POST /transactions', () => {
       updatedAt: expect.any(String),
     });
     const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { entity_type: 'transaction' } });
-    expect(row).toMatchObject({ action: 'CREATE', user_id: world.staff.user.id, entity_id: res.body.id });
+    expect(row).toMatchObject({ action: 'CREATE', user_id: world.owner.user.id, entity_id: res.body.id });
     expect(row.after).toMatchObject({ amount: '150000', status: 'APPROVED' });
   });
 
@@ -78,7 +78,7 @@ describe('POST /transactions', () => {
   ])('rejects %s', async (_label, override, field) => {
     const world = await setupWorld(ctx);
 
-    const res = await call(ctx, world.staff, 'post', TRANSACTIONS)
+    const res = await call(ctx, world.owner, 'post', TRANSACTIONS)
       .send({ ...expenseBody(world), ...override })
       .expect(400);
 
@@ -89,7 +89,7 @@ describe('POST /transactions', () => {
   it('accepts today as the transaction date', async () => {
     const world = await setupWorld(ctx);
     const today = todayInJakarta();
-    expect((await record(ctx, world.staff, expenseBody(world, { transactionDate: today }))).transactionDate).toBe(
+    expect((await record(ctx, world.owner, expenseBody(world, { transactionDate: today }))).transactionDate).toBe(
       today,
     );
   });
@@ -100,7 +100,7 @@ describe('POST /transactions', () => {
     const system = await createCategory(ctx.prisma, { name: 'Transfer Keluar', type: 'OUT', isSystem: true });
 
     for (const categoryId of [world.income.id, inactive.id, system.id, randomUUID()]) {
-      const res = await call(ctx, world.staff, 'post', TRANSACTIONS)
+      const res = await call(ctx, world.owner, 'post', TRANSACTIONS)
         .send(expenseBody(world, { categoryId }))
         .expect(400);
       expect(errorFields(res.body)).toEqual(['categoryId']);
@@ -112,7 +112,7 @@ describe('POST /transactions', () => {
     const inactive = await createAccount(ctx.prisma, { isActive: false });
 
     for (const accountId of [inactive.id, randomUUID()]) {
-      const res = await call(ctx, world.staff, 'post', TRANSACTIONS)
+      const res = await call(ctx, world.owner, 'post', TRANSACTIONS)
         .send(expenseBody(world, { accountId }))
         .expect(400);
       expect(errorFields(res.body)).toEqual(['accountId']);
@@ -122,7 +122,7 @@ describe('POST /transactions', () => {
   it('reports every problem at once', async () => {
     const world = await setupWorld(ctx);
 
-    const res = await call(ctx, world.staff, 'post', TRANSACTIONS)
+    const res = await call(ctx, world.owner, 'post', TRANSACTIONS)
       .send(expenseBody(world, { accountId: randomUUID(), categoryId: world.income.id }))
       .expect(400);
 

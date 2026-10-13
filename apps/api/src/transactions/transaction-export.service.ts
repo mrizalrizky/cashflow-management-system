@@ -20,9 +20,6 @@ const TYPE_LABELS: Record<TxType, string> = { IN: 'Masuk', OUT: 'Keluar' };
 const STATUS_LABELS: Record<TxStatus, string> = {
   APPROVED: 'Tercatat',
   VOID: 'Dibatalkan',
-  // Tidak dibuat lagi oleh edisi pribadi; hilang bersama nilainya di migrasi skema.
-  PENDING: 'Menunggu',
-  REJECTED: 'Ditolak',
 };
 
 const HEADER = [
@@ -34,7 +31,6 @@ const HEADER = [
   'Kategori',
   'Status',
   'Transfer',
-  'Dicatat oleh',
   'Alasan pembatalan',
   'Jumlah bukti',
   'Dicatat pada',
@@ -53,7 +49,6 @@ const EXPORT_SELECT = {
   created_at: true,
   account: { select: { name: true } },
   category: { select: { name: true } },
-  created_by: { select: { name: true } },
   _count: { select: { attachments: true } },
 } satisfies Prisma.TransactionSelect;
 
@@ -69,7 +64,6 @@ function toCells(row: ExportRow): (string | null)[] {
     row.category.name,
     STATUS_LABELS[row.status],
     row.transfer_group_id ? 'Ya' : 'Tidak',
-    row.created_by.name,
     row.void_reason,
     String(row._count.attachments),
     formatJakartaTimestamp(row.created_at),
@@ -128,10 +122,7 @@ export class TransactionExportService {
     filters: TransactionFiltersDto,
     ip: string | null,
   ): Promise<PreparedExport> {
-    const actor = await this.access.actorFor(this.prisma, user);
-    const where: Prisma.TransactionWhereInput = {
-      AND: [this.access.scope(actor), toTransactionWhere(filters)],
-    };
+    const where = toTransactionWhere(filters);
     const stamp = formatJakartaTimestamp(new Date()).replace(/[-:]/g, '').replace(' ', '-');
 
     await this.audit.log(this.prisma, {

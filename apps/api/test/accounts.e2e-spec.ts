@@ -1,44 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { setupE2e } from './e2e-context.js';
-import {
-  adminOnly,
-  asAdmin,
-  call,
-  createAccount,
-  createCategory,
-  createTransaction,
-  errorFields,
-  expectAccess,
-} from './fixtures.js';
+import { asOwner, call, createAccount, createCategory, createTransaction, errorFields } from './fixtures.js';
 import { ACCOUNT_OPTIONS, ACCOUNTS } from './routes.js';
 
 const NEW_ACCOUNT = { name: 'Kas Proyek', type: 'CASH', openingBalance: '1000000' };
 
-describe('accounts: access', () => {
+describe('GET /accounts/options', () => {
   const ctx = setupE2e();
 
-  it('limits the account list and changes to SUPER_ADMIN', async () => {
-    const account = await createAccount(ctx.prisma);
-
-    await expectAccess(ctx, { method: 'get', path: ACCOUNTS }, adminOnly());
-    await expectAccess(ctx, { method: 'post', path: ACCOUNTS, body: NEW_ACCOUNT }, adminOnly(201));
-    await expectAccess(
-      ctx,
-      { method: 'patch', path: `${ACCOUNTS}/${account.id}`, body: { name: 'Lain' } },
-      adminOnly(),
-    );
-  });
-
-  it('lets every role read the account options, which never include a balance', async () => {
+  it('lists the active accounts as options, without a balance', async () => {
     await createAccount(ctx.prisma, { name: 'Kas Kecil', type: 'CASH', openingBalance: 500000n });
     await createAccount(ctx.prisma, { name: 'Tidak Dipakai', isActive: false });
 
-    await expectAccess(
-      ctx,
-      { method: 'get', path: ACCOUNT_OPTIONS },
-      { SUPER_ADMIN: 200, PROJECT_MANAGER: 200, STAFF: 200 },
-    );
-    const res = await call(ctx, await asAdmin(ctx), 'get', ACCOUNT_OPTIONS).expect(200);
+    const res = await call(ctx, await asOwner(ctx), 'get', ACCOUNT_OPTIONS).expect(200);
 
     expect(res.body).toEqual([{ id: expect.any(String), name: 'Kas Kecil', type: 'CASH' }]);
   });
@@ -48,7 +22,7 @@ describe('POST /accounts', () => {
   const ctx = setupE2e();
 
   it('creates an account whose balance starts at the opening balance', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
 
     const res = await call(ctx, admin, 'post', ACCOUNTS)
       .send({ ...NEW_ACCOUNT, name: '  Kas Proyek  ' })
@@ -66,7 +40,7 @@ describe('POST /accounts', () => {
   });
 
   it('defaults the opening balance to zero', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const res = await call(ctx, admin, 'post', ACCOUNTS)
       .send({ name: 'Bank Baru', type: 'BANK' })
       .expect(201);
@@ -76,7 +50,7 @@ describe('POST /accounts', () => {
   it.each(['9007199254740993', '-500000', '000123'])(
     'stores the opening balance %j exactly',
     async (openingBalance) => {
-      const admin = await asAdmin(ctx);
+      const admin = await asOwner(ctx);
       const res = await call(ctx, admin, 'post', ACCOUNTS)
         .send({ ...NEW_ACCOUNT, openingBalance })
         .expect(201);
@@ -92,7 +66,7 @@ describe('POST /accounts', () => {
     ['a blank name', { name: '   ' }, 'name'],
     ['an unknown property', { balance: '5' }, 'balance'],
   ])('rejects %s', async (_label, override, field) => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const res = await call(ctx, admin, 'post', ACCOUNTS)
       .send({ ...NEW_ACCOUNT, ...override })
       .expect(400);
@@ -101,7 +75,7 @@ describe('POST /accounts', () => {
   });
 
   it('rejects a name that is already used, in any case, and records nothing', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     await call(ctx, admin, 'post', ACCOUNTS).send(NEW_ACCOUNT).expect(201);
 
     const res = await call(ctx, admin, 'post', ACCOUNTS)
@@ -116,7 +90,7 @@ describe('POST /accounts', () => {
     ['the same name', 'Kas Proyek'],
     ['the same name in another case', 'KAS PROYEK'],
   ])('creates only one account when two requests with %s arrive together', async (_label, other) => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
 
     const results = await Promise.all([
       call(ctx, admin, 'post', ACCOUNTS).send(NEW_ACCOUNT),
@@ -128,14 +102,14 @@ describe('POST /accounts', () => {
   });
 
   it('does not treat _ and % in a name as wildcards when checking for duplicates', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     await call(ctx, admin, 'post', ACCOUNTS).send({ ...NEW_ACCOUNT, name: 'Kas A1' }).expect(201);
     await call(ctx, admin, 'post', ACCOUNTS).send({ ...NEW_ACCOUNT, name: 'Kas A_' }).expect(201);
     await call(ctx, admin, 'post', ACCOUNTS).send({ ...NEW_ACCOUNT, name: 'Kas %' }).expect(201);
   });
 
   it('records the creation with the money as a string', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const res = await call(ctx, admin, 'post', ACCOUNTS).send(NEW_ACCOUNT).expect(201);
 
     const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { entity_type: 'account' } });
@@ -148,7 +122,7 @@ describe('GET /accounts', () => {
   const ctx = setupE2e();
 
   it('counts only recorded transactions of that account towards its balance', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const account = await createAccount(ctx.prisma, { name: 'Utama', openingBalance: 1_000_000n });
     const other = await createAccount(ctx.prisma, { name: 'Lain', openingBalance: 50n });
     const untouched = await createAccount(ctx.prisma, { name: 'Kosong', openingBalance: -700n });
@@ -174,7 +148,7 @@ describe('GET /accounts', () => {
   });
 
   it('orders by name and supports search, type and status filters with paging', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     await createAccount(ctx.prisma, { name: 'Rekening BCA', type: 'BANK' });
     await createAccount(ctx.prisma, { name: 'Kas Kecil', type: 'CASH' });
     await createAccount(ctx.prisma, { name: 'Kas Lama', type: 'CASH', isActive: false });
@@ -199,7 +173,7 @@ describe('PATCH /accounts/:id', () => {
   const ctx = setupE2e();
 
   it('updates the account and records before and after', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const account = await createAccount(ctx.prisma, { name: 'Lama', type: 'CASH', openingBalance: 10n });
 
     const res = await call(ctx, admin, 'patch', `${ACCOUNTS}/${account.id}`)
@@ -219,7 +193,7 @@ describe('PATCH /accounts/:id', () => {
   });
 
   it('lets an account keep its own name in a different case, but not take another one', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const first = await createAccount(ctx.prisma, { name: 'Kas Kecil' });
     await createAccount(ctx.prisma, { name: 'Bank Utama' });
 
@@ -228,7 +202,7 @@ describe('PATCH /accounts/:id', () => {
   });
 
   it('rejects null, a malformed id and an unknown id', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const account = await createAccount(ctx.prisma);
 
     await call(ctx, admin, 'patch', `${ACCOUNTS}/${account.id}`).send({ name: null }).expect(400);

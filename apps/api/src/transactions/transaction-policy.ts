@@ -1,14 +1,9 @@
-import type { Role, TxStatus } from '../generated/prisma/client.js';
+import type { TxStatus } from '../generated/prisma/client.js';
 
 /**
  * Aturan "apa yang boleh dilakukan pada sebuah transaksi", tanpa I/O. Di edisi pribadi
  * transaksi langsung dihitung saat disimpan; yang membedakan hanya tercatat atau dibatalkan.
  */
-
-export interface PolicyActor {
-  id: string;
-  role: Role;
-}
 
 export interface PolicySubject {
   status: TxStatus;
@@ -28,7 +23,7 @@ export interface TransactionPermissions {
 /** Status tempat isi dan bukti transaksi masih boleh diubah. */
 export const EDITABLE_STATUSES: readonly TxStatus[] = ['APPROVED'];
 
-export function permissionsFor(_actor: PolicyActor, tx: PolicySubject): TransactionPermissions {
+export function permissionsFor(tx: PolicySubject): TransactionPermissions {
   const recorded = tx.status === 'APPROVED';
   // Sisi transfer tidak diubah sendiri; hanya dibatalkan bersama pasangannya.
   if (tx.isTransfer) return { canEdit: false, canAttach: false, canVoid: recorded };

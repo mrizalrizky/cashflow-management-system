@@ -4,15 +4,7 @@ import { todayInJakarta } from '../src/common/calendar-date.js';
 import type { Account } from '../src/generated/prisma/client.js';
 import type { TransactionResponse } from '../src/transactions/transaction.mapper.js';
 import { E2eContext, setupE2e } from './e2e-context.js';
-import {
-  adminOnly,
-  call,
-  createAccount,
-  createCategory,
-  errorFields,
-  expectAccess,
-  TestSession,
-} from './fixtures.js';
+import { call, createAccount, createCategory, errorFields, TestSession } from './fixtures.js';
 import { ACCOUNTS, TRANSACTIONS, TRANSFERS } from './routes.js';
 import { setupWorld, transactionUrl, World } from './transaction-fixtures.js';
 
@@ -47,14 +39,14 @@ function transferBody(world: TransferWorld, overrides: Record<string, unknown> =
 }
 
 async function balances(ctx: E2eContext, world: TransferWorld): Promise<Record<string, number>> {
-  const res = await call(ctx, world.admin, 'get', ACCOUNTS).expect(200);
+  const res = await call(ctx, world.owner, 'get', ACCOUNTS).expect(200);
   return Object.fromEntries(
     res.body.data.map((a: { name: string; balance: string }) => [a.name, Number(a.balance)]),
   );
 }
 
 async function transfer(ctx: E2eContext, world: TransferWorld): Promise<TransactionResponse[]> {
-  const res = await call(ctx, world.admin, 'post', TRANSFERS).send(transferBody(world)).expect(201);
+  const res = await call(ctx, world.owner, 'post', TRANSFERS).send(transferBody(world)).expect(201);
   return res.body as TransactionResponse[];
 }
 
@@ -64,11 +56,6 @@ function voidLeg(ctx: E2eContext, session: TestSession, id: string) {
 
 describe('POST /transactions/transfer', () => {
   const ctx = setupE2e();
-
-  it('is for the admin only', async () => {
-    const world = await setupTransferWorld(ctx);
-    await expectAccess(ctx, { method: 'post', path: TRANSFERS, body: transferBody(world) }, adminOnly(201));
-  });
 
   it('creates two approved, linked legs and moves the money without changing the total', async () => {
     const world = await setupTransferWorld(ctx);
@@ -85,7 +72,7 @@ describe('POST /transactions/transfer', () => {
       category: { name: 'Transfer Keluar' },
       description: 'Isi kas kecil',
       transactionDate: '2026-10-01',
-      createdBy: { id: world.admin.user.id },
+      createdBy: { id: world.owner.user.id },
       permissions: { canEdit: false, canAttach: false, canVoid: true },
     });
     expect(incoming).toMatchObject({
@@ -113,7 +100,7 @@ describe('POST /transactions/transfer', () => {
 
     const rows = await ctx.prisma.auditLog.findMany({ where: { action: 'TRANSFER' } });
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ user_id: world.admin.user.id, entity_type: 'transaction' });
+    expect(rows[0]).toMatchObject({ user_id: world.owner.user.id, entity_type: 'transaction' });
     expect(rows[0]!.after).toMatchObject({
       transfer_group_id: out!.transferGroupId,
       out_transaction_id: out!.id,
@@ -133,7 +120,7 @@ describe('POST /transactions/transfer', () => {
   ])('rejects %s and writes nothing', async (_label, override, field) => {
     const world = await setupTransferWorld(ctx);
 
-    const res = await call(ctx, world.admin, 'post', TRANSFERS)
+    const res = await call(ctx, world.owner, 'post', TRANSFERS)
       .send(transferBody(world, override(world)))
       .expect(400);
 
@@ -147,12 +134,12 @@ describe('POST /transactions/transfer', () => {
     const tomorrow = new Date(`${todayInJakarta()}T00:00:00.000Z`);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-    const closed = await call(ctx, world.admin, 'post', TRANSFERS)
+    const closed = await call(ctx, world.owner, 'post', TRANSFERS)
       .send(transferBody(world, { toAccountId: inactive.id }))
       .expect(400);
     expect(errorFields(closed.body)).toEqual(['toAccountId']);
 
-    const future = await call(ctx, world.admin, 'post', TRANSFERS)
+    const future = await call(ctx, world.owner, 'post', TRANSFERS)
       .send(transferBody(world, { transactionDate: tomorrow.toISOString().slice(0, 10) }))
       .expect(400);
     expect(errorFields(future.body)).toEqual(['transactionDate']);
@@ -161,7 +148,7 @@ describe('POST /transactions/transfer', () => {
   it('fails cleanly, writing nothing, when the system categories are missing', async () => {
     const world = await setupTransferWorld(ctx, false);
 
-    const res = await call(ctx, world.admin, 'post', TRANSFERS).send(transferBody(world)).expect(500);
+    const res = await call(ctx, world.owner, 'post', TRANSFERS).send(transferBody(world)).expect(500);
 
     expect(res.body).toEqual({ statusCode: 500, message: 'Terjadi kesalahan pada server' });
     expect(await ctx.prisma.transaction.count()).toBe(0);
@@ -175,12 +162,12 @@ describe('transfer legs afterwards', () => {
     const world = await setupTransferWorld(ctx);
     await transfer(ctx, world);
 
-    const all = await call(ctx, world.admin, 'get', TRANSACTIONS).expect(200);
+    const all = await call(ctx, world.owner, 'get', TRANSACTIONS).expect(200);
     expect(all.body.data.map((row: TransactionResponse) => row.isTransfer)).toEqual([true, true]);
 
-    const without = await call(ctx, world.admin, 'get', `${TRANSACTIONS}?includeTransfers=false`).expect(200);
+    const without = await call(ctx, world.owner, 'get', `${TRANSACTIONS}?includeTransfers=false`).expect(200);
     expect(without.body.data).toEqual([]);
-    const withThem = await call(ctx, world.admin, 'get', `${TRANSACTIONS}?includeTransfers=true`).expect(200);
+    const withThem = await call(ctx, world.owner, 'get', `${TRANSACTIONS}?includeTransfers=true`).expect(200);
     expect(withThem.body.data).toHaveLength(2);
   });
 
@@ -190,8 +177,8 @@ describe('transfer legs afterwards', () => {
     const url = (action?: string) => transactionUrl(out!.id, action);
 
     // Statusnya boleh diubah, tetapi sisi transfer memang tidak diubah sendiri: 403, bukan 409.
-    await call(ctx, world.admin, 'patch', url()).send({ amount: '1' }).expect(403);
-    await call(ctx, world.admin, 'post', url('attachments')).attach('file', SAMPLE_FILES.pdf, 'nota.pdf').expect(403);
+    await call(ctx, world.owner, 'patch', url()).send({ amount: '1' }).expect(403);
+    await call(ctx, world.owner, 'post', url('attachments')).attach('file', SAMPLE_FILES.pdf, 'nota.pdf').expect(403);
 
     expect(await ctx.prisma.transaction.count({ where: { status: 'APPROVED' } })).toBe(2);
   });
@@ -201,18 +188,18 @@ describe('transfer legs afterwards', () => {
     const before = await balances(ctx, world);
     const legs = await transfer(ctx, world);
 
-    const res = await voidLeg(ctx, world.admin, legs[index]!.id).expect(200);
+    const res = await voidLeg(ctx, world.owner, legs[index]!.id).expect(200);
 
     expect(res.body).toMatchObject({ id: legs[index]!.id, status: 'VOID', voidReason: 'Salah akun' });
     const rows = await ctx.prisma.transaction.findMany();
     expect(rows.map((row) => [row.status, row.void_reason, row.voided_by_id])).toEqual([
-      ['VOID', 'Salah akun', world.admin.user.id],
-      ['VOID', 'Salah akun', world.admin.user.id],
+      ['VOID', 'Salah akun', world.owner.user.id],
+      ['VOID', 'Salah akun', world.owner.user.id],
     ]);
     expect(await balances(ctx, world)).toEqual(before);
     expect(await ctx.prisma.auditLog.count({ where: { action: 'VOID' } })).toBe(2);
 
-    await voidLeg(ctx, world.admin, legs[1 - index]!.id).expect(409);
+    await voidLeg(ctx, world.owner, legs[1 - index]!.id).expect(409);
   });
 
   it('are voided exactly once when both legs are voided at the same moment', async () => {
@@ -221,22 +208,12 @@ describe('transfer legs afterwards', () => {
     const [out, incoming] = await transfer(ctx, world);
 
     const results = await Promise.all([
-      voidLeg(ctx, world.admin, out!.id),
-      voidLeg(ctx, world.admin, incoming!.id),
+      voidLeg(ctx, world.owner, out!.id),
+      voidLeg(ctx, world.owner, incoming!.id),
     ]);
 
     expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 409]);
     expect(await balances(ctx, world)).toEqual(before);
     expect(await ctx.prisma.auditLog.count({ where: { action: 'VOID' } })).toBe(2);
-  });
-
-  it('are invisible to other roles', async () => {
-    const world = await setupTransferWorld(ctx);
-    await transfer(ctx, world);
-
-    for (const session of [world.manager, world.staff]) {
-      const res = await call(ctx, session, 'get', TRANSACTIONS).expect(200);
-      expect(res.body.data).toEqual([]);
-    }
   });
 });

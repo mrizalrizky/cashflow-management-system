@@ -59,9 +59,8 @@ export class TransactionWorkflowService {
     step: Transition,
   ): Promise<TransactionResponse> {
     return this.prisma.$transaction(async (tx) => {
-      const actor = await this.access.actorFor(tx, user);
-      const target = await this.access.loadForUpdate(tx, actor, id);
-      assertPermitted(actor, target, { ...step, statuses: [step.from] });
+      const target = await this.access.loadForUpdate(tx, id);
+      assertPermitted(target, { ...step, statuses: [step.from] });
 
       // Transfer diproses sebagai satu kesatuan: semua sisinya berubah, atau tidak sama sekali.
       const affected = await this.withTransferSiblings(tx, target);
@@ -85,7 +84,7 @@ export class TransactionWorkflowService {
           ip,
         });
       }
-      return toTransactionResponse(await this.access.loadForUser(tx, actor, id), actor);
+      return toTransactionResponse(await this.access.load(tx, id));
     });
   }
 

@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { SAMPLE_FILES } from '../src/attachments/testing/sample-files.js';
 import type { AuditLogResponse } from '../src/audit/audit-log.mapper.js';
 import { E2eContext, setupE2e } from './e2e-context.js';
-import { adminOnly, asAdmin, call, errorFields, expectAccess, TestSession } from './fixtures.js';
-import { ACCOUNTS, AUDIT_LOGS, CHANGE_PASSWORD, USERS } from './routes.js';
+import { asOwner, call, errorFields, TestSession } from './fixtures.js';
+import { ACCOUNTS, AUDIT_LOGS } from './routes.js';
 import { expenseBody, record, setupWorld, transactionUrl, World } from './transaction-fixtures.js';
 
 const SECRET_KEYS = ['password', 'password_hash', 'passwordHash', 'token', 'token_hash', 'storage_key', 'storageKey'];
@@ -22,11 +22,11 @@ function keysOf(value: unknown): string[] {
 
 /** Staf mencatat pengeluaran berbukti, lalu admin membatalkannya. */
 async function voidedExpense(ctx: E2eContext, world: World): Promise<string> {
-  const tx = await record(ctx, world.staff, expenseBody(world));
-  await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'attachments'))
+  const tx = await record(ctx, world.owner, expenseBody(world));
+  await call(ctx, world.owner, 'post', transactionUrl(tx.id, 'attachments'))
     .attach('file', SAMPLE_FILES.pdf, 'nota.pdf')
     .expect(201);
-  await call(ctx, world.admin, 'post', transactionUrl(tx.id, 'void')).send({ reason: 'Ganda' }).expect(200);
+  await call(ctx, world.owner, 'post', transactionUrl(tx.id, 'void')).send({ reason: 'Ganda' }).expect(200);
   return tx.id;
 }
 
@@ -39,12 +39,8 @@ function entry(ctx: E2eContext, marker: string, createdAt: string, userId: strin
 describe('GET /audit-logs', () => {
   const ctx = setupE2e();
 
-  it('is for the admin only', async () => {
-    await expectAccess(ctx, { method: 'get', path: AUDIT_LOGS }, adminOnly());
-  });
-
   it('cannot be written to', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const row = await entry(ctx, 'penanda', '2026-10-06T03:00:00.000Z');
 
     for (const method of ['post', 'put', 'patch', 'delete'] as const) {
@@ -58,14 +54,14 @@ describe('GET /audit-logs', () => {
     const world = await setupWorld(ctx);
     const id = await voidedExpense(ctx, world);
 
-    const all = await logs(ctx, world.admin);
+    const all = await logs(ctx, world.owner);
 
     expect(all[0]).toEqual({
       id: expect.any(String),
       action: 'VOID',
       entityType: 'transaction',
       entityId: id,
-      user: { id: world.admin.user.id, name: world.admin.user.name },
+      user: { id: world.owner.user.id, name: world.owner.user.name },
       before: expect.objectContaining({ status: 'APPROVED', amount: '150000' }),
       after: expect.objectContaining({ status: 'VOID' }),
       ip: expect.any(String),
@@ -73,11 +69,11 @@ describe('GET /audit-logs', () => {
     });
     const times = all.map((row) => row.createdAt);
     expect(times).toEqual([...times].sort().reverse());
-    expect(all.map((row) => row.action)).toEqual(expect.arrayContaining(['LOGIN', 'CREATE', 'ATTACH', 'VOID']));
+    expect(all.map((row) => row.action)).toEqual(expect.arrayContaining(['CREATE', 'ATTACH', 'VOID']));
   });
 
   it('shows an entry nobody is attached to, such as a failed login', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     await entry(ctx, 'penanda', '2026-10-06T03:00:00.000Z');
 
     const [row] = await logs(ctx, admin, '&entityType=penanda');
@@ -88,26 +84,26 @@ describe('GET /audit-logs', () => {
   it('filters by record, user and action, alone and together', async () => {
     const world = await setupWorld(ctx);
     const id = await voidedExpense(ctx, world);
-    await call(ctx, world.admin, 'post', ACCOUNTS).send({ name: 'Kas Baru', type: 'CASH' }).expect(201);
+    await call(ctx, world.owner, 'post', ACCOUNTS).send({ name: 'Kas Baru', type: 'CASH' }).expect(201);
 
-    const history = await logs(ctx, world.admin, `&entityType=transaction&entityId=${id}`);
+    const history = await logs(ctx, world.owner, `&entityType=transaction&entityId=${id}`);
     expect(history.map((row) => row.action)).toEqual(['VOID', 'ATTACH', 'CREATE']);
 
-    const byStaff = await logs(ctx, world.admin, `&userId=${world.staff.user.id}`);
-    expect(byStaff.length).toBeGreaterThan(0);
-    expect(new Set(byStaff.map((row) => row.user?.id))).toEqual(new Set([world.staff.user.id]));
+    const byOwner = await logs(ctx, world.owner, `&userId=${world.owner.user.id}`);
+    expect(byOwner.length).toBeGreaterThan(0);
+    expect(new Set(byOwner.map((row) => row.user?.id))).toEqual(new Set([world.owner.user.id]));
 
-    const voids = await logs(ctx, world.admin, '&action=VOID');
+    const voids = await logs(ctx, world.owner, '&action=VOID');
     expect(voids.map((row) => row.entityId)).toEqual([id]);
 
-    const accounts = await logs(ctx, world.admin, '&entityType=account');
+    const accounts = await logs(ctx, world.owner, '&entityType=account');
     expect(accounts.map((row) => [row.action, (row.after as { name: string }).name])).toEqual([['CREATE', 'Kas Baru']]);
 
-    expect(await logs(ctx, world.admin, `&entityType=transaction&action=CREATE&userId=${world.admin.user.id}`)).toEqual([]);
+    expect(await logs(ctx, world.owner, `&entityType=account&action=VOID&userId=${world.owner.user.id}`)).toEqual([]);
   });
 
   it('filters by Jakarta calendar days, both ends included', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     // 23:59:59 tanggal 5, 23:30 tanggal 6, dan 00:00 tanggal 7, semuanya waktu Jakarta (UTC+7).
     const fifth = await entry(ctx, 'penanda', '2026-10-05T16:59:59.000Z');
     const sixth = await entry(ctx, 'penanda', '2026-10-06T16:30:00.000Z');
@@ -121,7 +117,7 @@ describe('GET /audit-logs', () => {
   });
 
   it('pages through the entries', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     for (let i = 0; i < 5; i += 1) await entry(ctx, 'penanda', `2026-10-06T03:00:0${i}.000Z`);
 
     const res = await call(ctx, admin, 'get', `${AUDIT_LOGS}?entityType=penanda&page=2&pageSize=2`).expect(200);
@@ -133,26 +129,16 @@ describe('GET /audit-logs', () => {
     ]);
   });
 
-  it('never shows a password, a token or where a file is stored', async () => {
+  it('never shows a secret, a token or where a file is stored', async () => {
     const world = await setupWorld(ctx);
     await voidedExpense(ctx, world);
-    await call(ctx, world.staff, 'post', CHANGE_PASSWORD)
-      .send({ currentPassword: 'password-123', newPassword: 'password-baru-456' })
-      .expect(200);
-    await call(ctx, world.admin, 'post', `${USERS}/${world.otherStaff.user.id}/reset-password`)
-      .send({ newPassword: 'sementara-789' })
-      .expect(200);
 
-    const all = await logs(ctx, world.admin);
+    const all = await logs(ctx, world.owner);
 
-    expect(all.map((row) => row.action)).toEqual(
-      expect.arrayContaining(['LOGIN', 'CHANGE_PASSWORD', 'RESET_PASSWORD', 'ATTACH']),
-    );
+    expect(all.map((row) => row.action)).toEqual(expect.arrayContaining(['CREATE', 'ATTACH', 'VOID']));
     const keys = new Set(keysOf(all));
     for (const secret of SECRET_KEYS) expect(keys.has(secret)).toBe(false);
     const text = JSON.stringify(all);
-    expect(text).not.toContain('password-baru-456');
-    expect(text).not.toContain('sementara-789');
     expect(text).not.toContain('$argon2');
   });
 
@@ -164,7 +150,7 @@ describe('GET /audit-logs', () => {
     ['an action that is not a word', 'action=DROP%20TABLE', 'action'],
     ['an unknown parameter', 'hapus=1', 'hapus'],
   ])('refuses %s', async (_label, query, field) => {
-    const res = await call(ctx, await asAdmin(ctx), 'get', `${AUDIT_LOGS}?${query}`).expect(400);
+    const res = await call(ctx, await asOwner(ctx), 'get', `${AUDIT_LOGS}?${query}`).expect(400);
 
     expect(errorFields(res.body)).toEqual([field]);
   });

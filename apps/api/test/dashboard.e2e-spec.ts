@@ -2,14 +2,12 @@ import { todayInJakarta } from '../src/common/calendar-date.js';
 import type { CompanyDashboardResponse } from '../src/reports/report.mapper.js';
 import { E2eContext, setupE2e } from './e2e-context.js';
 import {
-  adminOnly,
-  asAdmin,
+  asOwner,
   call,
   createAccount,
   createCategory,
   createTransaction,
   errorFields,
-  expectAccess,
   TestSession,
 } from './fixtures.js';
 import { EXPECTED, REPORT_PERIOD, seedReportLedger } from './report-fixtures.js';
@@ -36,18 +34,14 @@ describe('GET /dashboard/company', () => {
   const ctx = setupE2e();
 
   it('no longer splits spending into overhead and projects', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const res = await call(ctx, admin, 'get', DASHBOARD).expect(200);
     expect(res.body).not.toHaveProperty('expenseByScope');
   });
 
-  it('is for the admin only', async () => {
-    await expectAccess(ctx, { method: 'get', path: DASHBOARD }, adminOnly());
-  });
-
   it('matches the figures computed by hand', async () => {
     await seedReportLedger(ctx);
-    const body = await dashboard(ctx, await asAdmin(ctx));
+    const body = await dashboard(ctx, await asOwner(ctx));
 
     expect(body.period).toEqual(REPORT_PERIOD);
     expect(body.accounts.map((a) => [a.name, a.balance])).toEqual(Object.entries(EXPECTED.balances));
@@ -61,7 +55,7 @@ describe('GET /dashboard/company', () => {
 
   it('never counts void transactions, nor transfers', async () => {
     const ledger = await seedReportLedger(ctx);
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const before = await dashboard(ctx, admin);
 
     await ctx.prisma.transaction.updateMany({
@@ -89,7 +83,7 @@ describe('GET /dashboard/company', () => {
 
   it('counts the first and the last day of the period, and nothing outside it', async () => {
     await seedReportLedger(ctx);
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
 
     const oneDay = await dashboard(ctx, admin, `${DASHBOARD}?from=2026-08-31&to=2026-08-31`);
     expect(oneDay.totals).toEqual({ income: '0', expense: '5000000', net: '-5000000' });
@@ -110,7 +104,7 @@ describe('GET /dashboard/company', () => {
 
   it('lists every month of the period, with zeros where nothing happened', async () => {
     await seedReportLedger(ctx);
-    const body = await dashboard(ctx, await asAdmin(ctx), `${DASHBOARD}?from=2026-06-15&to=2026-11-02`);
+    const body = await dashboard(ctx, await asOwner(ctx), `${DASHBOARD}?from=2026-06-15&to=2026-11-02`);
 
     expect(body.monthly.map((m) => m.month)).toEqual(['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
     expect(body.monthly[0]).toEqual({ month: '2026-06', income: '0', expense: '0', net: '0' });
@@ -119,7 +113,7 @@ describe('GET /dashboard/company', () => {
   });
 
   it('covers the last twelve months when no period is given', async () => {
-    const body = await dashboard(ctx, await asAdmin(ctx), DASHBOARD);
+    const body = await dashboard(ctx, await asOwner(ctx), DASHBOARD);
     const today = todayInJakarta();
 
     expect(body.period.to).toBe(today);
@@ -141,7 +135,7 @@ describe('GET /dashboard/company', () => {
     });
     await ctx.prisma.category.update({ where: { id: ledger.material.id }, data: { is_active: false } });
 
-    const body = await dashboard(ctx, await asAdmin(ctx));
+    const body = await dashboard(ctx, await asOwner(ctx));
 
     expect(named(body.expenseByCategory)).toEqual([
       { name: 'Material', amount: '40000000' },
@@ -153,7 +147,7 @@ describe('GET /dashboard/company', () => {
 
   it('lists the ten most recently recorded transactions, whatever their status or date', async () => {
     await seedReportLedger(ctx);
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
 
     const body = await dashboard(ctx, admin, `${DASHBOARD}?from=2026-08-01&to=2026-08-01`);
 
@@ -167,7 +161,7 @@ describe('GET /dashboard/company', () => {
   });
 
   it('reports zeros on an empty database', async () => {
-    const body = await dashboard(ctx, await asAdmin(ctx), DASHBOARD);
+    const body = await dashboard(ctx, await asOwner(ctx), DASHBOARD);
 
     expect(body.accounts).toEqual([]);
     expect(body.totalBalance).toBe('0');
@@ -178,7 +172,7 @@ describe('GET /dashboard/company', () => {
   });
 
   it('adds up sums beyond what a JavaScript number can hold', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const account = await createAccount(ctx.prisma);
     const category = await createCategory(ctx.prisma, { type: 'IN' });
     for (let i = 0; i < 2; i += 1) {
@@ -205,7 +199,7 @@ describe('GET /dashboard/company', () => {
     ['a period longer than sixty months', 'from=2021-10-31&to=2026-10-01', 'to'],
     ['an unknown parameter', 'bulan=10', 'bulan'],
   ])('refuses %s', async (_label, query, field) => {
-    const res = await call(ctx, await asAdmin(ctx), 'get', `${DASHBOARD}?${query}`).expect(400);
+    const res = await call(ctx, await asOwner(ctx), 'get', `${DASHBOARD}?${query}`).expect(400);
 
     expect(errorFields(res.body)).toEqual([field]);
   });

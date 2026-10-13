@@ -19,7 +19,6 @@ const HEADER = [
   'Kategori',
   'Status',
   'Transfer',
-  'Dicatat oleh',
   'Alasan pembatalan',
   'Jumlah bukti',
   'Dicatat pada',
@@ -81,13 +80,13 @@ async function listed(ctx: E2eContext, session: TestSession, query = ''): Promis
 /** Transaksi dengan keterangan yang berbeda-beda, dari berbagai pembuat, status, tipe dan tanggal. */
 async function seedVariety(ctx: E2eContext, world: World): Promise<void> {
   const second = await createAccount(ctx.prisma, { name: 'Bank Uji' });
-  await record(ctx, world.staff, expenseBody(world, { description: 'staf semen' }));
-  await record(ctx, world.staff, expenseBody(world, { description: 'staf besi', transactionDate: '2026-09-15' }));
-  await record(ctx, world.staff, expenseBody(world, { description: 'staf overhead listrik', accountId: second.id }));
-  await record(ctx, world.otherStaff, expenseBody(world, { description: 'staf lain pasir', transactionDate: '2026-09-20' }));
-  await record(ctx, world.manager, incomeBody(world, { description: 'koordinator termin' }));
-  const voided = await record(ctx, world.admin, incomeBody(world, { description: 'admin termin' }));
-  await call(ctx, world.admin, 'post', transactionUrl(voided.id, 'void')).send({ reason: 'Ganda' }).expect(200);
+  await record(ctx, world.owner, expenseBody(world, { description: 'staf semen' }));
+  await record(ctx, world.owner, expenseBody(world, { description: 'staf besi', transactionDate: '2026-09-15' }));
+  await record(ctx, world.owner, expenseBody(world, { description: 'staf overhead listrik', accountId: second.id }));
+  await record(ctx, world.owner, expenseBody(world, { description: 'staf lain pasir', transactionDate: '2026-09-20' }));
+  await record(ctx, world.owner, incomeBody(world, { description: 'koordinator termin' }));
+  const voided = await record(ctx, world.owner, incomeBody(world, { description: 'admin termin' }));
+  await call(ctx, world.owner, 'post', transactionUrl(voided.id, 'void')).send({ reason: 'Ganda' }).expect(200);
   const group = randomUUID();
   for (const type of ['OUT', 'IN'] as const) {
     await createTransaction(ctx.prisma, {
@@ -96,7 +95,7 @@ async function seedVariety(ctx: E2eContext, world: World): Promise<void> {
       description: `transfer ${type}`,
       accountId: type === 'OUT' ? world.account.id : second.id,
       categoryId: type === 'OUT' ? world.expense.id : world.income.id,
-      createdById: world.admin.user.id,
+      createdById: world.owner.user.id,
       transferGroupId: group,
     });
   }
@@ -105,19 +104,17 @@ async function seedVariety(ctx: E2eContext, world: World): Promise<void> {
 describe('GET /transactions/export', () => {
   const ctx = setupE2e();
 
-  it('needs a login, and is open to every role', async () => {
+  it('needs a session', async () => {
     const world = await setupWorld(ctx);
 
     await api(ctx).get(TRANSACTION_EXPORT).expect(401);
-    for (const session of [world.admin, world.manager, world.staff]) {
-      await call(ctx, session, 'get', TRANSACTION_EXPORT).expect(200);
-    }
+    await call(ctx, world.owner, 'get', TRANSACTION_EXPORT).expect(200);
   });
 
   it('is a UTF-8 CSV download with a header row', async () => {
     const world = await setupWorld(ctx);
 
-    const { res, bytes, header, rows } = await download(ctx, world.admin);
+    const { res, bytes, header, rows } = await download(ctx, world.owner);
 
     expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
     expect(res.headers['content-disposition']).toMatch(/^attachment; filename="transaksi-\d{8}-\d{4}\.csv"$/);
@@ -129,17 +126,17 @@ describe('GET /transactions/export', () => {
 
   it('writes one row per transaction with everything needed to read it on its own', async () => {
     const world = await setupWorld(ctx);
-    const tx = await record(ctx, world.staff, expenseBody(world));
-    await call(ctx, world.staff, 'post', transactionUrl(tx.id, 'attachments'))
+    const tx = await record(ctx, world.owner, expenseBody(world));
+    await call(ctx, world.owner, 'post', transactionUrl(tx.id, 'attachments'))
       .attach('file', SAMPLE_FILES.pdf, 'nota.pdf')
       .expect(201);
-    await call(ctx, world.admin, 'post', transactionUrl(tx.id, 'void')).send({ reason: 'Nota buram' }).expect(200);
-    await record(ctx, world.admin, incomeBody(world, { transactionDate: '2026-09-30' }));
+    await call(ctx, world.owner, 'post', transactionUrl(tx.id, 'void')).send({ reason: 'Nota buram' }).expect(200);
+    await record(ctx, world.owner, incomeBody(world, { transactionDate: '2026-09-30' }));
 
-    const { rows } = await download(ctx, world.admin);
+    const { rows } = await download(ctx, world.owner);
 
     expect(rows).toHaveLength(2);
-    expect(rows[0]!.slice(0, 11)).toEqual([
+    expect(rows[0]!.slice(0, 10)).toEqual([
       '2026-10-01',
       'Keluar',
       '150000',
@@ -148,12 +145,11 @@ describe('GET /transactions/export', () => {
       'Material Uji',
       'Dibatalkan',
       'Tidak',
-      'Staf Satu',
       'Nota buram',
       '1',
     ]);
-    expect(rows[0]![11]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
-    expect(rows[1]!.slice(0, 9)).toEqual([
+    expect(rows[0]![10]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+    expect(rows[1]!.slice(0, 8)).toEqual([
       '2026-09-30',
       'Masuk',
       '500000',
@@ -162,7 +158,6 @@ describe('GET /transactions/export', () => {
       'Termin Uji',
       'Tercatat',
       'Tidak',
-      'Admin',
     ]);
   });
 
@@ -173,12 +168,12 @@ describe('GET /transactions/export', () => {
       amount: 5n,
       accountId: world.account.id,
       categoryId: world.expense.id,
-      createdById: world.admin.user.id,
+      createdById: world.owner.user.id,
       createdAt: new Date('2026-10-06T17:30:00.000Z'),
       transferGroupId: randomUUID(),
     });
 
-    const { rows } = await download(ctx, world.admin);
+    const { rows } = await download(ctx, world.owner);
 
     expect(rows[0]![HEADER.indexOf('Transfer')]).toBe('Ya');
     expect(rows[0]![HEADER.indexOf('Dicatat pada')]).toBe('2026-10-07 00:30');
@@ -192,17 +187,15 @@ describe('GET /transactions/export', () => {
     '?search=termin',
     '?includeTransfers=false',
     '?type=OUT&status=APPROVED&includeTransfers=false',
-  ])('gives each role exactly the rows, in the order, of their list for %j', async (query) => {
+  ])('gives exactly the rows, in the order, of the list for %j', async (query) => {
     const world = await setupWorld(ctx);
     await seedVariety(ctx, world);
 
-    for (const session of [world.admin, world.manager, world.staff, world.otherStaff]) {
-      const list = await listed(ctx, session, query);
-      const file = await exported(ctx, session, query);
+    const list = await listed(ctx, world.owner, query);
+    const file = await exported(ctx, world.owner, query);
 
-      expect(file).toEqual(list.names);
-      expect(file).toHaveLength(list.total);
-    }
+    expect(file).toEqual(list.names);
+    expect(file).toHaveLength(list.total);
   });
 
   it('follows the account and category filters the same way', async () => {
@@ -210,22 +203,8 @@ describe('GET /transactions/export', () => {
     await seedVariety(ctx, world);
 
     for (const query of [`?accountId=${world.account.id}`, `?categoryId=${world.income.id}`]) {
-      for (const session of [world.admin, world.manager, world.staff]) {
-        expect(await exported(ctx, session, query)).toEqual((await listed(ctx, session, query)).names);
-      }
+      expect(await exported(ctx, world.owner, query)).toEqual((await listed(ctx, world.owner, query)).names);
     }
-  });
-
-  it('never hands over rows that are not the user’s to see', async () => {
-    const world = await setupWorld(ctx);
-    await seedVariety(ctx, world);
-
-    // Selain admin: hanya miliknya sendiri, tanpa transfer.
-    expect(await exported(ctx, world.manager)).toEqual(['koordinator termin']);
-    expect(await exported(ctx, world.manager, '?search=besi')).toEqual([]);
-    expect((await exported(ctx, world.otherStaff)).sort()).toEqual(['staf lain pasir']);
-    expect(await exported(ctx, world.otherStaff, '?search=semen')).toEqual([]);
-    expect(await exported(ctx, world.staff, '?includeTransfers=true&search=transfer')).toEqual([]);
   });
 
   it('keeps hostile text as text, one row per transaction', async () => {
@@ -245,13 +224,13 @@ describe('GET /transactions/export', () => {
         description,
         accountId: world.account.id,
         categoryId: world.expense.id,
-        createdById: world.admin.user.id,
+        createdById: world.owner.user.id,
         createdAt: new Date(Date.UTC(2026, 9, 6, 3, 0, hostile.length - index)),
       });
     }
     await ctx.prisma.account.update({ where: { id: world.account.id }, data: { name: '=cmd|x' } });
 
-    const { rows, bytes } = await download(ctx, world.admin);
+    const { rows, bytes } = await download(ctx, world.owner);
 
     expect(rows.map((row) => row[DESCRIPTION])).toEqual([
       `'=HYPERLINK("http://x","y")`,
@@ -276,20 +255,20 @@ describe('GET /transactions/export', () => {
       description: `baris ${i}`,
       account_id: world.account.id,
       category_id: world.expense.id,
-      created_by_id: world.admin.user.id,
+      created_by_id: world.owner.user.id,
     }));
     for (let start = 0; start < rows.length; start += 5_000) {
       await ctx.prisma.transaction.createMany({ data: rows.slice(start, start + 5_000) });
     }
     const findMany = vi.spyOn(ctx.app.get(PrismaService).transaction, 'findMany');
 
-    const file = await download(ctx, world.admin);
+    const file = await download(ctx, world.owner);
 
     expect(file.rows).toHaveLength(20_000);
     expect(new Set(file.rows.map((row) => row[DESCRIPTION])).size).toBe(20_000);
     expect(findMany.mock.calls.length).toBeGreaterThanOrEqual(20_000 / EXPORT_BATCH_SIZE);
     for (const [args] of findMany.mock.calls) expect(args?.take).toBeLessThanOrEqual(EXPORT_BATCH_SIZE);
-    const list = await call(ctx, world.admin, 'get', `${TRANSACTIONS}?pageSize=1`).expect(200);
+    const list = await call(ctx, world.owner, 'get', `${TRANSACTIONS}?pageSize=1`).expect(200);
     expect(list.body.meta.total).toBe(20_000);
     findMany.mockRestore();
   }, 120_000);
@@ -298,15 +277,15 @@ describe('GET /transactions/export', () => {
     const world = await setupWorld(ctx);
     await seedVariety(ctx, world);
 
-    await download(ctx, world.manager, '?status=APPROVED&search=termin');
+    await download(ctx, world.owner, '?status=APPROVED&search=koordinator');
 
     const entries = await ctx.prisma.auditLog.findMany({ where: { action: 'EXPORT' } });
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
-      user_id: world.manager.user.id,
+      user_id: world.owner.user.id,
       entity_type: 'transaction',
       entity_id: 'export',
-      after: { filters: { status: 'APPROVED', search: 'termin' }, rows: 1 },
+      after: { filters: { status: 'APPROVED', search: 'koordinator' }, rows: 1 },
     });
   });
 
@@ -318,7 +297,7 @@ describe('GET /transactions/export', () => {
   ])('refuses %s without writing an audit entry', async (_label, query, field) => {
     const world = await setupWorld(ctx);
 
-    const res = await call(ctx, world.admin, 'get', `${TRANSACTION_EXPORT}${query}`).expect(400);
+    const res = await call(ctx, world.owner, 'get', `${TRANSACTION_EXPORT}${query}`).expect(400);
 
     expect(errorFields(res.body)).toEqual([field]);
     expect(await ctx.prisma.auditLog.count({ where: { action: 'EXPORT' } })).toBe(0);
@@ -338,7 +317,7 @@ describe('TransactionExportService under awkward conditions', () => {
       description: `baris ${i}`,
       account_id: world.account.id,
       category_id: world.expense.id,
-      created_by_id: world.admin.user.id,
+      created_by_id: world.owner.user.id,
       created_at: new Date(Date.UTC(2026, 9, 2, 0, 0, 0, i)),
     }));
     await ctx.prisma.transaction.createMany({ data: rows });
@@ -370,12 +349,12 @@ describe('TransactionExportService under awkward conditions', () => {
     await seedRecorded(world, 3);
     const service = ctx.app.get(TransactionExportService);
 
-    await service.prepare(toAuthUser(world.admin.user), { status: 'APPROVED' }, '10.0.0.9');
+    await service.prepare(toAuthUser(world.owner.user), { status: 'APPROVED' }, '10.0.0.9');
 
     const entries = await ctx.prisma.auditLog.findMany({ where: { action: 'EXPORT' } });
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
-      user_id: world.admin.user.id,
+      user_id: world.owner.user.id,
       ip: '10.0.0.9',
       after: { filters: { status: 'APPROVED' }, rows: 3 },
     });
@@ -389,7 +368,7 @@ describe('TransactionExportService under awkward conditions', () => {
     const out = new Writable({ highWaterMark: 1, write: () => undefined });
     setTimeout(() => out.destroy(), 200);
 
-    const prepared = await service.prepare(toAuthUser(world.admin.user), {}, null);
+    const prepared = await service.prepare(toAuthUser(world.owner.user), {}, null);
     const written = await prepared.writeTo(out);
 
     expect(written).toBeLessThan(EXPORT_BATCH_SIZE * 2 + 5);
@@ -411,7 +390,7 @@ describe('TransactionExportService under awkward conditions', () => {
       await ctx.prisma.transaction.update({ where: { id: boundary.id }, data: change });
     });
 
-    const prepared = await service.prepare(toAuthUser(world.admin.user), { status: 'APPROVED' }, null);
+    const prepared = await service.prepare(toAuthUser(world.owner.user), { status: 'APPROVED' }, null);
     const written = await prepared.writeTo(out);
 
     // Baris yang berubah sudah telanjur tertulis, dan boleh muncul sekali lagi bila ia pindah

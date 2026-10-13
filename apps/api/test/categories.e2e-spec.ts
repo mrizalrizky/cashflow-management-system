@@ -1,45 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { setupE2e } from './e2e-context.js';
-import {
-  adminOnly,
-  asAdmin,
-  call,
-  createCategory,
-  errorFields,
-  expectAccess,
-  loginAs,
-} from './fixtures.js';
+import { asOwner, call, createCategory, errorFields } from './fixtures.js';
 import { CATEGORIES } from './routes.js';
 
 const NEW_CATEGORY = { name: 'Material', type: 'OUT' };
 
 type Named = { name: string };
 
-describe('categories: access', () => {
-  const ctx = setupE2e();
-
-  it('lets every role read categories but only SUPER_ADMIN change them', async () => {
-    const category = await createCategory(ctx.prisma);
-
-    await expectAccess(
-      ctx,
-      { method: 'get', path: CATEGORIES },
-      { SUPER_ADMIN: 200, PROJECT_MANAGER: 200, STAFF: 200 },
-    );
-    await expectAccess(ctx, { method: 'post', path: CATEGORIES, body: NEW_CATEGORY }, adminOnly(201));
-    await expectAccess(
-      ctx,
-      { method: 'patch', path: `${CATEGORIES}/${category.id}`, body: { name: 'Lain' } },
-      adminOnly(),
-    );
-  });
-});
-
 describe('GET /categories', () => {
   const ctx = setupE2e();
 
   it('returns a plain list ordered by type then name, filterable by type', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     await createCategory(ctx.prisma, { name: 'Upah Tukang', type: 'OUT' });
     await createCategory(ctx.prisma, { name: 'Termin Proyek', type: 'IN' });
     await createCategory(ctx.prisma, { name: 'Material', type: 'OUT' });
@@ -65,12 +37,10 @@ describe('GET /categories', () => {
     await call(ctx, admin, 'get', `${CATEGORIES}?type=TRANSFER`).expect(400);
   });
 
-  it('shows inactive categories to SUPER_ADMIN only, whatever others ask for', async () => {
+  it('lists inactive categories too, and filters by status', async () => {
     await createCategory(ctx.prisma, { name: 'Aktif' });
     await createCategory(ctx.prisma, { name: 'Lama', isActive: false });
-    const admin = await asAdmin(ctx);
-    const staff = await loginAs(ctx, { role: 'STAFF' });
-    const manager = await loginAs(ctx, { role: 'PROJECT_MANAGER' });
+    const admin = await asOwner(ctx);
 
     const names = async (session: typeof admin, query = '') => {
       const res = await call(ctx, session, 'get', `${CATEGORIES}?${query}`).expect(200);
@@ -80,10 +50,6 @@ describe('GET /categories', () => {
     expect(await names(admin)).toEqual(['Aktif', 'Lama']);
     expect(await names(admin, 'isActive=false')).toEqual(['Lama']);
     expect(await names(admin, 'isActive=true')).toEqual(['Aktif']);
-    for (const session of [staff, manager]) {
-      expect(await names(session)).toEqual(['Aktif']);
-      expect(await names(session, 'isActive=false')).toEqual(['Aktif']);
-    }
   });
 });
 
@@ -91,7 +57,7 @@ describe('POST /categories', () => {
   const ctx = setupE2e();
 
   it('creates an ordinary, active category and records it', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
 
     const res = await call(ctx, admin, 'post', CATEGORIES)
       .send({ name: '  Material  ', type: 'OUT' })
@@ -109,7 +75,7 @@ describe('POST /categories', () => {
   });
 
   it('refuses the same name within a type, in any case, but allows it in the other type', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     await call(ctx, admin, 'post', CATEGORIES).send(NEW_CATEGORY).expect(201);
 
     const res = await call(ctx, admin, 'post', CATEGORIES)
@@ -124,7 +90,7 @@ describe('POST /categories', () => {
     ['the same name', 'Material'],
     ['the same name in another case', 'MATERIAL'],
   ])('creates only one category when two requests with %s arrive together', async (_label, other) => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
 
     const results = await Promise.all([
       call(ctx, admin, 'post', CATEGORIES).send(NEW_CATEGORY),
@@ -136,7 +102,7 @@ describe('POST /categories', () => {
   });
 
   it('reserves the names of system categories in both types', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     await createCategory(ctx.prisma, { name: 'Transfer Masuk', type: 'IN', isSystem: true });
     const ordinary = await createCategory(ctx.prisma, { name: 'Lain', type: 'OUT' });
 
@@ -151,7 +117,7 @@ describe('POST /categories', () => {
     ['a blank name', { name: ' ' }, 'name'],
     ['an attempt to create a system category', { isSystem: true }, 'isSystem'],
   ])('rejects %s', async (_label, override, field) => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const res = await call(ctx, admin, 'post', CATEGORIES)
       .send({ ...NEW_CATEGORY, ...override })
       .expect(400);
@@ -163,7 +129,7 @@ describe('PATCH /categories/:id', () => {
   const ctx = setupE2e();
 
   it('renames and deactivates a category, recording before and after', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const category = await createCategory(ctx.prisma, { name: 'Lama' });
 
     const res = await call(ctx, admin, 'patch', `${CATEGORIES}/${category.id}`)
@@ -177,7 +143,7 @@ describe('PATCH /categories/:id', () => {
   });
 
   it('never changes the type of a category', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const category = await createCategory(ctx.prisma, { type: 'OUT' });
 
     const res = await call(ctx, admin, 'patch', `${CATEGORIES}/${category.id}`)
@@ -188,7 +154,7 @@ describe('PATCH /categories/:id', () => {
   });
 
   it('refuses a rename that collides with another category of the same type', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const first = await createCategory(ctx.prisma, { name: 'Material', type: 'OUT' });
     await createCategory(ctx.prisma, { name: 'Peralatan', type: 'OUT' });
     await createCategory(ctx.prisma, { name: 'Pendapatan Lain', type: 'IN' });
@@ -203,7 +169,7 @@ describe('PATCH /categories/:id', () => {
   it.each([{ name: 'Nama Lain' }, { isActive: false }])(
     'leaves a system category untouched when asked for %j',
     async (body) => {
-      const admin = await asAdmin(ctx);
+      const admin = await asOwner(ctx);
       const system = await createCategory(ctx.prisma, { name: 'Transfer Masuk', type: 'IN', isSystem: true });
 
       const res = await call(ctx, admin, 'patch', `${CATEGORIES}/${system.id}`).send(body).expect(400);
@@ -215,7 +181,7 @@ describe('PATCH /categories/:id', () => {
   );
 
   it('rejects null and answers 404 for an unknown id', async () => {
-    const admin = await asAdmin(ctx);
+    const admin = await asOwner(ctx);
     const category = await createCategory(ctx.prisma);
 
     await call(ctx, admin, 'patch', `${CATEGORIES}/${category.id}`).send({ name: null }).expect(400);

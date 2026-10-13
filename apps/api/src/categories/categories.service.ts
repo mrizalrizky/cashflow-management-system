@@ -26,11 +26,9 @@ export class CategoriesService {
   ) {}
 
   /** Kategori jumlahnya sedikit, jadi dikembalikan seluruhnya tanpa halaman. */
-  list(user: AuthUser, query: ListCategoriesQueryDto): Promise<Category[]> {
-    // Hanya SUPER_ADMIN yang mengelola kategori; peran lain cukup melihat yang masih dipakai.
-    const isActive = user.role === 'SUPER_ADMIN' ? query.isActive : true;
+  list(query: ListCategoriesQueryDto): Promise<Category[]> {
     return this.prisma.category.findMany({
-      where: { type: query.type, is_active: isActive },
+      where: { type: query.type, is_active: query.isActive },
       orderBy: [{ type: 'asc' }, { name: 'asc' }, { id: 'asc' }],
     });
   }

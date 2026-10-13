@@ -1,25 +1,16 @@
-import type { Role, User } from '../generated/prisma/client.js';
+import type { User } from '../generated/prisma/client.js';
 
-/** User yang sedang login, seperti yang dikirim ke klien dan ditempel ke request. */
+/** Pemilik yang sedang masuk, seperti yang dikirim ke klien dan ditempel ke request. */
 export interface AuthUser {
   id: string;
   name: string;
-  email: string;
-  role: Role;
-  mustChangePassword: boolean;
 }
 
 export function toAuthUser(user: User): AuthUser {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    mustChangePassword: user.must_change_password,
-  };
+  return { id: user.id, name: user.name };
 }
 
-/** Hasil login, refresh, atau ganti password. `refreshToken` hanya untuk cookie. */
+/** Hasil masuk, refresh, atau ganti PIN. `refreshToken` hanya untuk cookie. */
 export interface Session {
   accessToken: string;
   refreshToken: string;

@@ -1,17 +1,10 @@
 import type { Account, Category } from '../src/generated/prisma/client.js';
 import type { TransactionResponse } from '../src/transactions/transaction.mapper.js';
 import type { E2eContext } from './e2e-context.js';
-import {
-  asAdmin,
-  call,
-  createAccount,
-  createCategory,
-  loginAs,
-  TestSession,
-} from './fixtures.js';
+import { asOwner, call, createAccount, createCategory, TestSession } from './fixtures.js';
 import { TRANSACTIONS } from './routes.js';
 
-type UserSession = Awaited<ReturnType<typeof loginAs>>;
+type OwnerSession = Awaited<ReturnType<typeof asOwner>>;
 
 export interface Ledger {
   account: Account;
@@ -29,20 +22,13 @@ export async function setupLedger(ctx: E2eContext): Promise<Ledger> {
 }
 
 export interface World extends Ledger {
-  admin: UserSession;
-  manager: UserSession;
-  staff: UserSession;
-  otherStaff: UserSession;
+  owner: OwnerSession;
 }
 
-/** Dunia kecil yang dipakai sebagian besar test transaksi: satu orang per peran. */
+/** Dunia kecil yang dipakai sebagian besar test transaksi: buku besar dan pemiliknya. */
 export async function setupWorld(ctx: E2eContext): Promise<World> {
   const ledger = await setupLedger(ctx);
-  const admin = await asAdmin(ctx);
-  const manager = await loginAs(ctx, { role: 'PROJECT_MANAGER', name: 'Koordinator A' });
-  const staff = await loginAs(ctx, { role: 'STAFF', name: 'Staf Satu' });
-  const otherStaff = await loginAs(ctx, { role: 'STAFF', name: 'Staf Dua' });
-  return { ...ledger, admin, manager, staff, otherStaff };
+  return { ...ledger, owner: await asOwner(ctx) };
 }
 
 export interface TransactionBody {

@@ -20,7 +20,7 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 
 try {
   const user = await prisma.user.create({
-    data: { name: 'Uji Pulih', email: 'uji-pulih@example.com', password_hash: 'x', role: 'SUPER_ADMIN' },
+    data: { name: 'Uji Pulih' },
   });
   const account = await prisma.account.create({
     data: { name: 'Kas Uji Pulih', type: 'CASH', opening_balance: 1_000_000n },
@@ -33,7 +33,7 @@ try {
         type: 'OUT',
         // Termasuk nominal di atas 2^53, supaya terbukti tidak berubah saat dipulihkan.
         amount: i === 5 ? 9_007_199_254_740_993n : BigInt(i * 125_000),
-        status: i % 2 === 0 ? 'APPROVED' : 'PENDING',
+        status: i % 2 === 0 ? 'APPROVED' : 'VOID',
         transaction_date: new Date(`2026-10-0${i}T00:00:00.000Z`),
         description: `uji pulih ${i}`,
         account_id: account.id,

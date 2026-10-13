@@ -1,12 +1,7 @@
 import { formatCalendarDate } from '../common/calendar-date.js';
 import { fromMoney } from '../common/money.js';
 import type { Attachment, Prisma, TxStatus, TxType } from '../generated/prisma/client.js';
-import {
-  permissionsFor,
-  PolicyActor,
-  PolicySubject,
-  TransactionPermissions,
-} from './transaction-policy.js';
+import { permissionsFor, PolicySubject, TransactionPermissions } from './transaction-policy.js';
 
 const PERSON = { select: { id: true, name: true } } as const;
 
@@ -52,7 +47,7 @@ export interface TransactionResponse {
   voidedAt: string | null;
   voidReason: string | null;
   attachments: AttachmentResponse[];
-  /** Yang boleh dilakukan pemanggil pada transaksi ini. */
+  /** Yang boleh dilakukan pada transaksi ini. */
   permissions: TransactionPermissions;
   createdAt: string;
   updatedAt: string;
@@ -94,10 +89,7 @@ export function toPolicySubject(tx: TransactionWithRelations): PolicySubject {
   };
 }
 
-export function toTransactionResponse(
-  tx: TransactionWithRelations,
-  actor: PolicyActor,
-): TransactionResponse {
+export function toTransactionResponse(tx: TransactionWithRelations): TransactionResponse {
   return {
     id: tx.id,
     type: tx.type,
@@ -114,7 +106,7 @@ export function toTransactionResponse(
     voidedAt: tx.voided_at?.toISOString() ?? null,
     voidReason: tx.void_reason,
     attachments: tx.attachments.map(toAttachmentResponse),
-    permissions: permissionsFor(actor, toPolicySubject(tx)),
+    permissions: permissionsFor(toPolicySubject(tx)),
     createdAt: tx.created_at.toISOString(),
     updatedAt: tx.updated_at.toISOString(),
   };

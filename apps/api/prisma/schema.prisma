@@ -8,14 +8,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Role {
-  SUPER_ADMIN
-  PROJECT_MANAGER
-  STAFF
-
-  @@map("role")
-}
-
 enum TxType {
   IN
   OUT
@@ -24,20 +16,10 @@ enum TxType {
 }
 
 enum TxStatus {
-  PENDING
   APPROVED
-  REJECTED
   VOID
 
   @@map("tx_status")
-}
-
-enum ProjectStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
-
-  @@map("project_status")
 }
 
 enum AccountType {
@@ -47,25 +29,24 @@ enum AccountType {
   @@map("account_type")
 }
 
+/// Satu-satunya pengguna: pemilik edisi pribadi. Baris ini dibuat seed dan tidak pernah ditampilkan.
 model User {
-  id                   String   @id @default(uuid())
-  name                 String
-  email                String   @unique(map: "uq_users_email")
-  password_hash        String
-  role                 Role
-  is_active            Boolean  @default(true)
-  must_change_password Boolean  @default(true)
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
+  id                  String    @id @default(uuid())
+  name                String
+  /// Hash argon2 PIN; null berarti PIN belum dibuat.
+  pin_hash            String?
+  /// PIN salah berturut-turut sejak terakhir berhasil atau sejak jeda terakhir.
+  pin_failed_attempts Int       @default(0)
+  /// Selama waktu ini belum lewat, PIN tidak bisa dicoba sama sekali.
+  pin_locked_until    DateTime?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
 
-  project_memberships   ProjectMember[] @relation("project_member_user")
-  project_assignments   ProjectMember[] @relation("project_member_assigner")
-  transactions_created  Transaction[]   @relation("transaction_created_by")
-  transactions_reviewed Transaction[]   @relation("transaction_reviewed_by")
-  transactions_voided   Transaction[]   @relation("transaction_voided_by")
-  attachments           Attachment[]
-  audit_logs            AuditLog[]
-  refresh_tokens        RefreshToken[]
+  transactions_created Transaction[]  @relation("transaction_created_by")
+  transactions_voided  Transaction[]  @relation("transaction_voided_by")
+  attachments          Attachment[]
+  audit_logs           AuditLog[]
+  refresh_tokens       RefreshToken[]
 
   @@map("users")
 }
@@ -96,57 +77,17 @@ model Category {
   @@map("categories")
 }
 
-model Project {
-  id                      String        @id @default(uuid())
-  code                    String        @unique(map: "uq_projects_code") // mis. PRJ-2026-001
-  name                    String
-  client_name             String
-  contract_value          BigInt        @default(0)
-  // Nilai kontrak berikut PPN, diisi dengan tangan; 0 berarti belum diisi.
-  contract_value_with_ppn BigInt        @default(0)
-  status                  ProjectStatus @default(ACTIVE)
-  start_date              DateTime?     @db.Date
-  end_date                DateTime?     @db.Date
-  notes                   String?
-  created_at              DateTime      @default(now())
-  updated_at              DateTime      @updatedAt
-
-  members      ProjectMember[]
-  transactions Transaction[]
-
-  @@map("projects")
-}
-
-model ProjectMember {
-  project_id  String
-  user_id     String // wajib user dengan role PROJECT_MANAGER (validasi di service)
-  assigned_at DateTime @default(now())
-  assigned_by String?
-
-  project  Project @relation(fields: [project_id], references: [id])
-  user     User    @relation("project_member_user", fields: [user_id], references: [id])
-  assigner User?   @relation("project_member_assigner", fields: [assigned_by], references: [id])
-
-  @@id([project_id, user_id])
-  @@index([user_id], map: "idx_project_members_user_id")
-  @@map("project_members")
-}
-
 model Transaction {
   id                String    @id @default(uuid())
   type              TxType
   amount            BigInt // > 0, rupiah; CHECK constraint di migrasi
   transaction_date  DateTime  @db.Date
   description       String
-  status            TxStatus  @default(PENDING)
+  status            TxStatus  @default(APPROVED)
   account_id        String
   category_id       String
-  project_id        String? // null = overhead perusahaan
   transfer_group_id String? // terisi = sisi transfer
   created_by_id     String
-  reviewed_by_id    String? // approve atau reject
-  reviewed_at       DateTime?
-  reject_reason     String?
   voided_by_id      String?
   voided_at         DateTime?
   void_reason       String?
@@ -155,15 +96,12 @@ model Transaction {
 
   account     Account      @relation(fields: [account_id], references: [id])
   category    Category     @relation(fields: [category_id], references: [id])
-  project     Project?     @relation(fields: [project_id], references: [id], onDelete: Restrict)
   created_by  User         @relation("transaction_created_by", fields: [created_by_id], references: [id])
-  reviewed_by User?        @relation("transaction_reviewed_by", fields: [reviewed_by_id], references: [id], onDelete: Restrict)
   voided_by   User?        @relation("transaction_voided_by", fields: [voided_by_id], references: [id], onDelete: Restrict)
   attachments Attachment[]
 
   @@index([transaction_date], map: "idx_transactions_transaction_date")
   @@index([status, transaction_date], map: "idx_transactions_status_transaction_date")
-  @@index([project_id, status], map: "idx_transactions_project_id_status")
   @@index([account_id, status], map: "idx_transactions_account_id_status")
   @@index([created_by_id], map: "idx_transactions_created_by_id")
   @@index([transfer_group_id], map: "idx_transactions_transfer_group_id")

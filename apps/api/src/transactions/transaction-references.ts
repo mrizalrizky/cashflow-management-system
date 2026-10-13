@@ -1,7 +1,6 @@
 import { todayInJakarta } from '../common/calendar-date.js';
 import { FieldError, validationFailed } from '../common/validation.js';
 import type { Prisma, TxType } from '../generated/prisma/client.js';
-import type { PolicyActor } from './transaction-policy.js';
 
 /** Isi transaksi yang merujuk data lain, setelah perubahan diterapkan. */
 export interface TransactionReferences {
@@ -29,7 +28,6 @@ function fieldError(field: string, message: string): FieldError {
  */
 export async function assertReferencesValid(
   tx: Prisma.TransactionClient,
-  _actor: PolicyActor,
   refs: TransactionReferences,
   changed: ChangedReferences,
 ): Promise<void> {

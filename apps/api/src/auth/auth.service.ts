@@ -1,11 +1,9 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuditAction, AuditService } from '../audit/audit.service.js';
-import { validationFailed } from '../common/validation.js';
 import type { Db } from '../database/db.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
 import { Session, toAuthUser } from './auth.types.js';
-import { PasswordService } from './password.service.js';
 import { SessionService } from './session.service.js';
 import { TokenService } from './token.service.js';
 
@@ -32,36 +30,10 @@ export class ConcurrentRefreshException extends UnauthorizedException {
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     private readonly sessions: SessionService,
     private readonly audit: AuditService,
   ) {}
-
-  /** `email` sudah dinormalisasi oleh DTO. */
-  async login(email: string, password: string, ip: string | null): Promise<Session> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    const passwordMatches = await this.passwords.verify(user?.password_hash ?? null, password);
-
-    if (!user || !passwordMatches || !user.is_active) {
-      await this.audit.log(this.prisma, {
-        userId: user?.id ?? null,
-        action: 'LOGIN_FAILED',
-        entityType: 'user',
-        entityId: user?.id ?? 'unknown',
-        after: { email },
-        ip,
-      });
-      // Pesan yang sama untuk semua sebab, supaya tidak membocorkan email mana yang terdaftar.
-      throw new UnauthorizedException('Email atau password salah');
-    }
-
-    const refreshToken = await this.prisma.$transaction(async (tx) => {
-      await this.logUserEvent(tx, 'LOGIN', user.id, ip);
-      return this.sessions.create(tx, user.id);
-    });
-    return this.buildSession(user, refreshToken);
-  }
 
   /** Menukar refresh token dengan yang baru. Token lama langsung tidak berlaku. */
   async refresh(rawToken: string | undefined, ip: string | null): Promise<Session> {
@@ -80,7 +52,6 @@ export class AuthService {
       await this.endSessionsAfterTokenReuse(current.user_id, ip);
       throw sessionEnded();
     }
-    if (!current.user.is_active) throw sessionEnded();
 
     const refreshToken = await this.prisma.$transaction((tx) =>
       this.sessions.rotate(tx, current.id, current.user_id, now),
@@ -102,37 +73,6 @@ export class AuthService {
       await this.sessions.end(tx, token.id);
       await this.logUserEvent(tx, 'LOGOUT', token.user_id, ip);
     });
-  }
-
-  /** Mengganti password, mengakhiri semua sesi lain, dan membuka sesi baru untuk pemanggil. */
-  async changePassword(
-    userId: string,
-    currentPassword: string,
-    newPassword: string,
-    ip: string | null,
-  ): Promise<Session> {
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    if (!(await this.passwords.verify(user.password_hash, currentPassword))) {
-      // Sengaja 400, bukan 401: sesi pemanggil masih sah, hanya isian formulirnya yang salah.
-      throw validationFailed([{ field: 'currentPassword', messages: ['Password saat ini salah'] }]);
-    }
-    if (newPassword === currentPassword) {
-      throw validationFailed([
-        { field: 'newPassword', messages: ['Password baru harus berbeda dari password saat ini'] },
-      ]);
-    }
-
-    const password_hash = await this.passwords.hash(newPassword);
-    const { updated, refreshToken } = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.user.update({
-        where: { id: userId },
-        data: { password_hash, must_change_password: false },
-      });
-      await this.sessions.endAll(tx, userId);
-      await this.logUserEvent(tx, 'CHANGE_PASSWORD', userId, ip);
-      return { updated, refreshToken: await this.sessions.create(tx, userId) };
-    });
-    return this.buildSession(updated, refreshToken);
   }
 
   /**

@@ -21,84 +21,51 @@ function descriptions(rows: TransactionResponse[]): string[] {
   return rows.map((row) => row.description).sort();
 }
 
-/** Transaksi beberapa pembuat, dengan deskripsi yang menamai pembuatnya. */
+/** Tiga transaksi pemilik. */
 async function seedTransactions(ctx: E2eContext, world: World) {
   return {
-    staffFirst: await record(ctx, world.staff, expenseBody(world, { description: 'staf satu' })),
-    staffSecond: await record(ctx, world.staff, expenseBody(world, { description: 'staf dua' })),
-    other: await record(ctx, world.otherStaff, expenseBody(world, { description: 'staf lain' })),
-    manager: await record(ctx, world.manager, expenseBody(world, { description: 'koordinator' })),
-    admin: await record(ctx, world.admin, incomeBody(world, { description: 'admin' })),
+    first: await record(ctx, world.owner, expenseBody(world, { description: 'beli satu' })),
+    second: await record(ctx, world.owner, expenseBody(world, { description: 'beli dua' })),
+    income: await record(ctx, world.owner, incomeBody(world, { description: 'gaji' })),
   };
 }
 
-describe('GET /transactions: who sees what', () => {
+describe('GET /transactions: reading', () => {
   const ctx = setupE2e();
 
-  it('shows an admin everything, and everyone else their own', async () => {
+  it('lists every transaction of the owner', async () => {
     const world = await setupWorld(ctx);
     await seedTransactions(ctx, world);
 
-    expect(descriptions(await list(ctx, world.admin))).toHaveLength(5);
-    expect(descriptions(await list(ctx, world.manager))).toEqual(['koordinator']);
-    expect(descriptions(await list(ctx, world.staff))).toEqual(['staf dua', 'staf satu']);
+    expect(descriptions(await list(ctx, world.owner))).toEqual(['beli dua', 'beli satu', 'gaji']);
   });
 
-  it('answers a transaction outside the caller’s scope exactly like one that does not exist', async () => {
+  it('answers 404 for a transaction that does not exist and 400 for an id that is not one', async () => {
     const world = await setupWorld(ctx);
     const seeded = await seedTransactions(ctx, world);
 
-    const missing = await call(ctx, world.manager, 'get', transactionUrl(randomUUID())).expect(404);
+    const missing = await call(ctx, world.owner, 'get', transactionUrl(randomUUID())).expect(404);
     expect(missing.body).toEqual({ statusCode: 404, message: 'Transaksi tidak ditemukan' });
-
-    for (const [session, hidden] of [
-      [world.manager, seeded.staffFirst],
-      [world.staff, seeded.other],
-      [world.otherStaff, seeded.staffFirst],
-    ] as const) {
-      const res = await call(ctx, session, 'get', transactionUrl(hidden.id)).expect(404);
-      expect(res.body).toEqual(missing.body);
-    }
-
-    await call(ctx, world.manager, 'get', transactionUrl(seeded.manager.id)).expect(200);
-    await call(ctx, world.staff, 'get', transactionUrl(seeded.staffFirst.id)).expect(200);
-    await call(ctx, world.admin, 'get', transactionUrl(seeded.staffSecond.id)).expect(200);
-    await call(ctx, world.staff, 'get', transactionUrl('bukan-uuid')).expect(400);
+    await call(ctx, world.owner, 'get', transactionUrl(seeded.first.id)).expect(200);
+    await call(ctx, world.owner, 'get', transactionUrl('bukan-uuid')).expect(400);
   });
 
-  it('never lets a filter widen what the caller may see', async () => {
+  it('tells what may be done with each row', async () => {
     const world = await setupWorld(ctx);
     await seedTransactions(ctx, world);
 
-    expect(await list(ctx, world.manager, 'search=staf')).toEqual([]);
-    expect(descriptions(await list(ctx, world.staff, 'search=staf'))).toEqual(['staf dua', 'staf satu']);
-    expect(await list(ctx, world.staff, 'search=lain')).toEqual([]);
-    expect(await list(ctx, world.staff, `accountId=${world.account.id}`)).toHaveLength(2);
-  });
-
-  it('tells each caller what they may do with each row', async () => {
-    const world = await setupWorld(ctx);
-    await seedTransactions(ctx, world);
-
-    const forAdmin = Object.fromEntries(
-      (await list(ctx, world.admin)).map((row) => [row.description, row.permissions]),
+    const permissions = Object.fromEntries(
+      (await list(ctx, world.owner)).map((row) => [row.description, row.permissions]),
     );
-    const forStaff = Object.fromEntries(
-      (await list(ctx, world.staff)).map((row) => [row.description, row.permissions]),
-    );
-
-    expect(forAdmin['staf satu']).toMatchObject({ canEdit: true, canVoid: true });
-    expect(forStaff['staf satu']).toMatchObject({ canEdit: true, canAttach: true });
+    expect(permissions['beli satu']).toEqual({ canEdit: true, canAttach: true, canVoid: true });
   });
 
-  it('shows no balance or other account detail to anyone', async () => {
+  it('shows no balance or other account detail in a row', async () => {
     const world = await setupWorld(ctx);
     await seedTransactions(ctx, world);
 
-    for (const session of [world.admin, world.manager, world.staff]) {
-      for (const row of await list(ctx, session)) {
-        expect(row.account).toEqual({ id: world.account.id, name: 'Kas Uji' });
-      }
+    for (const row of await list(ctx, world.owner)) {
+      expect(row.account).toEqual({ id: world.account.id, name: 'Kas Uji' });
     }
   });
 });
@@ -111,12 +78,12 @@ describe('GET /transactions: filters, order and paging', () => {
     const otherAccount = await createAccount(ctx.prisma, { name: 'Bank Lain' });
     const otherCategory = await createCategory(ctx.prisma, { name: 'Upah Uji', type: 'OUT' });
 
-    await record(ctx, world.admin, expenseBody(world, { transactionDate: '2026-09-01', description: 'semen 100% asli' }));
-    await record(ctx, world.admin, expenseBody(world, { transactionDate: '2026-09-15', description: 'upah tukang', categoryId: otherCategory.id }));
-    await record(ctx, world.admin, incomeBody(world, { transactionDate: '2026-09-30', description: 'pendapatan lain', accountId: otherAccount.id }));
+    await record(ctx, world.owner, expenseBody(world, { transactionDate: '2026-09-01', description: 'semen 100% asli' }));
+    await record(ctx, world.owner, expenseBody(world, { transactionDate: '2026-09-15', description: 'upah tukang', categoryId: otherCategory.id }));
+    await record(ctx, world.owner, incomeBody(world, { transactionDate: '2026-09-30', description: 'pendapatan lain', accountId: otherAccount.id }));
     await ctx.prisma.transaction.updateMany({ where: { description: 'upah tukang' }, data: { status: 'VOID' } });
 
-    const found = async (query: string) => descriptions(await list(ctx, world.admin, query));
+    const found = async (query: string) => descriptions(await list(ctx, world.owner, query));
 
     expect(await found('dateFrom=2026-09-15')).toEqual(['pendapatan lain', 'upah tukang']);
     expect(await found('dateTo=2026-09-15')).toEqual(['semen 100% asli', 'upah tukang']);
@@ -140,7 +107,7 @@ describe('GET /transactions: filters, order and paging', () => {
     'overhead=true',
   ])('rejects the query %s', async (query) => {
     const world = await setupWorld(ctx);
-    await call(ctx, world.admin, 'get', `${TRANSACTIONS}?${query}`).expect(400);
+    await call(ctx, world.owner, 'get', `${TRANSACTIONS}?${query}`).expect(400);
   });
 
   it('lists the newest transaction date first, then the newest entry, with paging', async () => {
@@ -151,10 +118,10 @@ describe('GET /transactions: filters, order and paging', () => {
       ['tengah', '2026-09-01'],
       ['baru kedua', '2026-09-20'],
     ]) {
-      await record(ctx, world.admin, expenseBody(world, { description, transactionDate }));
+      await record(ctx, world.owner, expenseBody(world, { description, transactionDate }));
     }
 
-    const all = await call(ctx, world.admin, 'get', TRANSACTIONS).expect(200);
+    const all = await call(ctx, world.owner, 'get', TRANSACTIONS).expect(200);
     expect(all.body.data.map((row: TransactionResponse) => row.description)).toEqual([
       'baru kedua',
       'baru pertama',
@@ -162,7 +129,7 @@ describe('GET /transactions: filters, order and paging', () => {
       'lama',
     ]);
 
-    const page = await call(ctx, world.admin, 'get', `${TRANSACTIONS}?page=2&pageSize=3`).expect(200);
+    const page = await call(ctx, world.owner, 'get', `${TRANSACTIONS}?page=2&pageSize=3`).expect(200);
     expect(page.body.data.map((row: TransactionResponse) => row.description)).toEqual(['lama']);
     expect(page.body.meta).toEqual({ page: 2, pageSize: 3, total: 4 });
   });

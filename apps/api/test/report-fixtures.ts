@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Account, Category, TxStatus, TxType, User } from '../src/generated/prisma/client.js';
 import type { E2eContext } from './e2e-context.js';
-import { createAccount, createCategory, createTransaction, createUser } from './fixtures.js';
+import { createAccount, createCategory, createOwner, createTransaction } from './fixtures.js';
 
 /**
  * Buku kecil untuk menguji laporan. Angka yang diharapkan di `EXPECTED` dihitung dengan
@@ -111,7 +111,7 @@ export async function seedReportLedger(ctx: E2eContext): Promise<ReportLedger> {
     wages: await createCategory(prisma, { name: 'Upah', type: 'OUT' }),
     rent: await createCategory(prisma, { name: 'Sewa Kantor', type: 'OUT' }),
     income: await createCategory(prisma, { name: 'Termin', type: 'IN' }),
-    recorder: await createUser(prisma, { role: 'STAFF', name: 'Pencatat Laporan' }),
+    recorder: await createOwner(prisma, { name: 'Pencatat Laporan' }),
     transferGroupId: randomUUID(),
   };
 

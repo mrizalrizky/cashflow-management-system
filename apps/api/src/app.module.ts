@@ -13,7 +13,6 @@ import { HealthModule } from './health/health.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
-import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -23,7 +22,6 @@ import { UsersModule } from './users/users.module.js';
     StorageModule,
     AuthModule,
     HealthModule,
-    UsersModule,
     AccountsModule,
     CategoriesModule,
     TransactionsModule,

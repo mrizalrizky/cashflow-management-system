@@ -7,13 +7,9 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Attachment, Prisma } from '../generated/prisma/client.js';
 import { StorageService } from '../storage/storage.service.js';
 import { TransactionAccessService } from '../transactions/transaction-access.service.js';
-import {
-  assertPermitted,
-  notAllowed,
-  TRANSACTION_ENTITY,
-} from '../transactions/transaction-guards.js';
+import { assertPermitted, TRANSACTION_ENTITY } from '../transactions/transaction-guards.js';
 import type { TransactionWithRelations } from '../transactions/transaction.mapper.js';
-import { EDITABLE_STATUSES, PolicyActor } from '../transactions/transaction-policy.js';
+import { EDITABLE_STATUSES } from '../transactions/transaction-policy.js';
 import { sanitizeFileName } from './file-name.js';
 import { sniffFileType } from './file-sniffer.js';
 
@@ -48,8 +44,7 @@ export class AttachmentsService {
     ip: string | null,
   ): Promise<Attachment> {
     // Dicek dulu sebelum menyimpan apa pun, supaya yang tidak berhak tidak bisa mengisi disk.
-    const actor = await this.access.actorFor(this.prisma, user);
-    this.assertCanChangeProof(actor, await this.access.loadForUser(this.prisma, actor, transactionId));
+    this.assertCanChangeProof(await this.access.load(this.prisma, transactionId));
 
     const type = sniffFileType(file.buffer);
     if (!type) throw new BadRequestException('Jenis berkas tidak didukung');
@@ -59,8 +54,8 @@ export class AttachmentsService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         // Dicek lagi di bawah kunci baris: status bisa berubah (mis. dibatalkan) selagi berkas diunggah.
-        const transaction = await this.access.loadForUpdate(tx, actor, transactionId);
-        this.assertCanChangeProof(actor, transaction);
+        const transaction = await this.access.loadForUpdate(tx, transactionId);
+        this.assertCanChangeProof(transaction);
         if (transaction.attachments.length >= MAX_ATTACHMENTS) {
           throw new BadRequestException(`Maksimal ${MAX_ATTACHMENTS} bukti per transaksi`);
         }
@@ -85,35 +80,28 @@ export class AttachmentsService {
     }
   }
 
-  /** Bukti hanya bisa diunduh oleh yang boleh melihat transaksinya. */
   async open(
     user: AuthUser,
     attachmentId: string,
   ): Promise<{ attachment: Attachment; stream: Readable }> {
-    const actor = await this.access.actorFor(this.prisma, user);
-    const attachment = await this.findInScope(actor, attachmentId);
+    const attachment = await this.find(attachmentId);
     return { attachment, stream: await this.storage.open(attachment.storage_key) };
   }
 
   async remove(user: AuthUser, attachmentId: string, ip: string | null): Promise<void> {
-    const actor = await this.access.actorFor(this.prisma, user);
-    const attachment = await this.findInScope(actor, attachmentId);
+    const attachment = await this.find(attachmentId);
 
     await this.prisma.$transaction(async (tx) => {
-      const transaction = await this.access.loadForUpdate(tx, actor, attachment.transaction_id);
-      this.assertCanChangeProof(actor, transaction);
-      // Selain admin, hanya pengunggahnya yang boleh menghapus.
-      if (actor.role !== 'SUPER_ADMIN' && attachment.uploaded_by_id !== user.id) {
-        throw notAllowed('menghapus bukti');
-      }
+      const transaction = await this.access.loadForUpdate(tx, attachment.transaction_id);
+      this.assertCanChangeProof(transaction);
       await tx.attachment.delete({ where: { id: attachment.id } });
       await this.recordChange(tx, 'DETACH', user, attachment, ip);
     });
     await this.removeFile(attachment.storage_key);
   }
 
-  private assertCanChangeProof(actor: PolicyActor, transaction: TransactionWithRelations): void {
-    assertPermitted(actor, transaction, {
+  private assertCanChangeProof(transaction: TransactionWithRelations): void {
+    assertPermitted(transaction, {
       permission: 'canAttach',
       statuses: EDITABLE_STATUSES,
       verb: 'diberi bukti',
@@ -121,10 +109,8 @@ export class AttachmentsService {
     });
   }
 
-  private async findInScope(actor: PolicyActor, attachmentId: string): Promise<Attachment> {
-    const attachment = await this.prisma.attachment.findFirst({
-      where: { id: attachmentId, transaction: this.access.scope(actor) },
-    });
+  private async find(attachmentId: string): Promise<Attachment> {
+    const attachment = await this.prisma.attachment.findUnique({ where: { id: attachmentId } });
     if (!attachment) throw attachmentNotFound();
     return attachment;
   }

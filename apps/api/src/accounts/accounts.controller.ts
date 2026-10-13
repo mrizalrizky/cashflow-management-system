@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Ip, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types.js';
-import { CurrentUser, Roles } from '../auth/decorators.js';
+import { CurrentUser } from '../auth/decorators.js';
 import type { Paginated } from '../common/pagination.js';
 import {
   AccountOption,
@@ -21,14 +21,12 @@ export class AccountsController {
     return (await this.accounts.options()).map(toAccountOption);
   }
 
-  @Roles('SUPER_ADMIN')
   @Get()
   async list(@Query() query: ListAccountsQueryDto): Promise<Paginated<AccountResponse>> {
     const page = await this.accounts.list(query);
     return { ...page, data: page.data.map(toAccountResponse) };
   }
 
-  @Roles('SUPER_ADMIN')
   @Post()
   async create(
     @CurrentUser() actor: AuthUser,
@@ -38,7 +36,6 @@ export class AccountsController {
     return toAccountResponse(await this.accounts.create(actor, dto, ip));
   }
 
-  @Roles('SUPER_ADMIN')
   @Patch(':id')
   async update(
     @CurrentUser() actor: AuthUser,

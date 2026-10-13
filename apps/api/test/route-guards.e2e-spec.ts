@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { api, E2eContext, setupE2e } from './e2e-context.js';
-import { call, loginAs, Method } from './fixtures.js';
+import type { Method } from './fixtures.js';
 
 interface Route {
   method: Method;
@@ -13,26 +13,8 @@ interface Route {
 const PUBLIC = [
   'GET /api/v1/health',
   'GET /api/v1/health/live',
-  'POST /api/v1/auth/login',
   'POST /api/v1/auth/refresh',
   'POST /api/v1/auth/logout',
-];
-
-/** Rute yang hanya untuk SUPER_ADMIN; peran lain harus ditolak sebelum apa pun diproses. */
-const ADMIN_ONLY = [
-  'GET /api/v1/users',
-  'POST /api/v1/users',
-  'GET /api/v1/users/{id}',
-  'PATCH /api/v1/users/{id}',
-  'POST /api/v1/users/{id}/reset-password',
-  'GET /api/v1/accounts',
-  'POST /api/v1/accounts',
-  'PATCH /api/v1/accounts/{id}',
-  'POST /api/v1/categories',
-  'PATCH /api/v1/categories/{id}',
-  'POST /api/v1/transactions/transfer',
-  'GET /api/v1/dashboard/company',
-  'GET /api/v1/audit-logs',
 ];
 
 const METHODS = new Set<string>(['get', 'post', 'patch', 'put', 'delete']);
@@ -62,8 +44,8 @@ describe('route guards', () => {
   it('finds the routes of every module', () => {
     const names = registeredRoutes(ctx).map(nameOf);
 
-    expect(names.length).toBeGreaterThanOrEqual(25);
-    expect(names).toEqual(expect.arrayContaining([...PUBLIC, ...ADMIN_ONLY]));
+    expect(names.length).toBeGreaterThanOrEqual(20);
+    expect(names).toEqual(expect.arrayContaining(PUBLIC));
     expect(names).toEqual(
       expect.arrayContaining([
         'GET /api/v1/transactions/export',
@@ -78,6 +60,10 @@ describe('route guards', () => {
     for (const removed of ['approve', 'reject', 'cancel']) {
       expect(names).not.toContain(`POST /api/v1/transactions/{id}/${removed}`);
     }
+  });
+
+  it('has no user management routes in the personal edition', () => {
+    expect(registeredRoutes(ctx).map(nameOf).filter((name) => name.includes('/users'))).toEqual([]);
   });
 
   it('has no project routes in the personal edition', () => {
@@ -104,19 +90,5 @@ describe('route guards', () => {
     }
 
     expect(open).toEqual([]);
-  });
-
-  it.each(['PROJECT_MANAGER', 'STAFF'] as const)('refuse every admin-only route to a %s', async (role) => {
-    const session = await loginAs(ctx, { role });
-    const routes = registeredRoutes(ctx).filter((route) => ADMIN_ONLY.includes(nameOf(route)));
-    expect(routes).toHaveLength(ADMIN_ONLY.length);
-
-    const allowed: string[] = [];
-    for (const route of routes) {
-      const res = await call(ctx, session, route.method, urlOf(route));
-      if (res.status !== 403) allowed.push(`${nameOf(route)} -> ${res.status}`);
-    }
-
-    expect(allowed).toEqual([]);
   });
 });

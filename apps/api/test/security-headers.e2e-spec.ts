@@ -3,7 +3,7 @@ import { validateEnv } from '../src/config/env.validation.js';
 import { setupDocs } from '../src/docs.js';
 import { createTestApp, TestApp } from './app-factory.js';
 import { api, setupE2e } from './e2e-context.js';
-import { HEALTH, USERS } from './routes.js';
+import { ACCOUNTS, HEALTH } from './routes.js';
 
 const ALLOWED = 'https://kas.example.com';
 const STRANGER = 'https://lain.example';
@@ -21,7 +21,7 @@ describe('security headers', () => {
 
   it.each([
     ['a public route', HEALTH, 200],
-    ['a refused request', USERS, 401],
+    ['a refused request', ACCOUNTS, 401],
     ['a route that does not exist', '/api/v1/tidak-ada', 404],
   ])('are sent with %s', async (_label, path, status) => {
     const res = await api(ctx).get(path).expect(status);
@@ -59,7 +59,7 @@ describe('CORS', () => {
 
     it('approves no preflight', async () => {
       const res = await api(ctx)
-        .options(USERS)
+        .options(ACCOUNTS)
         .set('Origin', STRANGER)
         .set('Access-Control-Request-Method', 'POST');
 
@@ -89,7 +89,7 @@ describe('CORS', () => {
 
     it('approves the preflight of a listed origin', async () => {
       const res = await request(app.getHttpServer())
-        .options(USERS)
+        .options(ACCOUNTS)
         .set('Origin', ALLOWED)
         .set('Access-Control-Request-Method', 'POST')
         .expect(204);

@@ -68,10 +68,9 @@ export class TransfersService {
         ip,
       });
 
-      const actor = await this.access.actorFor(tx, user);
       return Promise.all(
         [out.id, incoming.id].map(async (id) =>
-          toTransactionResponse(await this.access.loadForUser(tx, actor, id), actor),
+          toTransactionResponse(await this.access.load(tx, id)),
         ),
       );
     });

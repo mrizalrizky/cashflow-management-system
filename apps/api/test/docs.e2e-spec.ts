@@ -14,8 +14,6 @@ describe('API documentation', () => {
     expect(res.body.openapi).toMatch(/^3\./);
     expect(Object.keys(res.body.paths)).toEqual(
       expect.arrayContaining([
-        '/api/v1/auth/login',
-        '/api/v1/users',
         '/api/v1/accounts',
         '/api/v1/accounts/options',
         '/api/v1/categories',

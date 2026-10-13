@@ -11,13 +11,13 @@ async function seen(ctx: E2eContext, session: TestSession, id: string): Promise<
 }
 
 async function balance(ctx: E2eContext, world: World): Promise<string> {
-  const res = await call(ctx, world.admin, 'get', ACCOUNTS).expect(200);
+  const res = await call(ctx, world.owner, 'get', ACCOUNTS).expect(200);
   const accounts = res.body.data as { id: string; balance: string }[];
   return accounts.find((account) => account.id === world.account.id)!.balance;
 }
 
 async function expenseTotal(ctx: E2eContext, world: World): Promise<string> {
-  const res = await call(ctx, world.admin, 'get', `${DASHBOARD}?from=2026-10-01&to=2026-10-31`).expect(200);
+  const res = await call(ctx, world.owner, 'get', `${DASHBOARD}?from=2026-10-01&to=2026-10-31`).expect(200);
   return res.body.totals.expense as string;
 }
 
@@ -26,7 +26,7 @@ describe('transaction flow in the personal edition', () => {
 
   it('counts an expense at once, follows an edit, keeps the proof, and gives the money back on void', async () => {
     const world = await setupWorld(ctx);
-    const owner = world.admin;
+    const owner = world.owner;
     expect(await balance(ctx, world)).toBe('1000000');
 
     // Dicatat: langsung tercatat dan mengurangi saldo, tanpa menunggu siapa pun.

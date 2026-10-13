@@ -99,6 +99,35 @@ describe('PIN', () => {
     expect(await ctx.prisma.auditLog.count({ where: { action: 'PIN_CHANGE' } })).toBe(1);
   });
 
+  it('signs other devices out on their very next request after a PIN change', async () => {
+    const here = await setupPin(ctx);
+    const elsewhere = await loginWithPin(ctx, OWNER_PIN).expect(200);
+    await api(ctx).get(ME).set(...bearer(elsewhere.body.accessToken)).expect(200);
+
+    const changed = await api(ctx)
+      .post(CHANGE_PIN)
+      .set(...bearer(here.accessToken))
+      .send({ currentPin: OWNER_PIN, newPin: '246810' })
+      .expect(200);
+
+    await api(ctx).get(ME).set(...bearer(elsewhere.body.accessToken)).expect(401);
+    await api(ctx).get(ME).set(...bearer(here.accessToken)).expect(401);
+    await api(ctx).get(ME).set(...bearer(changed.body.accessToken)).expect(200);
+  });
+
+  it('counts wrong current PINs toward the pause, like the PIN entry', async () => {
+    const session = await setupPin(ctx);
+    const attempt = (currentPin: string) =>
+      api(ctx).post(CHANGE_PIN).set(...bearer(session.accessToken)).send({ currentPin, newPin: '246810' });
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 5; i += 1) statuses.push((await attempt('000000')).status);
+    expect(statuses).toEqual([400, 400, 400, 400, 429]);
+    await attempt(OWNER_PIN).expect(429);
+    await loginWithPin(ctx, OWNER_PIN).expect(429);
+    expect(await ctx.prisma.auditLog.count({ where: { action: 'LOGIN_FAILED' } })).toBe(5);
+  });
+
   it('refuses to change the PIN with a wrong current PIN or to the same PIN', async () => {
     const session = await setupPin(ctx);
     const wrong = await api(ctx)

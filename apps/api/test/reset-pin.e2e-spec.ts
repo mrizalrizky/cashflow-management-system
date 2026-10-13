@@ -1,7 +1,7 @@
 import { resetPin } from '../src/cli/reset-pin.js';
 import { api, setupE2e } from './e2e-context.js';
-import { createOwner, loginWithPin, OWNER_PIN, setupPin } from './fixtures.js';
-import { PIN_STATUS, REFRESH } from './routes.js';
+import { bearer, createOwner, loginWithPin, OWNER_PIN, setupPin } from './fixtures.js';
+import { ME, PIN_STATUS, REFRESH } from './routes.js';
 
 describe('reset-pin', () => {
   const ctx = setupE2e();
@@ -26,6 +26,16 @@ describe('reset-pin', () => {
 
     await setupPin(ctx, '246810');
     await loginWithPin(ctx, OWNER_PIN).expect(401);
+  });
+
+  it('signs every device out on its very next request', async () => {
+    await createOwner(ctx.prisma);
+    const session = await setupPin(ctx);
+    await api(ctx).get(ME).set(...bearer(session.accessToken)).expect(200);
+
+    await resetPin(ctx.prisma);
+
+    await api(ctx).get(ME).set(...bearer(session.accessToken)).expect(401);
   });
 
   it('does nothing when there is no owner yet', async () => {

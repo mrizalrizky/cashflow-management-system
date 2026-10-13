@@ -39,6 +39,8 @@ model User {
   pin_failed_attempts Int       @default(0)
   /// Selama waktu ini belum lewat, PIN tidak bisa dicoba sama sekali.
   pin_locked_until    DateTime?
+  /// Naik tiap PIN diganti atau direset; token akses dengan versi lain ditolak, jadi perangkat lain langsung keluar.
+  session_version     Int       @default(0)
   created_at          DateTime  @default(now())
   updated_at          DateTime  @updatedAt
 

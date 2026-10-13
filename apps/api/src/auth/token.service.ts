@@ -11,6 +11,8 @@ const ALGORITHM = 'HS256';
 
 export interface AccessTokenPayload {
   sub: string;
+  /** `users.session_version` saat token dibuat; berbeda berarti PIN sudah diganti atau direset. */
+  ver: number;
 }
 
 export interface RefreshToken {
@@ -31,9 +33,9 @@ export class TokenService {
     this.secret = config.getOrThrow<string>('JWT_ACCESS_SECRET');
   }
 
-  signAccessToken(userId: string): Promise<string> {
+  signAccessToken(userId: string, sessionVersion: number): Promise<string> {
     return this.jwt.signAsync(
-      { sub: userId },
+      { sub: userId, ver: sessionVersion },
       { secret: this.secret, algorithm: ALGORITHM, expiresIn: ACCESS_TOKEN_TTL_SECONDS },
     );
   }

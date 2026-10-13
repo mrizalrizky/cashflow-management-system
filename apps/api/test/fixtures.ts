@@ -69,10 +69,21 @@ export function call(ctx: E2eContext, session: TestSession, method: Method, path
   return api(ctx)[method](path).set(...bearer(session.accessToken));
 }
 
-/** Sesi pemilik tanpa lewat layar PIN; dipakai test yang tidak menguji cara masuk. */
+/** Hash pengganti untuk sesi buatan test: PIN-nya tidak pernah diperiksa. */
+const PLACEHOLDER_PIN_HASH = 'test-tanpa-pin';
+
+/**
+ * Sesi pemilik tanpa lewat layar PIN; dipakai test yang tidak menguji cara masuk. Pemilik
+ * yang bersesi selalu sudah punya PIN, jadi PIN-nya diisi bila belum ada.
+ */
 export async function asOwner(ctx: E2eContext): Promise<TestSession & { user: User }> {
-  const user = (await ctx.prisma.user.findFirst({ orderBy: { created_at: 'asc' } })) ?? (await createOwner(ctx.prisma));
-  const accessToken = await ctx.app.get(TokenService).signAccessToken(user.id);
+  const existing = await ctx.prisma.user.findFirst({ orderBy: { created_at: 'asc' } });
+  const user = !existing
+    ? await createOwner(ctx.prisma, { pinHash: PLACEHOLDER_PIN_HASH })
+    : existing.pin_hash === null
+      ? await ctx.prisma.user.update({ where: { id: existing.id }, data: { pin_hash: PLACEHOLDER_PIN_HASH } })
+      : existing;
+  const accessToken = await ctx.app.get(TokenService).signAccessToken(user.id, user.session_version);
   const refreshToken = await ctx.app.get(SessionService).create(ctx.prisma, user.id);
   return {
     accessToken,

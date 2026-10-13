@@ -14,13 +14,13 @@ describe('TokenService', () => {
     vi.useRealTimers();
   });
 
-  it('signs an access token that verifies back to the user id', async () => {
-    const token = await tokens.signAccessToken('user-1');
-    expect(await tokens.verifyAccessToken(token)).toMatchObject({ sub: 'user-1' });
+  it('signs an access token that verifies back to the user id and session version', async () => {
+    const token = await tokens.signAccessToken('user-1', 3);
+    expect(await tokens.verifyAccessToken(token)).toMatchObject({ sub: 'user-1', ver: 3 });
   });
 
   it('rejects a token signed with another secret', async () => {
-    const forged = await createService('b'.repeat(40)).signAccessToken('user-1');
+    const forged = await createService('b'.repeat(40)).signAccessToken('user-1', 3);
     await expect(tokens.verifyAccessToken(forged)).rejects.toThrow();
   });
 
@@ -30,7 +30,7 @@ describe('TokenService', () => {
 
   it('rejects an access token after 15 minutes', async () => {
     vi.useFakeTimers({ now: new Date('2026-01-01T00:00:00Z') });
-    const token = await tokens.signAccessToken('user-1');
+    const token = await tokens.signAccessToken('user-1', 3);
 
     vi.setSystemTime(new Date('2026-01-01T00:14:00Z'));
     await expect(tokens.verifyAccessToken(token)).resolves.toBeDefined();

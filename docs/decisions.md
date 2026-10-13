@@ -170,5 +170,7 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **PIN 6 sampai 12 angka, jeda 15 menit setelah 5 salah untuk semua pengunjung**, disimpan di database sehingga bertahan saat API dinyalakan ulang. Batas per pengunjung (`LOGIN_RATE_LIMIT`) tetap berlaku di atasnya. Sesi berlaku 30 hari dan dirotasi; ganti PIN mengakhiri sesi perangkat lain.
 - **Transaksi yang tercatat boleh diubah**; pembatalan lewat VOID, tanpa hard delete. Status tinggal `APPROVED` (tampil "Tercatat") dan `VOID` ("Dibatalkan"). Bukti tidak lagi wajib.
 - **Akun dan kategori awal diganti untuk keperluan pribadi**: Dompet dan Rekening Bank; Gaji, Bonus, Pendapatan Lain; Makan & Minum, Belanja, Transportasi, Tagihan & Utilitas, Kesehatan, Hiburan, Pendidikan, Lain-lain.
+- **Ganti PIN dan reset PIN langsung mengeluarkan perangkat lain**, bukan setelah token aksesnya kedaluwarsa (15 menit): `users.session_version` naik, token akses membawa versinya, dan guard menolak versi yang berbeda pada permintaan berikutnya. Angka, bukan waktu, karena waktu terbit JWT hanya sampai detik.
+- **PIN saat ini di formulir Ganti PIN dihitung seperti masuk**: salah lima kali memulai jeda yang sama, supaya formulir itu bukan jalan menebak PIN.
 - **Lupa PIN lewat perintah server `reset-pin`**, bukan lewat aplikasi, supaya tidak ada jalan masuk tanpa PIN. Reset menghapus PIN dan semua sesi; data tidak tersentuh.
 - **Log audit pindah ke Pengaturan** (`/pengaturan/audit-log`); filter dan kolom pengguna dihapus karena hanya ada satu pengguna.

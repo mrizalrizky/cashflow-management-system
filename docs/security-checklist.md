@@ -15,7 +15,7 @@ Tiap butir bagian 13 dokumen dasar (`implementation-plan-cashflow-mvp.md`), di m
 
 ## 1. PIN dan token
 
-- **Di mana:** PIN 6 sampai 12 angka (`src/common/pin-policy.ts`), di-hash argon2id (`src/auth/password.service.ts`, dipakai `src/auth/pin.service.ts`). `src/auth/token.service.ts`: refresh token acak, yang disimpan hanya hash SHA-256-nya; sesi 30 hari, dirotasi tiap diperpanjang, dan diakhiri saat PIN diganti (perangkat lain) atau direset (semua). `src/audit/audit.service.ts` membuang field rahasia (`pin`, `pin_hash`, `currentPin`, `newPin`, `token_hash`, `refreshToken`) sebelum menyimpan `before`/`after`.
+- **Di mana:** PIN 6 sampai 12 angka (`src/common/pin-policy.ts`), di-hash argon2id (`src/auth/password.service.ts`, dipakai `src/auth/pin.service.ts`). `src/auth/token.service.ts`: refresh token acak, yang disimpan hanya hash SHA-256-nya; sesi 30 hari, dirotasi tiap diperpanjang, dan diakhiri saat PIN diganti (perangkat lain) atau direset (semua); token akses yang masih beredar ikut ditolak pada permintaan berikutnya lewat `users.session_version` (`src/auth/jwt-auth.guard.ts`). PIN saat ini di Ganti PIN ikut hitungan dan jeda yang sama dengan masuk. `src/audit/audit.service.ts` membuang field rahasia (`pin`, `pin_hash`, `currentPin`, `newPin`, `token_hash`, `refreshToken`) sebelum menyimpan `before`/`after`.
 - **Bukti:** `src/auth/token.service.spec.ts`, `src/audit/audit.service.spec.ts`, `test/auth-pin.e2e-spec.ts`, `test/reset-pin.e2e-spec.ts`, `test/auth-refresh.e2e-spec.ts` (rotasi dan deteksi pemakaian ulang), `test/audit-logs.e2e-spec.ts` ("never shows a password, a token or where a file is stored").
 
 ## 2. Guard sesi

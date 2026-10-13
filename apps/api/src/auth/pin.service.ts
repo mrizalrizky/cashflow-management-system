@@ -1,8 +1,7 @@
 import { ConflictException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
-import { validationFailed } from '../common/validation.js';
 import type { Db } from '../database/db.js';
-import type { Prisma, User } from '../generated/prisma/client.js';
+import type { Prisma, PrismaClient, User } from '../generated/prisma/client.js';
 import { afterFailure, lockedFor } from './pin-lockout.js';
 import { PasswordService } from './password.service.js';
 
@@ -52,11 +51,37 @@ export class PinService {
     return tx.user.findUniqueOrThrow({ where: { id: owner.id } });
   }
 
+  async verify(tx: Prisma.TransactionClient, pin: string, ip: string | null, now = new Date()): Promise<PinCheck> {
+    return this.check(tx, pin, ip, now);
+  }
+
+  /**
+   * Mengganti PIN setelah PIN saat ini diperiksa dengan hitungan dan jeda yang sama seperti
+   * masuk, supaya formulir ini tidak menjadi jalan menebak PIN. Versi sesi naik, jadi token
+   * akses perangkat lain langsung ditolak.
+   */
+  async change(
+    tx: Prisma.TransactionClient,
+    currentPin: string,
+    newPin: string,
+    ip: string | null,
+    now = new Date(),
+  ): Promise<PinCheck> {
+    const check = await this.check(tx, currentPin, ip, now);
+    if (check.kind !== 'ok') return check;
+    const owner = await tx.user.update({
+      where: { id: check.owner.id },
+      data: { pin_hash: await this.hashes.hash(newPin), session_version: { increment: 1 } },
+    });
+    await this.audit.log(tx, { userId: owner.id, action: 'PIN_CHANGE', entityType: 'user', entityId: owner.id, ip });
+    return { kind: 'ok', owner };
+  }
+
   /**
    * Memeriksa PIN di bawah kunci baris pemilik, supaya tebakan yang datang bersamaan tetap
    * dihitung satu per satu.
    */
-  async verify(tx: Prisma.TransactionClient, pin: string, ip: string | null, now = new Date()): Promise<PinCheck> {
+  private async check(tx: Prisma.TransactionClient, pin: string, ip: string | null, now: Date): Promise<PinCheck> {
     const owner = await ownerFor(tx);
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${owner.id} FOR UPDATE`;
     const current = await tx.user.findUniqueOrThrow({ where: { id: owner.id } });
@@ -90,35 +115,22 @@ export class PinService {
     return pause === null ? { kind: 'wrong' } : { kind: 'locked', minutes: pause };
   }
 
-  async change(
-    tx: Prisma.TransactionClient,
-    ownerId: string,
-    currentPin: string,
-    newPin: string,
-    ip: string | null,
-  ): Promise<void> {
-    const owner = await tx.user.findUniqueOrThrow({ where: { id: ownerId } });
-    if (!(await this.hashes.verify(owner.pin_hash, currentPin))) {
-      // Sengaja 400, bukan 401: sesi pemanggil masih sah, hanya isian formulirnya yang salah.
-      throw validationFailed([{ field: 'currentPin', messages: ['PIN saat ini salah'] }]);
-    }
-    if (newPin === currentPin) {
-      throw validationFailed([{ field: 'newPin', messages: ['PIN baru harus berbeda dari PIN saat ini'] }]);
-    }
-    await tx.user.update({ where: { id: ownerId }, data: { pin_hash: await this.hashes.hash(newPin) } });
-    await this.audit.log(tx, { userId: ownerId, action: 'PIN_CHANGE', entityType: 'user', entityId: ownerId, ip });
-  }
-
-  /** Untuk perintah `reset-pin` di server: PIN, hitungan, jeda, dan semua sesi dikosongkan. */
-  async reset(db: Db): Promise<boolean> {
-    const owner = await db.user.findFirst({ orderBy: { created_at: 'asc' } });
-    if (!owner) return false;
-    await db.user.update({
-      where: { id: owner.id },
-      data: { pin_hash: null, pin_failed_attempts: 0, pin_locked_until: null },
+  /**
+   * Untuk perintah `reset-pin` di server: PIN, hitungan, jeda, dan semua sesi dikosongkan dalam
+   * satu transaksi bersama catatan auditnya. Versi sesi naik, jadi token akses yang masih
+   * beredar langsung ditolak.
+   */
+  async reset(db: PrismaClient): Promise<boolean> {
+    return db.$transaction(async (tx) => {
+      const owner = await tx.user.findFirst({ orderBy: { created_at: 'asc' } });
+      if (!owner) return false;
+      await tx.user.update({
+        where: { id: owner.id },
+        data: { pin_hash: null, pin_failed_attempts: 0, pin_locked_until: null, session_version: { increment: 1 } },
+      });
+      await tx.refreshToken.deleteMany({ where: { user_id: owner.id } });
+      await this.audit.log(tx, { userId: owner.id, action: 'PIN_RESET', entityType: 'user', entityId: owner.id });
+      return true;
     });
-    await db.refreshToken.deleteMany({ where: { user_id: owner.id } });
-    await this.audit.log(db, { userId: owner.id, action: 'PIN_RESET', entityType: 'user', entityId: owner.id });
-    return true;
   }
 }

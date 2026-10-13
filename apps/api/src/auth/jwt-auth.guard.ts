@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../database/prisma.service.js';
 import { toAuthUser } from './auth.types.js';
 import { AuthenticatedRequest, IS_PUBLIC } from './decorators.js';
-import { TokenService } from './token.service.js';
+import { AccessTokenPayload, TokenService } from './token.service.js';
 
 function extractBearerToken(header: string | undefined): string | null {
   const [scheme, token] = (header ?? '').split(' ');
@@ -23,22 +23,23 @@ export class JwtAuthGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const userId = await this.resolveUserId(request.headers.authorization);
+    const payload = await this.resolvePayload(request.headers.authorization);
 
-    // Dibaca ulang tiap request supaya sesi berakhir seketika setelah PIN direset.
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw invalidSession();
+    // Dibaca ulang tiap request: setelah PIN diganti atau direset, versi sesinya naik dan token
+    // lama ditolak pada permintaan berikutnya, tidak menunggu kedaluwarsa.
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.pin_hash === null || user.session_version !== payload.ver) throw invalidSession();
 
     request.user = toAuthUser(user);
 
     return true;
   }
 
-  private async resolveUserId(authorization: string | undefined): Promise<string> {
+  private async resolvePayload(authorization: string | undefined): Promise<AccessTokenPayload> {
     const token = extractBearerToken(authorization);
     if (!token) throw invalidSession();
     try {
-      return (await this.tokens.verifyAccessToken(token)).sub;
+      return await this.tokens.verifyAccessToken(token);
     } catch {
       throw invalidSession();
     }

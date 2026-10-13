@@ -3,6 +3,7 @@ import { AuditAction, AuditService } from '../audit/audit.service.js';
 import type { Db } from '../database/db.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
+import { validationFailed } from '../common/validation.js';
 import { Session, toAuthUser } from './auth.types.js';
 import { PinService, pinLocked } from './pin.service.js';
 import { SessionService } from './session.service.js';
@@ -65,15 +66,20 @@ export class AuthService {
 
   /** Mengganti PIN, mengakhiri semua sesi lain, dan membuka sesi baru untuk pemanggil. */
   async changePin(ownerId: string, currentPin: string, newPin: string, ip: string | null): Promise<Session> {
-    const { owner, refreshToken } = await this.prisma.$transaction(async (tx) => {
-      await this.pins.change(tx, ownerId, currentPin, newPin, ip);
+    if (newPin === currentPin) {
+      throw validationFailed([{ field: 'newPin', messages: ['PIN baru harus berbeda dari PIN saat ini'] }]);
+    }
+    // Seperti masuk: penolakan dilempar setelah transaksi, supaya hitungan salah tersimpan.
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const check = await this.pins.change(tx, currentPin, newPin, ip);
+      if (check.kind !== 'ok') return check;
       await this.sessions.endAll(tx, ownerId);
-      return {
-        owner: await tx.user.findUniqueOrThrow({ where: { id: ownerId } }),
-        refreshToken: await this.sessions.create(tx, ownerId),
-      };
+      return { ...check, refreshToken: await this.sessions.create(tx, ownerId) };
     });
-    return this.buildSession(owner, refreshToken);
+    // Sengaja 400, bukan 401: sesi pemanggil masih sah, hanya isian formulirnya yang salah.
+    if (outcome.kind === 'wrong') throw validationFailed([{ field: 'currentPin', messages: ['PIN saat ini salah'] }]);
+    if (outcome.kind === 'locked') throw pinLocked(outcome.minutes);
+    return this.buildSession(outcome.owner, outcome.refreshToken);
   }
 
   /** Menukar refresh token dengan yang baru. Token lama langsung tidak berlaku. */
@@ -139,7 +145,7 @@ export class AuthService {
 
   private async buildSession(user: User, refreshToken: string): Promise<Session> {
     return {
-      accessToken: await this.tokens.signAccessToken(user.id),
+      accessToken: await this.tokens.signAccessToken(user.id, user.session_version),
       refreshToken,
       user: toAuthUser(user),
     };

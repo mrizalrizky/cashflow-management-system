@@ -18,7 +18,8 @@ export type AuditAction =
   | 'TRANSFER'
   | 'ATTACH'
   | 'DETACH'
-  | 'EXPORT';
+  | 'EXPORT'
+  | 'AI_REVIEW';
 
 export interface AuditEntry {
   userId: string | null;

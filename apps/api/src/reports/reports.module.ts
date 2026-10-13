@@ -9,5 +9,6 @@ import { DashboardService } from './dashboard.service.js';
   imports: [AccountsModule, TransactionsModule],
   controllers: [DashboardController],
   providers: [CashflowReportService, DashboardService],
+  exports: [CashflowReportService],
 })
 export class ReportsModule {}

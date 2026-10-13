@@ -5,6 +5,7 @@ import {
   currentYearInJakarta,
   formatCalendarMonth,
   isCalendarMonth,
+  lastDayOf,
   monthsBetween,
   parseCalendarMonth,
   IsCalendarDate,
@@ -100,6 +101,13 @@ describe('months', () => {
   it('stores a month as its first day and reads it back', () => {
     expect(parseCalendarMonth('2026-02').toISOString()).toBe('2026-02-01T00:00:00.000Z');
     expect(formatCalendarMonth(new Date('2026-02-01T00:00:00.000Z'))).toBe('2026-02');
+  });
+
+  it('gives the last day of a month, leap years included', () => {
+    expect(lastDayOf('2026-09')).toBe('2026-09-30');
+    expect(lastDayOf('2026-12')).toBe('2026-12-31');
+    expect(lastDayOf('2028-02')).toBe('2028-02-29');
+    expect(lastDayOf('2026-02')).toBe('2026-02-28');
   });
 
   it('adds months across years and counts the months between two months', () => {

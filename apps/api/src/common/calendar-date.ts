@@ -141,3 +141,9 @@ export function addMonths(month: string, count: number): string {
 export function monthsBetween(from: string, to: string): number {
   return monthIndex(to) - monthIndex(from);
 }
+
+/** Hari terakhir sebuah bulan `YYYY-MM`, sebagai `YYYY-MM-DD`. */
+export function lastDayOf(month: string): string {
+  // Hari ke-0 bulan berikutnya adalah hari terakhir bulan ini.
+  return formatCalendarDate(new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)));
+}

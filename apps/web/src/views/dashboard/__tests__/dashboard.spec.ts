@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
+import Select from 'primevue/select'
+import * as accountsApi from '@/api/accounts'
+import * as categoriesApi from '@/api/categories'
 import { ApiError } from '@/api/http'
 import * as reportsApi from '@/api/reports'
 import type { CompanyDashboard } from '@/api/types'
@@ -10,10 +13,14 @@ import { PERIOD_PRESETS } from '@/lib/periods'
 import { routes } from '@/router/routes'
 import { freshPinia, mountView } from '@/test/mount'
 import { signIn } from '@/test/session'
-import { makeTransaction } from '@/test/transactions'
+import { KAS, makeTransaction, MATERIAL } from '@/test/transactions'
+import TransactionFormDialog from '@/views/transactions/TransactionFormDialog.vue'
 import DashboardView from '../DashboardView.vue'
 
 vi.mock('@/api/reports')
+vi.mock('@/api/accounts')
+vi.mock('@/api/categories')
+vi.mock('@/api/transactions')
 vi.mock('@/lib/calendar', () => ({ todayInJakarta: () => '2026-10-07' }))
 
 const getDashboard = vi.mocked(reportsApi.getCompanyDashboard)
@@ -358,5 +365,43 @@ describe('DashboardView: changing the period', () => {
 
     expect(stat(wrapper, 'income')).toContain('Rp 99.000.000')
     expect(wrapper.get('[data-testid="period-covered"]').text()).toBe('01 Jan 2026 – 07 Okt 2026')
+  })
+})
+
+describe('DashboardView: recording an expense', () => {
+  beforeEach(() => {
+    vi.mocked(accountsApi.listAccountOptions).mockResolvedValue([KAS])
+    vi.mocked(categoriesApi.listCategories).mockResolvedValue([MATERIAL])
+  })
+
+  function typeSelect(wrapper: VueWrapper) {
+    return wrapper.findAllComponents(Select).find((s) => s.props('ariaLabelledby') === 'tx-type-label')
+  }
+
+  it('opens the transaction form with an expense chosen, and reloads the figures after saving', async () => {
+    const { wrapper } = await mountDashboard()
+    getDashboard.mockClear()
+    expect(wrapper.findComponent(TransactionFormDialog).props('visible')).toBe(false)
+
+    await wrapper.get('[data-testid="record-expense"]').trigger('click')
+    await flushPromises()
+    const form = wrapper.findComponent(TransactionFormDialog)
+    expect(form.props('visible')).toBe(true)
+    expect(form.props('transaction')).toBeNull()
+    expect(typeSelect(wrapper)!.props('modelValue')).toBe('OUT')
+
+    form.vm.$emit('saved', makeTransaction())
+    await flushPromises()
+    expect(getDashboard).toHaveBeenCalledTimes(1)
+  })
+
+  it('changes nothing when the form is closed without saving', async () => {
+    const { wrapper } = await mountDashboard()
+    getDashboard.mockClear()
+
+    await wrapper.get('[data-testid="record-expense"]').trigger('click')
+    wrapper.findComponent(TransactionFormDialog).vm.$emit('update:visible', false)
+    await flushPromises()
+    expect(getDashboard).not.toHaveBeenCalled()
   })
 })

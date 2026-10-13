@@ -14,9 +14,11 @@ import MonthlyCashflowChart from '@/components/MonthlyCashflowChart.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatCard from '@/components/StatCard.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
+import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { formatCalendarDate } from '@/lib/format'
 import { accountTypeLabel } from '@/lib/labels'
 import PeriodPicker from './PeriodPicker.vue'
+import TransactionFormDialog from '@/views/transactions/TransactionFormDialog.vue'
 import RecentTransactions from './RecentTransactions.vue'
 
 /** Periode yang diminta pengguna; bagian yang kosong diisi bawaan API. */
@@ -61,11 +63,24 @@ const categories = computed(() =>
     amount,
   })),
 )
+// Mencatat pengeluaran langsung dari dasbor; form-nya sama dengan di halaman Transaksi.
+const options = useTransactionOptions()
+const recording = ref(false)
+
 onMounted(reload)
 </script>
 
 <template>
-  <PageHeader title="Dashboard" />
+  <PageHeader title="Dashboard">
+    <template #actions>
+      <Button
+        label="Catat pengeluaran"
+        icon="pi pi-plus"
+        data-testid="record-expense"
+        @click="recording = true"
+      />
+    </template>
+  </PageHeader>
 
   <ErrorState v-if="error && !dashboard" :message="error" @retry="reload" />
   <div v-else-if="!dashboard" class="flex justify-center py-10">
@@ -166,4 +181,11 @@ onMounted(reload)
       </div>
     </div>
   </template>
+
+  <TransactionFormDialog
+    v-model:visible="recording"
+    :transaction="null"
+    :options="options"
+    @saved="reload"
+  />
 </template>

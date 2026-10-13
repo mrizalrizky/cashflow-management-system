@@ -65,6 +65,7 @@ const auditActions = openLabelSet({
   ATTACH: 'Menambah bukti',
   DETACH: 'Menghapus bukti',
   EXPORT: 'Mengekspor',
+  AI_REVIEW: 'Penilaian AI',
 })
 export const auditActionLabel = auditActions.label
 export const AUDIT_ACTION_OPTIONS: Option<string>[] = auditActions.options
@@ -74,6 +75,7 @@ const auditEntities = openLabelSet({
   account: 'Akun',
   category: 'Kategori',
   installment: 'Cicilan',
+  wishlist_item: 'Wishlist',
   user: 'Pemilik',
 })
 export const auditEntityLabel = auditEntities.label

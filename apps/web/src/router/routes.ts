@@ -1,5 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
-import { INSTALLMENT_DETAIL_ROUTE, PATHS, TRANSACTION_DETAIL_ROUTE } from './paths'
+import { INSTALLMENT_DETAIL_ROUTE, PATHS, TRANSACTION_DETAIL_ROUTE, WISHLIST_DETAIL_ROUTE } from './paths'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -50,6 +50,16 @@ export const routes: RouteRecordRaw[] = [
     path: INSTALLMENT_DETAIL_ROUTE,
     component: () => import('@/views/installments/InstallmentDetailView.vue'),
     meta: { title: 'Cicilan' },
+  },
+  {
+    path: PATHS.wishlist,
+    component: () => import('@/views/wishlist/WishlistView.vue'),
+    meta: { title: 'Wishlist' },
+  },
+  {
+    path: WISHLIST_DETAIL_ROUTE,
+    component: () => import('@/views/wishlist/WishlistDetailView.vue'),
+    meta: { title: 'Wishlist' },
   },
   {
     path: PATHS.masterData,

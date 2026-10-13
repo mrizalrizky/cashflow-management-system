@@ -31,6 +31,7 @@ describe('AppLayout', () => {
       'Dashboard',
       'Transaksi',
       'Cicilan',
+      'Wishlist',
       'Master data',
       'Pengaturan',
     ])
@@ -70,10 +71,11 @@ describe('AppLayout', () => {
       'Dashboard',
       'Transaksi',
       'Cicilan',
+      'Wishlist',
       'Master data',
       'Pengaturan',
     ])
-    drawerLinks[4]!.click()
+    drawerLinks[5]!.click()
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/pengaturan')

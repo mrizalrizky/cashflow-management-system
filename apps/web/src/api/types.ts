@@ -132,6 +132,44 @@ export interface InstallmentList {
 
 export type InstallmentDetail = Installment & { transactions: Transaction[] }
 
+export type WishlistStatus = 'WAITING' | 'BOUGHT' | 'CANCELLED'
+export type AiVerdict = 'IMPULSIVE' | 'NEEDS_THOUGHT' | 'PLANNED'
+
+/** Ringkasan keuangan yang dikirim ke AI: hanya total. */
+export interface FinanceSummary {
+  totalBalance: string
+  months: string[]
+  averageMonthlyIncome: string
+  averageMonthlyExpense: string
+  unpaidInstallments: { count: number; monthlyTotal: string; lastEndMonth: string | null }
+}
+
+export interface WishlistReview {
+  verdict: AiVerdict
+  reasons: string[]
+  suggestion: string
+  financeSnapshot: FinanceSummary | null
+  reviewedAt: string
+  model: string
+  /** Jawaban atau harga diubah setelah penilaian ini. */
+  answersChanged: boolean
+}
+
+export interface WishlistItem {
+  id: string
+  name: string
+  price: string
+  reason: string
+  similarOwned: string
+  valueAdded: string
+  usageDuration: string
+  includeFinance: boolean
+  status: WishlistStatus
+  review: WishlistReview | null
+  createdAt: string
+  updatedAt: string
+}
+
 /** Rentang tanggal kalender `YYYY-MM-DD`; kedua ujungnya ikut dihitung. */
 export interface Period {
   from: string

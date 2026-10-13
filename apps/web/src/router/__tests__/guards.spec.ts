@@ -37,6 +37,7 @@ describe('resolveNavigation', () => {
     for (const item of menu()) expect(navigate(OWNER, item.to)).toBe(true)
     expect(navigate(OWNER, '/pengaturan/audit-log')).toBe(true)
     expect(navigate(OWNER, '/cicilan/:id')).toBe(true)
+    expect(navigate(OWNER, '/wishlist/:id')).toBe(true)
   })
 
   it('no longer knows the company pages', () => {
@@ -56,7 +57,7 @@ describe('postLoginPath', () => {
 
 describe('menu', () => {
   it('lists the pages of the personal edition', () => {
-    expect(menu().map((item) => item.label)).toEqual(['Dashboard', 'Transaksi', 'Cicilan', 'Master data', 'Pengaturan'])
+    expect(menu().map((item) => item.label)).toEqual(['Dashboard', 'Transaksi', 'Cicilan', 'Wishlist', 'Master data', 'Pengaturan'])
   })
 })
 

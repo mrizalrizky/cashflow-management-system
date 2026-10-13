@@ -5,6 +5,7 @@ export const PATHS = {
   dashboard: '/dashboard',
   transactions: '/transaksi',
   installments: '/cicilan',
+  wishlist: '/wishlist',
   masterData: '/master-data',
   settings: '/pengaturan',
   auditLog: '/pengaturan/audit-log',
@@ -21,6 +22,13 @@ export const INSTALLMENT_DETAIL_ROUTE = `${PATHS.installments}/:id`
 
 export function installmentPath(id: string): string {
   return `${PATHS.installments}/${id}`
+}
+
+/** Pola rute halaman detail barang wishlist. */
+export const WISHLIST_DETAIL_ROUTE = `${PATHS.wishlist}/:id`
+
+export function wishlistPath(id: string): string {
+  return `${PATHS.wishlist}/${id}`
 }
 
 export function transactionPath(id: string): string {

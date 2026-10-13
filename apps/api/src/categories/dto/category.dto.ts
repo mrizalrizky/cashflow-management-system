@@ -12,6 +12,11 @@ export class CreateCategoryDto {
 
   @IsIn(TX_TYPES)
   type: TxType;
+
+  /** Transaksi berkategori ini wajib memilih cicilan. Hanya untuk kategori pengeluaran. */
+  @IsOptionalNotNull()
+  @IsBoolean()
+  isInstallment?: boolean;
 }
 
 /** Tipe sengaja tidak bisa diubah: transaksi yang sudah memakai kategori ini bergantung padanya. */
@@ -23,6 +28,11 @@ export class UpdateCategoryDto {
   @IsOptionalNotNull()
   @IsBoolean()
   isActive?: boolean;
+
+  /** Transaksi berkategori ini wajib memilih cicilan. Hanya untuk kategori pengeluaran. */
+  @IsOptionalNotNull()
+  @IsBoolean()
+  isInstallment?: boolean;
 }
 
 export class ListCategoriesQueryDto {

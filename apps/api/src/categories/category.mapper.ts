@@ -6,6 +6,8 @@ export interface CategoryResponse {
   type: TxType;
   isSystem: boolean;
   isActive: boolean;
+  /** Transaksi pengeluaran berkategori ini wajib memilih cicilan. */
+  isInstallment: boolean;
 }
 
 export function toCategoryResponse(category: Category): CategoryResponse {
@@ -15,5 +17,6 @@ export function toCategoryResponse(category: Category): CategoryResponse {
     type: category.type,
     isSystem: category.is_system,
     isActive: category.is_active,
+    isInstallment: category.is_installment,
   };
 }

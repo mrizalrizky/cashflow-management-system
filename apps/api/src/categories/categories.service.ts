@@ -8,6 +8,7 @@ import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { lockForTransaction, LOCKS } from '../common/advisory-lock.js';
 import { equalsText } from '../common/search.js';
+import { validationFailed } from '../common/validation.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Category, Prisma, TxType } from '../generated/prisma/client.js';
 import type {
@@ -17,6 +18,12 @@ import type {
 } from './dto/category.dto.js';
 
 const ENTITY = 'category';
+
+function onlyExpense(): BadRequestException {
+  return validationFailed([
+    { field: 'isInstallment', messages: ['Hanya kategori pengeluaran yang bisa menjadi kategori cicilan'] },
+  ]);
+}
 
 @Injectable()
 export class CategoriesService {
@@ -35,8 +42,11 @@ export class CategoriesService {
 
   async create(actor: AuthUser, dto: CreateCategoryDto, ip: string | null): Promise<Category> {
     return this.prisma.$transaction(async (tx) => {
+      if (dto.isInstallment && dto.type !== 'OUT') throw onlyExpense();
       await this.assertNameAvailable(tx, dto.name, dto.type);
-      const category = await tx.category.create({ data: { name: dto.name, type: dto.type } });
+      const category = await tx.category.create({
+        data: { name: dto.name, type: dto.type, is_installment: dto.isInstallment ?? false },
+      });
       await this.audit.log(tx, {
         userId: actor.id,
         action: 'CREATE',
@@ -61,10 +71,12 @@ export class CategoriesService {
       // Kategori sistem (Transfer Masuk/Keluar) dirujuk oleh logika transfer.
       if (before.is_system) throw new BadRequestException('Kategori sistem tidak bisa diubah');
       if (dto.name !== undefined) await this.assertNameAvailable(tx, dto.name, before.type, id);
+      if (dto.isInstallment === true && before.type !== 'OUT') throw onlyExpense();
+      if (dto.isInstallment === false && before.is_installment) await this.assertNoLinkedPayment(tx, id);
 
       const category = await tx.category.update({
         where: { id },
-        data: { name: dto.name, is_active: dto.isActive },
+        data: { name: dto.name, is_active: dto.isActive, is_installment: dto.isInstallment },
       });
       await this.audit.log(tx, {
         userId: actor.id,
@@ -77,6 +89,12 @@ export class CategoriesService {
       });
       return category;
     });
+  }
+
+  /** Tanda cicilan tetap selama ada transaksi berkategori ini yang tertaut ke cicilan (spec P2, aturan 8). */
+  private async assertNoLinkedPayment(tx: Prisma.TransactionClient, id: string): Promise<void> {
+    const linked = await tx.transaction.count({ where: { category_id: id, installment_id: { not: null } } });
+    if (linked > 0) throw new ConflictException('Kategori ini masih dipakai pembayaran cicilan');
   }
 
   /**

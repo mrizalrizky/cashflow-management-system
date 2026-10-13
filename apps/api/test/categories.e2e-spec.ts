@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { setupE2e } from './e2e-context.js';
-import { asOwner, call, createCategory, errorFields } from './fixtures.js';
+import { asOwner, call, createCategory, createInstallment, createTransaction, errorFields } from './fixtures.js';
 import { CATEGORIES } from './routes.js';
+import { setupWorld } from './transaction-fixtures.js';
 
 const NEW_CATEGORY = { name: 'Material', type: 'OUT' };
 
@@ -30,6 +31,7 @@ describe('GET /categories', () => {
       type: 'IN',
       isSystem: false,
       isActive: true,
+      isInstallment: false,
     });
 
     const income = await call(ctx, admin, 'get', `${CATEGORIES}?type=IN`).expect(200);
@@ -69,6 +71,7 @@ describe('POST /categories', () => {
       type: 'OUT',
       isSystem: false,
       isActive: true,
+      isInstallment: false,
     });
     const row = await ctx.prisma.auditLog.findFirstOrThrow({ where: { entity_type: 'category' } });
     expect(row).toMatchObject({ action: 'CREATE', user_id: admin.user.id, entity_id: res.body.id });
@@ -189,5 +192,63 @@ describe('PATCH /categories/:id', () => {
       .send({ name: 'X' })
       .expect(404);
     expect(res.body).toEqual({ statusCode: 404, message: 'Kategori tidak ditemukan' });
+  });
+});
+
+describe('installment flag on categories', () => {
+  const ctx = setupE2e();
+
+  it('creates an expense category flagged as an installment category', async () => {
+    const owner = await asOwner(ctx);
+    const res = await call(ctx, owner, 'post', CATEGORIES)
+      .send({ name: 'Cicilan', type: 'OUT', isInstallment: true })
+      .expect(201);
+    expect(res.body).toMatchObject({ name: 'Cicilan', isInstallment: true });
+    const plain = await call(ctx, owner, 'post', CATEGORIES).send({ name: 'Makan', type: 'OUT' }).expect(201);
+    expect(plain.body.isInstallment).toBe(false);
+  });
+
+  it('refuses the flag on an income category', async () => {
+    const owner = await asOwner(ctx);
+    const res = await call(ctx, owner, 'post', CATEGORIES)
+      .send({ name: 'Gaji', type: 'IN', isInstallment: true })
+      .expect(400);
+    expect(res.body.errors).toEqual([
+      { field: 'isInstallment', messages: ['Hanya kategori pengeluaran yang bisa menjadi kategori cicilan'] },
+    ]);
+  });
+
+  it('turns the flag on and off while nothing linked uses the category', async () => {
+    const owner = await asOwner(ctx);
+    const category = await createCategory(ctx.prisma, { name: 'Kredit', type: 'OUT' });
+    await call(ctx, owner, 'patch', `${CATEGORIES}/${category.id}`).send({ isInstallment: true }).expect(200);
+    const off = await call(ctx, owner, 'patch', `${CATEGORIES}/${category.id}`).send({ isInstallment: false }).expect(200);
+    expect(off.body.isInstallment).toBe(false);
+    const log = await ctx.prisma.auditLog.findFirstOrThrow({
+      where: { entity_type: 'category', action: 'UPDATE' },
+      orderBy: { created_at: 'desc' },
+    });
+    expect(log.before).toMatchObject({ is_installment: true });
+    expect(log.after).toMatchObject({ is_installment: false });
+  });
+
+  it('keeps the flag on while a transaction of this category is linked to an installment', async () => {
+    const world = await setupWorld(ctx);
+    await ctx.prisma.category.update({ where: { id: world.expense.id }, data: { is_installment: true } });
+    const motor = await createInstallment(ctx.prisma);
+    await createTransaction(ctx.prisma, {
+      accountId: world.account.id,
+      categoryId: world.expense.id,
+      createdById: world.owner.user.id,
+      type: 'OUT',
+      amount: 1_500_000n,
+      status: 'VOID',
+      installmentId: motor.id,
+    });
+
+    const res = await call(ctx, world.owner, 'patch', `${CATEGORIES}/${world.expense.id}`)
+      .send({ isInstallment: false })
+      .expect(409);
+    expect(res.body.message).toBe('Kategori ini masih dipakai pembayaran cicilan');
   });
 });

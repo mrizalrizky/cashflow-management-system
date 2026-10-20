@@ -252,3 +252,16 @@ describe('installment flag on categories', () => {
     expect(res.body.message).toBe('Kategori ini masih dipakai pembayaran cicilan');
   });
 });
+
+describe('transfer category names', () => {
+  const ctx = setupE2e();
+
+  it.each([['Transfer Masuk', 'IN'], ['transfer keluar', 'OUT'], ['Transfer Keluar', 'IN']])(
+    'keeps %s for transfers, even before the first transfer',
+    async (name, type) => {
+      const owner = await asOwner(ctx);
+      const res = await call(ctx, owner, 'post', CATEGORIES).send({ name, type }).expect(409);
+      expect(res.body.message).toBe('Kategori sudah ada');
+    },
+  );
+});

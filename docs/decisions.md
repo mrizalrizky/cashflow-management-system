@@ -210,3 +210,8 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **Pengaturan aplikasi disimpan di secret `ENV_PRODUCTION`** (pilihan pemilik) dan ditulis ke `deploy/.env` tiap deploy; file itu tetap di server untuk `deploy/dc`, cadangan, dan pemulihan.
 - **Deploy yang gagal sehat dalam 3 menit dikembalikan ke image sebelumnya.** Migrasi yang sudah berjalan tidak dibatalkan.
 - **`npm audit` sementara hanya melapor**: advisori high yang tersisa ada di CLI Prisma (mysql2, deepmerge-ts), diperbaiki di prisma 7.10.1. Jadikan pemblokir lagi setelah Prisma dinaikkan.
+
+## Seed hanya membuat pemilik
+
+- **Seed tidak lagi membuat akun dan kategori awal** (permintaan pemilik): akun dan kategori dibuat sendiri di Master data. Keputusan "Akun dan kategori awal diganti untuk keperluan pribadi" di bagian Edisi pribadi (P1) tidak berlaku lagi.
+- **Kategori transfer ("Transfer Masuk", "Transfer Keluar") dibuat oleh transfer pertama**, bukan oleh seed, dengan upsert supaya dua transfer pertama yang bersamaan tidak menggandakannya. Kedua nama itu selalu dicadangkan, jadi kategori buatan pemilik tidak bisa memakainya lebih dulu.

@@ -8,6 +8,7 @@ import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { lockForTransaction, LOCKS } from '../common/advisory-lock.js';
 import { equalsText } from '../common/search.js';
+import { isSystemCategoryName } from './system-categories.js';
 import { validationFailed } from '../common/validation.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Category, Prisma, TxType } from '../generated/prisma/client.js';
@@ -109,6 +110,8 @@ export class CategoriesService {
     exceptId?: string,
   ): Promise<void> {
     await lockForTransaction(tx, LOCKS.categoryName);
+    // Nama kategori transfer dicadangkan walau kategorinya belum dibuat (dibuat saat transfer pertama).
+    if (isSystemCategoryName(name)) throw new ConflictException('Kategori sudah ada');
     const taken = await tx.category.findFirst({
       where: {
         name: equalsText(name),

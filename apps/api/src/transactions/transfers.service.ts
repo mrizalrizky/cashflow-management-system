@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
+import { systemCategoryId } from '../categories/system-categories.js';
 import { parseCalendarDate, todayInJakarta } from '../common/calendar-date.js';
 import { toMoney } from '../common/money.js';
 import { FieldError, validationFailed } from '../common/validation.js';
@@ -31,8 +32,8 @@ export class TransfersService {
     return this.prisma.$transaction(async (tx) => {
       await this.assertValid(tx, dto);
       const [outCategoryId, inCategoryId] = await Promise.all([
-        this.systemCategoryId(tx, 'OUT'),
-        this.systemCategoryId(tx, 'IN'),
+        systemCategoryId(tx, 'OUT'),
+        systemCategoryId(tx, 'IN'),
       ]);
 
       const shared = {
@@ -92,12 +93,4 @@ export class TransfersService {
     if (errors.length > 0) throw validationFailed(errors);
   }
 
-  /** Kategori sistem dibuat oleh seed; tanpa itu aplikasi salah pasang, bukan salah input. */
-  private async systemCategoryId(tx: Prisma.TransactionClient, type: TxType): Promise<string> {
-    const category = await tx.category.findFirst({ where: { is_system: true, type } });
-    if (!category) {
-      throw new Error(`Kategori sistem untuk transfer (${type}) tidak ada; jalankan seed.`);
-    }
-    return category.id;
-  }
 }

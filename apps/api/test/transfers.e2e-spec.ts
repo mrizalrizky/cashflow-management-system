@@ -145,13 +145,18 @@ describe('POST /transactions/transfer', () => {
     expect(errorFields(future.body)).toEqual(['transactionDate']);
   });
 
-  it('fails cleanly, writing nothing, when the system categories are missing', async () => {
+  it('creates the transfer categories itself the first time, then reuses them', async () => {
     const world = await setupTransferWorld(ctx, false);
 
-    const res = await call(ctx, world.owner, 'post', TRANSFERS).send(transferBody(world)).expect(500);
+    await call(ctx, world.owner, 'post', TRANSFERS).send(transferBody(world)).expect(201);
+    await call(ctx, world.owner, 'post', TRANSFERS).send(transferBody(world)).expect(201);
 
-    expect(res.body).toEqual({ statusCode: 500, message: 'Terjadi kesalahan pada server' });
-    expect(await ctx.prisma.transaction.count()).toBe(0);
+    const system = await ctx.prisma.category.findMany({ where: { is_system: true }, orderBy: { name: 'asc' } });
+    expect(system.map((category) => [category.name, category.type])).toEqual([
+      ['Transfer Keluar', 'OUT'],
+      ['Transfer Masuk', 'IN'],
+    ]);
+    expect(await ctx.prisma.transaction.count()).toBe(4);
   });
 });
 

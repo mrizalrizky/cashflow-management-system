@@ -23,7 +23,7 @@ npm run dev:api     # http://localhost:3000/api/v1/health
 npm run dev:web     # http://localhost:5173
 ```
 
-Seed aman dijalankan berulang. Ia membuat pemilik tanpa PIN, beserta akun dan kategori awal; saat aplikasi dibuka pertama kali, Anda diminta membuat PIN (6 sampai 12 angka). Lupa PIN di pengembangan: `npm run reset-pin:dev -w api`.
+Seed aman dijalankan berulang. Ia hanya membuat pemilik tanpa PIN; akun dan kategori Anda buat sendiri di Master data; saat aplikasi dibuka pertama kali, Anda diminta membuat PIN (6 sampai 12 angka). Lupa PIN di pengembangan: `npm run reset-pin:dev -w api`.
 
 ## Menjalankan di server
 
@@ -37,7 +37,7 @@ deploy/dc up -d --build                       # pasang atau perbarui
 | Keperluan | Perintah |
 |---|---|
 | Memasang dan memperbarui | `deploy/dc up -d --build` |
-| Migrasi database, akun dan kategori awal | otomatis tiap `deploy/dc up`, oleh layanan `migrate` |
+| Migrasi database dan pemilik | otomatis tiap `deploy/dc up`, oleh layanan `migrate` |
 | Cadangan sekarang | `deploy/dc exec backup bash deploy/backup-loop.sh --run-once` (terjadwal tiap malam oleh layanan `backup`) |
 | Memulihkan | `deploy/dc --profile tools run --rm restore /backups/<nama cadangan>` |
 | Melihat log | `deploy/dc logs -f api` |

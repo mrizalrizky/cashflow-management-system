@@ -79,7 +79,7 @@ Semua perintah di panduan ini memakai `deploy/dc`: Docker Compose dengan berkas 
 deploy/dc up -d --build
 ```
 
-Pertama kali, ini membangun image (beberapa menit), menyiapkan tabel di database Neon beserta akun dan kategori awal, lalu menyalakan semuanya. Periksa:
+Pertama kali, ini membangun image (beberapa menit), menyiapkan tabel di database Neon beserta baris pemilik, lalu menyalakan semuanya. Periksa:
 
 ```bash
 deploy/dc ps
@@ -102,7 +102,7 @@ Harus muncul satu folder `cashflow-<waktu>`. Bila gagal dengan pesan `server ver
 
 1. Buka alamat aplikasi (mis. `https://kas.perusahaan.co.id`).
 2. Aplikasi meminta **PIN baru**: 6 sampai 12 angka, diketik dua kali. PIN inilah satu-satunya kunci aplikasi; simpan di pengelola kata sandi.
-3. Sesuaikan akun (Dompet, Rekening Bank) dan kategori awal di menu Master data. Akun dan kategori awal hanya dibuat pada pemasangan pertama: yang Anda ganti namanya atau nonaktifkan tidak muncul lagi saat aplikasi diperbarui.
+3. Buat akun (mis. dompet dan rekening bank) dan kategori di menu Master data: aplikasi tidak membuat data awal. Dua kategori untuk transfer antar akun dibuat sendiri saat transfer pertama.
 
 ## Lupa PIN
 

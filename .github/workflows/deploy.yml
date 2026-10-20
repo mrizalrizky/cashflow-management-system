@@ -65,6 +65,16 @@ jobs:
             echo "::error::Set these in the production environment (Settings > Environments):$missing"
             exit 1
           fi
+          # The settings Compose refuses to start without (see deploy/env.example), checked here
+          # so a missing one fails before anything reaches the server.
+          unset_settings=""
+          for setting in DATABASE_URL JWT_ACCESS_SECRET TUNNEL_TOKEN BACKUP_HOST_DIR; do
+            printf '%s\n' "$ENV_PRODUCTION" | grep -Eq "^${setting}=.+" || unset_settings="$unset_settings $setting"
+          done
+          if [ -n "$unset_settings" ]; then
+            echo "::error::Add these lines (with a value) to the ENV_PRODUCTION secret:$unset_settings"
+            exit 1
+          fi
           # The image names are set by this workflow; an old line in the secret would override
           # nothing here but would confuse whoever reads the file on the server.
           if printf '%s\n' "$ENV_PRODUCTION" | grep -Eq '^(API|MIGRATE|WEB|BACKUP)_IMAGE='; then

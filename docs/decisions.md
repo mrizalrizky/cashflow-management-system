@@ -206,7 +206,7 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 
 - **Hanya `personal-edition` yang di-deploy**; `main` (edisi perusahaan) diuji pada push dan pull request, tidak di-deploy.
 - **Image dibangun di GitHub dan disimpan di ghcr.io**, lalu ditarik VPS per digest. VPS kecil tidak membangun apa pun, dan yang berjalan pasti build yang lulus test.
-- **VPS tanpa IP publik dijangkau lewat Tailscale**: runner bergabung dengan auth key ephemeral bertag `tag:ci`, lalu SSH ke alamat tailnet dengan sidik jari kunci host yang wajib diisi. Pengunjung tetap masuk lewat Cloudflare Tunnel.
+- **Runner masuk ke VPS lewat SSH di alamat publiknya**, hanya dengan kunci, dan sidik jari kunci host wajib diisi supaya rahasia tidak terkirim ke server palsu. Pengunjung tetap masuk lewat Cloudflare Tunnel. (Tailscale sempat direncanakan untuk VPS tanpa IP publik; tidak dipakai karena VPS-nya punya IP publik.)
 - **Pengaturan aplikasi disimpan di secret `ENV_PRODUCTION`** (pilihan pemilik) dan ditulis ke `deploy/.env` tiap deploy; file itu tetap di server untuk `deploy/dc`, cadangan, dan pemulihan.
 - **Deploy yang gagal sehat dalam 3 menit dikembalikan ke image sebelumnya.** Migrasi yang sudah berjalan tidak dibatalkan.
 - **`npm audit` sementara hanya melapor**: advisori high yang tersisa ada di CLI Prisma (mysql2, deepmerge-ts), diperbaiki di prisma 7.10.1. Jadikan pemblokir lagi setelah Prisma dinaikkan.

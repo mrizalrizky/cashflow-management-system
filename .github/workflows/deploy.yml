@@ -1,6 +1,5 @@
-# Deploys the personal edition to the VPS. The VPS sits behind NAT with no public IP, so the
-# runner joins the tailnet and reaches it over SSH there. Visitors reach the app through the
-# Cloudflare Tunnel inside the stack, as before; nothing is opened on the server.
+# Deploys the personal edition to the VPS over SSH, at its public address. Visitors reach the
+# app through the Cloudflare Tunnel inside the stack, as before; only SSH is open on the server.
 #
 # Setup, secrets and variables: docs/deployment.md, "Deploy otomatis (GitHub Actions)".
 name: Deploy
@@ -52,7 +51,6 @@ jobs:
       # server:  ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub
       - name: Check the deploy settings are set
         env:
-          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
@@ -60,7 +58,7 @@ jobs:
           SSH_HOST_FINGERPRINT: ${{ vars.SSH_HOST_FINGERPRINT }}
         run: |
           missing=""
-          for name in TAILSCALE_AUTHKEY SSH_HOST SSH_USERNAME SSH_KEY ENV_PRODUCTION SSH_HOST_FINGERPRINT; do
+          for name in SSH_HOST SSH_USERNAME SSH_KEY ENV_PRODUCTION SSH_HOST_FINGERPRINT; do
             [ -n "$(printenv "$name")" ] || missing="$missing $name"
           done
           if [ -n "$missing" ]; then
@@ -87,13 +85,6 @@ jobs:
         run: |
           echo "COMPOSE_B64=$(base64 -w0 docker-compose.prod.yml)" >> "$GITHUB_ENV"
           echo "DC_B64=$(base64 -w0 deploy/dc)" >> "$GITHUB_ENV"
-
-      # Use an ephemeral, pre-approved, tagged key, so each run's device removes itself and the
-      # tailnet's access rules can limit it to SSH on the VPS.
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0

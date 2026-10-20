@@ -141,22 +141,16 @@ Setiap push ke branch `personal-edition` menjalankan `.github/workflows/deploy.y
 
 1. **Test** (`node-ci.yml`): lint, cek tipe, unit test, test end-to-end API (termasuk test 20.000 baris), dan test browser, terhadap PostgreSQL sementara. Gagal satu, tidak ada yang dibangun.
 2. **Image** (`docker-image.yml`): API, migrasi, web, dan cadangan dibangun di GitHub lalu didorong ke `ghcr.io/<pemilik>/<repo>-api` (dan `-migrate`, `-web`, `-backup`), bertanda commit dan branch.
-3. **Deploy**: runner bergabung ke tailnet Tailscale (VPS tanpa IP publik), masuk lewat SSH, menulis `deploy/.env` dari secret, menarik image **per digest** (persis yang baru dibangun), lalu `up --wait`. Migrasi berjalan lebih dulu; bila layanan tidak sehat dalam 3 menit, image sebelumnya dijalankan lagi dan deploy dinyatakan gagal. Image lama yang tidak dipakai dihapus supaya disk tidak penuh.
+3. **Deploy**: runner masuk ke VPS lewat SSH (alamat publiknya), menulis `deploy/.env` dari secret, menarik image **per digest** (persis yang baru dibangun), lalu `up --wait`. Migrasi berjalan lebih dulu; bila layanan tidak sehat dalam 3 menit, image sebelumnya dijalankan lagi dan deploy dinyatakan gagal. Image lama yang tidak dipakai dihapus supaya disk tidak penuh.
 
 Jalankan ulang dengan tangan dari tab **Actions > Deploy > Run workflow** (mis. setelah mengubah secret).
 
 ### Sekali saja: VPS
 
 - Docker Engine dan Docker Compose v2, dan pengguna SSH-nya anggota grup `docker`.
-- Tailscale terpasang dan masuk ke tailnet. Yang dipakai deploy adalah alamat tailnet VPS (100.x.y.z atau nama MagicDNS-nya), bukan IP publik.
+- SSH hanya dengan kunci: `PasswordAuthentication no` di `/etc/ssh/sshd_config`. Runner GitHub datang dari banyak alamat yang berganti-ganti, jadi port SSH tidak bisa dibatasi ke satu alamat; yang menjaga adalah kunci dan sidik jari host.
 - Folder `BACKUP_HOST_DIR` sudah ada. Folder aplikasi (bawaan `/srv/cashflow`) dibuat sendiri oleh deploy; pengguna SSH harus boleh menulis di sana.
 - Kunci SSH khusus deploy: buat pasangan kunci baru, tambahkan bagian publiknya ke `~/.ssh/authorized_keys` pengguna itu.
-
-### Sekali saja: Tailscale
-
-- Di konsol Tailscale, buat tag `tag:ci` dan izinkan tag itu hanya ke SSH VPS (port 22), mis. di access controls:
-  `{"src": ["tag:ci"], "dst": ["<nama-vps>:22"], "action": "accept"}` (sesuaikan dengan bentuk aturan tailnet Anda).
-- Buat **auth key** yang *reusable*, *ephemeral*, *pre-approved*, dengan tag `tag:ci`. Ephemeral: perangkat runner terhapus sendiri setelah tiap deploy.
 
 ### Sekali saja: GitHub
 
@@ -164,8 +158,7 @@ Di **Settings > Environments**, buat environment `production` (boleh diberi *req
 
 | Jenis | Nama | Isi |
 |---|---|---|
-| Secret | `TAILSCALE_AUTHKEY` | Auth key Tailscale di atas. |
-| Secret | `SSH_HOST` | Alamat tailnet VPS, mis. `100.101.102.103` atau `vps.tail1234.ts.net`. |
+| Secret | `SSH_HOST` | Alamat publik VPS (IP atau nama domain). |
 | Secret | `SSH_PORT` | Opsional; bawaan 22. |
 | Secret | `SSH_USERNAME` | Pengguna SSH di VPS. |
 | Secret | `SSH_KEY` | Kunci privat SSH khusus deploy (seluruh isinya). |
@@ -224,7 +217,7 @@ Untuk memulihkan ke database Neon yang baru (mis. cabang atau proyek Neon lain),
 | Masuk ditolak: "PIN dikunci" | Lima PIN salah berturut-turut menjeda masuk 15 menit untuk semua perangkat. Tunggu, atau jalankan "Lupa PIN" bila PIN memang terlupa. |
 | `backup` berstatus `unhealthy` | `deploy/dc logs --tail 30 backup`. Biasanya database tidak terjangkau atau disk cadangan penuh. Setelah diperbaiki, jalankan cadangan sekarang juga (lihat "Cadangan"). |
 | Cadangan gagal dengan `server version mismatch` | Database Neon memakai PostgreSQL yang lebih baru dari klien cadangan. Ubah angka versi di baris `FROM postgres:17-bookworm` pada `deploy/backup.Dockerfile` menjadi versi database, lalu `deploy/dc up -d --build backup`. |
-| Deploy GitHub Actions gagal di "Connect to Tailscale" atau tidak bisa SSH | Auth key Tailscale kedaluwarsa atau tanpa tag, atau aturan tailnet tidak mengizinkan `tag:ci` ke port 22 VPS. Di VPS: `tailscale status`. |
+| Deploy GitHub Actions tidak bisa SSH ("connection refused" atau "timeout") | `SSH_HOST` atau `SSH_PORT` salah, atau firewall VPS (mis. `ufw`) menutup port SSH. |
 | Deploy gagal dengan "fingerprint" atau "handshake" | `SSH_HOST_FINGERPRINT` tidak cocok dengan kunci host VPS (mis. VPS dipasang ulang). Ambil lagi dengan `ssh-keygen -lf`. |
 | `migrate` gagal atau macet pada database yang benar | `DATABASE_URL` memakai alamat pooled (host memuat `-pooler`). Ganti dengan alamat langsung. |
 | Permintaan pertama setelah lama sepi terasa lambat atau gagal sekali | Neon menidurkan database yang menganggur dan butuh beberapa detik untuk bangun. Ulangi; bila mengganggu, matikan "Scale to zero" di Neon (paket berbayar). |

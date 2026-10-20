@@ -13,12 +13,13 @@ import type {
   ListInstallmentsQueryDto,
   UpdateInstallmentDto,
 } from './dto/installment.dto.js';
-import { lockInstallment, paidCount } from './installment-lock.js';
+import { lockInstallment, paidAmount, paidCount } from './installment-lock.js';
 import {
   InstallmentDetailResponse,
   InstallmentListResponse,
   InstallmentResponse,
   InstallmentSummary,
+  Payments,
   progressFor,
   toInstallmentResponse,
   toInstallmentSnapshot,
@@ -52,10 +53,11 @@ export class InstallmentsService {
   async list(query: ListInstallmentsQueryDto): Promise<InstallmentListResponse> {
     const month = currentMonthInJakarta();
     const installments = await this.prisma.installment.findMany({ orderBy: [{ name: 'asc' }, { id: 'asc' }] });
-    const counts = await this.paidCounts(installments.map((installment) => installment.id));
-    const all = installments.map((installment) =>
-      toInstallmentResponse(installment, progressFor(installment, counts.get(installment.id) ?? 0, month)),
-    );
+    const payments = await this.payments(installments.map((installment) => installment.id));
+    const all = installments.map((installment) => {
+      const paid = payments.get(installment.id) ?? { count: 0, amount: 0n };
+      return toInstallmentResponse(installment, progressFor(installment, paid.count, month), paid.amount);
+    });
     return {
       items: all.filter((item) => matchesFilter(item, query.status)),
       summary: this.summarize(installments, all, month),
@@ -70,9 +72,10 @@ export class InstallmentsService {
       include: TRANSACTION_INCLUDE,
       orderBy: [{ transaction_date: 'desc' }, { created_at: 'desc' }, { id: 'desc' }],
     });
-    const paid = transactions.filter((transaction) => transaction.status !== 'VOID').length;
+    const counted = transactions.filter((transaction) => transaction.status !== 'VOID');
+    const amount = counted.reduce((sum, transaction) => sum + transaction.amount, 0n);
     return {
-      ...toInstallmentResponse(installment, progressFor(installment, paid, currentMonthInJakarta())),
+      ...toInstallmentResponse(installment, progressFor(installment, counted.length, currentMonthInJakarta()), amount),
       transactions: transactions.map(toTransactionResponse),
     };
   }
@@ -185,20 +188,29 @@ export class InstallmentsService {
       activeMonthlyTotal: fromMoney(activeMonthlyTotal),
       unpaid,
       unpaidTotal: fromMoney(unpaid.reduce((sum, item) => sum + toMoney(item.amount), 0n)),
+      remainingTotal: fromMoney(all.reduce((sum, item) => sum + toMoney(item.remainingAmount), 0n)),
     };
   }
 
   private async respond(tx: Prisma.TransactionClient, installment: Installment): Promise<InstallmentResponse> {
     const paid = await paidCount(tx, installment.id);
-    return toInstallmentResponse(installment, progressFor(installment, paid, currentMonthInJakarta()));
+    return toInstallmentResponse(
+      installment,
+      progressFor(installment, paid, currentMonthInJakarta()),
+      await paidAmount(tx, installment.id),
+    );
   }
 
-  private async paidCounts(ids: string[]): Promise<Map<string, number>> {
+  /** Satu query untuk semua cicilan: berapa bulan dan berapa rupiah yang sudah dibayar. */
+  private async payments(ids: string[]): Promise<Map<string, Payments>> {
     const groups = await this.prisma.transaction.groupBy({
       by: ['installment_id'],
       where: { installment_id: { in: ids }, status: { not: 'VOID' } },
       _count: { _all: true },
+      _sum: { amount: true },
     });
-    return new Map(groups.map((group) => [group.installment_id!, group._count._all]));
+    return new Map(
+      groups.map((group) => [group.installment_id!, { count: group._count._all, amount: group._sum.amount ?? 0n }]),
+    );
   }
 }

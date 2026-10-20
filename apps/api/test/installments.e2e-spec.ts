@@ -15,13 +15,18 @@ describe('installments', () => {
   const ctx = setupE2e();
 
   /** Pembayaran yang ditulis langsung ke database. */
-  function pay(world: World, installmentId: string, status: 'APPROVED' | 'VOID' = 'APPROVED') {
+  function pay(
+    world: World,
+    installmentId: string,
+    status: 'APPROVED' | 'VOID' = 'APPROVED',
+    amount = 1_500_000n,
+  ) {
     return createTransaction(ctx.prisma, {
       accountId: world.account.id,
       categoryId: world.expense.id,
       createdById: world.owner.user.id,
       type: 'OUT',
-      amount: 1_500_000n,
+      amount,
       status,
       installmentId,
     });
@@ -45,6 +50,9 @@ describe('installments', () => {
         due: expect.any(Number),
         behindMonths: expect.any(Number),
         status: expect.any(String),
+        totalAmount: '4500000',
+        paidAmount: '0',
+        remainingAmount: '4500000',
         notes: 'BCA',
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
@@ -91,7 +99,7 @@ describe('installments', () => {
         months: 12,
         monthlyAmount: 800_000n,
       });
-      await pay(world, onTrack.id);
+      await pay(world, onTrack.id, 'APPROVED', 750_000n);
       // Belum mulai: tidak dihitung di total bulan ini.
       await createInstallment(ctx.prisma, { name: 'Kulkas', startMonth: monthFromNow(1), months: 6, monthlyAmount: 400_000n });
       // Lunas, dan periodenya sudah lewat.
@@ -106,15 +114,34 @@ describe('installments', () => {
       const res = await call(ctx, world.owner, 'get', INSTALLMENTS).expect(200);
 
       const byName = Object.fromEntries(res.body.items.map((i: { name: string }) => [i.name, i]));
-      expect(byName.Motor).toMatchObject({ paid: 1, due: 3, behindMonths: 2, status: 'BEHIND', endMonth: monthFromNow(0) });
-      expect(byName.Laptop).toMatchObject({ paid: 1, due: 1, status: 'ON_TRACK' });
+      expect(byName.Motor).toMatchObject({
+        paid: 1,
+        due: 3,
+        behindMonths: 2,
+        status: 'BEHIND',
+        endMonth: monthFromNow(0),
+        totalAmount: '4500000',
+        paidAmount: '1500000',
+        remainingAmount: '3000000',
+      });
+      // Dibayar 750.000 sekali (boleh berbeda dari nominal per bulan); sisa dihitung dari bulan yang tersisa.
+      expect(byName.Laptop).toMatchObject({
+        paid: 1,
+        due: 1,
+        status: 'ON_TRACK',
+        totalAmount: '9600000',
+        paidAmount: '750000',
+        remainingAmount: '8800000',
+      });
       expect(byName.Kulkas).toMatchObject({ paid: 0, due: 0, status: 'NOT_STARTED' });
-      expect(byName.HP).toMatchObject({ paid: 1, status: 'PAID_OFF' });
+      expect(byName.HP).toMatchObject({ paid: 1, status: 'PAID_OFF', remainingAmount: '0' });
       expect(res.body.summary).toEqual({
         month: monthFromNow(0),
         activeMonthlyTotal: '2300000',
         unpaid: [{ id: behind.id, name: 'Motor', months: 2, amount: '3000000' }],
         unpaidTotal: '3000000',
+        // 3.000.000 (Motor) + 8.800.000 (Laptop) + 2.400.000 (Kulkas); HP sudah lunas.
+        remainingTotal: '14200000',
       });
     });
 

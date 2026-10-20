@@ -120,6 +120,18 @@ function askDelete(): void {
         <dt class="text-sm text-surface-600">Kemajuan</dt>
         <dd class="font-medium" data-testid="installment-progress">{{ progressText(installment) }}</dd>
       </div>
+      <div>
+        <dt class="text-sm text-surface-600">Total</dt>
+        <dd class="font-medium" data-testid="installment-total"><MoneyText :amount="installment.totalAmount" /></dd>
+      </div>
+      <div>
+        <dt class="text-sm text-surface-600">Sudah dibayar</dt>
+        <dd class="font-medium" data-testid="installment-paid-amount"><MoneyText :amount="installment.paidAmount" /></dd>
+      </div>
+      <div>
+        <dt class="text-sm text-surface-600">Sisa</dt>
+        <dd class="font-medium" data-testid="installment-remaining"><MoneyText :amount="installment.remainingAmount" /></dd>
+      </div>
       <div v-if="installment.notes">
         <dt class="text-sm text-surface-600">Catatan</dt>
         <dd class="whitespace-pre-line">{{ installment.notes }}</dd>

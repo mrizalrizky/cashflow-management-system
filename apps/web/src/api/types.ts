@@ -115,6 +115,12 @@ export interface Installment {
   due: number
   behindMonths: number
   status: InstallmentStatus
+  /** Nominal per bulan × jumlah bulan. */
+  totalAmount: string
+  /** Jumlah sebenarnya dari pembayaran yang tercatat. */
+  paidAmount: string
+  /** Bulan yang belum dibayar × nominal per bulan. */
+  remainingAmount: string
   notes: string | null
   createdAt: string
   updatedAt: string
@@ -127,6 +133,8 @@ export interface InstallmentList {
     activeMonthlyTotal: string
     unpaid: { id: string; name: string; months: number; amount: string }[]
     unpaidTotal: string
+    /** Jumlah sisa semua cicilan yang belum lunas. */
+    remainingTotal: string
   }
 }
 

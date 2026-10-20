@@ -23,6 +23,9 @@ function makeInstallment(overrides: Partial<Installment> = {}): Installment {
     due: 3,
     behindMonths: 2,
     status: 'BEHIND',
+    totalAmount: '4500000',
+    paidAmount: '1500000',
+    remainingAmount: '3000000',
     notes: null,
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
@@ -40,6 +43,7 @@ const LIST: InstallmentList = {
     activeMonthlyTotal: '2300000',
     unpaid: [{ id: 'i-motor', name: 'Motor', months: 2, amount: '3000000' }],
     unpaidTotal: '3000000',
+    remainingTotal: '14200000',
   },
 }
 
@@ -63,13 +67,17 @@ describe('InstallmentsView', () => {
     expect(motor.text()).toContain('Agu 2026 – Okt 2026')
     expect(motor.text()).toContain('1/3')
     expect(motor.text()).toContain('Tertinggal')
+    expect(motor.get('[data-testid="installment-amounts"]').text()).toBe(
+      'Total Rp 4.500.000 · Dibayar Rp 1.500.000 · Sisa Rp 3.000.000',
+    )
+    expect(wrapper.get('[data-testid="stat-remaining-total"]').text()).toContain('Rp 14.200.000')
     expect(motor.find('a[href="/cicilan/i-motor"]').text()).toBe('Motor')
   })
 
   it('says when nothing is behind', async () => {
     vi.mocked(installmentsApi.listInstallments).mockResolvedValue({
       items: [],
-      summary: { month: '2026-10', activeMonthlyTotal: '0', unpaid: [], unpaidTotal: '0' },
+      summary: { month: '2026-10', activeMonthlyTotal: '0', unpaid: [], unpaidTotal: '0', remainingTotal: '0' },
     })
     const { wrapper } = await mountView(InstallmentsView, { path: '/cicilan', withOverlays: true })
     expect(wrapper.get('[data-testid="stat-unpaid"]').text()).toContain('Semua cicilan sudah dibayar sampai bulan ini')
@@ -123,6 +131,9 @@ describe('InstallmentDetailView', () => {
 
     expect(installmentsApi.getInstallment).toHaveBeenCalledWith('i-motor')
     expect(wrapper.get('h1').text()).toBe('Motor')
+    expect(wrapper.get('[data-testid="installment-total"]').text()).toContain('Rp 4.500.000')
+    expect(wrapper.get('[data-testid="installment-paid-amount"]').text()).toContain('Rp 1.500.000')
+    expect(wrapper.get('[data-testid="installment-remaining"]').text()).toContain('Rp 3.000.000')
     expect(wrapper.get('a[href="/transaksi/t-1"]').text()).toBe('Bayar motor Agu')
     expect(wrapper.find('[data-testid="delete-installment"]').exists()).toBe(false)
   })

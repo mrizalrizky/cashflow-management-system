@@ -80,7 +80,7 @@ export function pageOf<T>(items: T[], total = items.length): Paginated<T> {
 
 /** Jawaban daftar cicilan untuk dropdown form transaksi. */
 export function installmentList(items: Installment[] = []): InstallmentList {
-  return { items, summary: { month: '2026-10', activeMonthlyTotal: '0', unpaid: [], unpaidTotal: '0' } }
+  return { items, summary: { month: '2026-10', activeMonthlyTotal: '0', unpaid: [], unpaidTotal: '0', remainingTotal: '0' } }
 }
 
 export function makeInstallment(overrides: Partial<Installment> = {}): Installment {
@@ -95,6 +95,9 @@ export function makeInstallment(overrides: Partial<Installment> = {}): Installme
     due: 3,
     behindMonths: 2,
     status: 'BEHIND',
+    totalAmount: '4500000',
+    paidAmount: '1500000',
+    remainingAmount: '3000000',
     notes: null,
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',

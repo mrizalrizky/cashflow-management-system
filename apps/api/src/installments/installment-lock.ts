@@ -14,6 +14,15 @@ export async function lockInstallment(
   return rows.length === 0 ? null : tx.installment.findUnique({ where: { id } });
 }
 
+/** Jumlah rupiah pembayaran yang dihitung (tidak VOID) untuk satu cicilan. */
+export async function paidAmount(db: Db, id: string): Promise<bigint> {
+  const sum = await db.transaction.aggregate({
+    where: { installment_id: id, status: { not: 'VOID' } },
+    _sum: { amount: true },
+  });
+  return sum._sum.amount ?? 0n;
+}
+
 /** Pembayaran yang dihitung: transaksi tertaut yang tidak VOID, selain transaksi yang dikecualikan. */
 export function paidCount(db: Db, id: string, exceptTransactionId?: string): Promise<number> {
   return db.transaction.count({

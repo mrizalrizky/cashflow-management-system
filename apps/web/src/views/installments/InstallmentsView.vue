@@ -47,11 +47,17 @@ function onSaved(installment: Installment): void {
 
   <ErrorState v-if="error && !data" :message="error" @retry="reload" />
   <template v-else-if="data">
-    <div class="mb-6 grid gap-4 sm:grid-cols-2">
+    <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <StatCard
         label="Total cicilan aktif per bulan"
         :amount="data.summary.activeMonthlyTotal"
         data-testid="stat-active-monthly"
+      />
+      <StatCard
+        label="Total sisa cicilan"
+        :amount="data.summary.remainingTotal"
+        hint="Semua cicilan yang belum lunas"
+        data-testid="stat-remaining-total"
       />
       <div class="min-w-0 rounded-xl border border-surface-200 bg-surface-0 p-4" data-testid="stat-unpaid">
         <p class="text-sm text-surface-600">Belum dibayar bulan ini</p>
@@ -84,6 +90,10 @@ function onSaved(installment: Installment): void {
           <p class="text-sm text-surface-600">
             <MoneyText :amount="item.monthlyAmount" /> per bulan ·
             {{ formatMonth(item.startMonth) }} – {{ formatMonth(item.endMonth) }}
+          </p>
+          <p class="text-sm text-surface-600" data-testid="installment-amounts">
+            Total {{ formatRupiah(item.totalAmount) }} · Dibayar {{ formatRupiah(item.paidAmount) }} · Sisa
+            {{ formatRupiah(item.remainingAmount) }}
           </p>
         </div>
         <div class="flex items-center gap-2">

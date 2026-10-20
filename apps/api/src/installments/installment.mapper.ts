@@ -15,6 +15,12 @@ export interface InstallmentResponse {
   due: number;
   behindMonths: number;
   status: InstallmentStatus;
+  /** Nominal per bulan × jumlah bulan. */
+  totalAmount: string;
+  /** Jumlah sebenarnya dari pembayaran yang tidak VOID; tiap pembayaran boleh berbeda dari nominal per bulan. */
+  paidAmount: string;
+  /** Bulan yang belum dibayar × nominal per bulan. */
+  remainingAmount: string;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +41,8 @@ export interface InstallmentSummary {
   activeMonthlyTotal: string;
   unpaid: UnpaidInstallment[];
   unpaidTotal: string;
+  /** Jumlah sisa semua cicilan yang belum lunas. */
+  remainingTotal: string;
 }
 
 export interface InstallmentListResponse {
@@ -51,10 +59,18 @@ export function progressFor(installment: Installment, paid: number, currentMonth
   );
 }
 
+/** Pembayaran yang dihitung untuk satu cicilan: berapa bulan, dan berapa rupiah. */
+export interface Payments {
+  count: number;
+  amount: bigint;
+}
+
 export function toInstallmentResponse(
   installment: Installment,
   progress: InstallmentProgress,
+  paidAmount: bigint,
 ): InstallmentResponse {
+  const remainingMonths = BigInt(Math.max(installment.months - progress.paid, 0));
   return {
     id: installment.id,
     name: installment.name,
@@ -66,6 +82,9 @@ export function toInstallmentResponse(
     due: progress.due,
     behindMonths: progress.behindMonths,
     status: progress.status,
+    totalAmount: fromMoney(installment.monthly_amount * BigInt(installment.months)),
+    paidAmount: fromMoney(paidAmount),
+    remainingAmount: fromMoney(installment.monthly_amount * remainingMonths),
     notes: installment.notes,
     createdAt: installment.created_at.toISOString(),
     updatedAt: installment.updated_at.toISOString(),

@@ -196,3 +196,8 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 - **"Jawaban sudah diubah"** muncul bila jawaban atau harga berubah setelah penilaian terakhir; status dan pilihan ringkasan tidak dihitung.
 - **Status barang bebas berpindah** (termasuk kembali ke Menunggu), supaya salah pilih bisa dibetulkan.
 - **Jalan pintas Dibeli**: "Catat pengeluaran" mengisi nominal dan keterangan dengan harga dan nama barang; "Buat cicilan" mengisi nama dan mencatat harga di catatan, karena nominal per bulan tidak bisa diturunkan dari harga.
+
+## Cicilan: total, dibayar, sisa
+
+- **Total** = nominal per bulan × jumlah bulan (dihitung, tidak disimpan). **Dibayar** = jumlah sebenarnya dari pembayaran yang tidak VOID, karena tiap pembayaran boleh berbeda dari nominal per bulan. **Sisa** = bulan yang belum dibayar × nominal per bulan; 0 bila lunas.
+- **"Total sisa cicilan"** di atas halaman menjumlahkan sisa semua cicilan.

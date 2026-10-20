@@ -71,9 +71,9 @@ async function ensureCategories(
  */
 export async function seedDatabase(prisma: PrismaClient): Promise<void> {
   const firstInstall = await ensureOwner(prisma);
-  if (firstInstall) {
-    await ensureAccounts(prisma);
-    await ensureCategories(prisma, DEFAULT_CATEGORIES);
-  }
-  await ensureCategories(prisma, SYSTEM_CATEGORIES);
+  // if (firstInstall) {
+  //   await ensureAccounts(prisma);
+  //   // await ensureCategories(prisma, DEFAULT_CATEGORIES);
+  // }
+  // await ensureCategories(prisma, SYSTEM_CATEGORIES);
 }

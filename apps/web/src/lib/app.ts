@@ -1,1 +1,1 @@
-export const APP_NAME = 'Arus Kas'
+export const APP_NAME = 'PUTRI ABUNDANCE'

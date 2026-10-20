@@ -70,7 +70,8 @@ cleanup() {
   [ -f "$env_file" ] && compose --profile tools down --volumes --remove-orphans --rmi local > /dev/null 2>&1
   docker rm -f "$STUB" "$WEB_ALONE" > /dev/null 2>&1
   docker network rm "$NETWORK" > /dev/null 2>&1
-  docker image rm -f "$API_IMAGE" "$WEB_IMAGE" "$BACKUP_IMAGE" > /dev/null 2>&1
+  docker image rm -f "$API_IMAGE" "$WEB_IMAGE" "$BACKUP_IMAGE" \
+    "$PROJECT/api:compose" "$PROJECT/migrate:compose" "$PROJECT/web:compose" "$PROJECT/backup:compose" > /dev/null 2>&1
   rm -rf "$work"
   exit "$status"
 }
@@ -249,6 +250,10 @@ BACKUP_AT=01:30
 BACKUP_KEEP_DAYS=14
 TZ=Asia/Jakarta
 SMOKE_PORT=$STACK_PORT
+API_IMAGE=$PROJECT/api:compose
+MIGRATE_IMAGE=$PROJECT/migrate:compose
+WEB_IMAGE=$PROJECT/web:compose
+BACKUP_IMAGE=$PROJECT/backup:compose
 EOF
 
 for required in DATABASE_URL JWT_ACCESS_SECRET TUNNEL_TOKEN BACKUP_HOST_DIR; do

@@ -1,0 +1,128 @@
+# Builds the four production images and pushes them to GitHub's registry (ghcr.io). Run only by
+# the deploy, after the tests pass. The server pulls exactly these builds, by digest.
+name: Docker images
+
+on:
+  workflow_call:
+    outputs:
+      api:
+        description: API image (runtime stage), by digest
+        value: ${{ jobs.build-and-push.outputs.api }}
+      migrate:
+        description: Migration image (API build stage), by digest
+        value: ${{ jobs.build-and-push.outputs.migrate }}
+      web:
+        description: Web image (Caddy with the built app), by digest
+        value: ${{ jobs.build-and-push.outputs.web }}
+      backup:
+        description: Backup and restore image, by digest
+        value: ${{ jobs.build-and-push.outputs.backup }}
+
+# Read the code, write the images. The calling job must grant packages: write too.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      api: ${{ steps.names.outputs.repo }}-api@${{ steps.api.outputs.digest }}
+      migrate: ${{ steps.names.outputs.repo }}-migrate@${{ steps.migrate.outputs.digest }}
+      web: ${{ steps.names.outputs.repo }}-web@${{ steps.web.outputs.digest }}
+      backup: ${{ steps.names.outputs.repo }}-backup@${{ steps.backup.outputs.digest }}
+
+    steps:
+      # Actions are pinned to a commit: a tag can be moved to other code, and these steps hold a
+      # token that can push images.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Registry names must be lowercase; repository names on GitHub need not be.
+      - name: Name the images
+        id: names
+        run: echo "repo=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      # The workflow's own token: no registry account or long-lived token to keep.
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Attaching the SBOM and provenance needs a buildx builder: the runner's default docker
+      # driver refuses them.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # Each image is tagged with the commit and with the branch, carries the label that links
+      # the package to this repository (so this repository's workflows may pull it), and keeps
+      # its build cache between runs. No secret goes into any build: settings reach the
+      # containers at run time from the env file.
+      - name: API
+        id: api
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: runtime
+          push: true
+          sbom: true
+          provenance: mode=max
+          tags: |
+            ${{ steps.names.outputs.repo }}-api:${{ github.sha }}
+            ${{ steps.names.outputs.repo }}-api:${{ github.ref_name }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      # The API's build stage: it holds the Prisma CLI and runs migrations, then the seed.
+      - name: Migrations
+        id: migrate
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: build
+          push: true
+          sbom: true
+          provenance: mode=max
+          tags: |
+            ${{ steps.names.outputs.repo }}-migrate:${{ github.sha }}
+            ${{ steps.names.outputs.repo }}-migrate:${{ github.ref_name }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=migrate
+
+      - name: Web
+        id: web
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          sbom: true
+          provenance: mode=max
+          tags: |
+            ${{ steps.names.outputs.repo }}-web:${{ github.sha }}
+            ${{ steps.names.outputs.repo }}-web:${{ github.ref_name }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Backup
+        id: backup
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+        with:
+          context: .
+          file: deploy/backup.Dockerfile
+          push: true
+          sbom: true
+          provenance: mode=max
+          tags: |
+            ${{ steps.names.outputs.repo }}-backup:${{ github.sha }}
+            ${{ steps.names.outputs.repo }}-backup:${{ github.ref_name }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=backup
+          cache-to: type=gha,mode=max,scope=backup

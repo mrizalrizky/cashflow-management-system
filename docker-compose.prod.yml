@@ -2,6 +2,10 @@
 #
 #   docker compose --env-file deploy/.env -f docker-compose.prod.yml up -d --build
 #
+# Image: deploy GitHub Actions mengisi API_IMAGE, MIGRATE_IMAGE, WEB_IMAGE, dan BACKUP_IMAGE
+# dengan image dari ghcr.io (per digest), lalu menjalankan `pull` dan `up --no-build`. Tanpa
+# nilai itu, image dibangun di server dengan nama lokal di bawah.
+#
 # Tidak ada port yang dibuka: satu-satunya jalan masuk adalah Cloudflare Tunnel (`cloudflared`),
 # yang meneruskan ke `web`. Database berada di luar (Neon), lewat DATABASE_URL.
 # Panduan lengkap: docs/deployment.md
@@ -21,6 +25,7 @@ x-api-build: &api-build
   dockerfile: apps/api/Dockerfile
 
 x-backup-image: &backup-image
+  image: ${BACKUP_IMAGE:-cashflow-backup:local}
   build:
     context: .
     dockerfile: deploy/backup.Dockerfile
@@ -36,6 +41,7 @@ x-backup-image: &backup-image
 services:
   # Sekali jalan tiap deploy: menerapkan migrasi yang belum ada, lalu seed (aman diulang).
   migrate:
+    image: ${MIGRATE_IMAGE:-cashflow-migrate:local}
     build:
       <<: *api-build
       target: build
@@ -46,6 +52,7 @@ services:
 
   api:
     <<: *long-running
+    image: ${API_IMAGE:-cashflow-api:local}
     build:
       <<: *api-build
       target: runtime
@@ -74,6 +81,7 @@ services:
   # Caddy: menyajikan web dan meneruskan /api ke `api`. HTTP biasa, hanya di jaringan Docker.
   web:
     <<: *long-running
+    image: ${WEB_IMAGE:-cashflow-web:local}
     build:
       context: .
       dockerfile: apps/web/Dockerfile

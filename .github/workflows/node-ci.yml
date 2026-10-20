@@ -1,0 +1,79 @@
+# Lint, type checks, unit tests, API end-to-end tests and browser tests, against a throwaway
+# PostgreSQL. Runs on every pull request, on pushes to main (the company edition, which is not
+# deployed from here), and from the deploy of personal-edition before anything is built.
+name: Node.js CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+# The GitHub token can read the code and nothing else.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # The end-to-end tests empty every table, so they get a database of their own. Its name must
+    # end in _test: the tests refuse to run anywhere else.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: cashflow
+          POSTGRES_PASSWORD: cashflow_ci
+          POSTGRES_DB: cashflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cashflow -d cashflow_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    env:
+      TEST_DATABASE_URL: postgresql://cashflow:cashflow_ci@localhost:5432/cashflow_test
+      # No test may reach Anthropic; the test setups blank the key as well.
+      ANTHROPIC_API_KEY: ""
+
+    steps:
+      # Actions are pinned to a commit: a tag can be moved to other code.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          # The version the Dockerfiles run; change them together.
+          node-version: 24.x
+          cache: npm
+
+      # `postinstall` of the API runs `prisma generate`.
+      - run: npm ci
+
+      # Reported, not yet blocking: the high advisories today are in Prisma's CLI (mysql2,
+      # deepmerge-ts), fixed in prisma 7.10.1. Make this step blocking again once Prisma is
+      # bumped (remove continue-on-error).
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
+      # oxlint, eslint and both type checks.
+      - run: npm run lint
+
+      - run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      # Also the 20,000-row export and the 10,000-row report, which are too slow over a remote
+      # database but quick on this one.
+      - name: API end-to-end tests
+        run: npm run test:e2e
+
+      - name: Install the browser for the browser tests
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+
+      - name: Browser tests
+        run: npm run test:browser

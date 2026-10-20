@@ -1,0 +1,178 @@
+# Deploys the personal edition to the VPS. The VPS sits behind NAT with no public IP, so the
+# runner joins the tailnet and reaches it over SSH there. Visitors reach the app through the
+# Cloudflare Tunnel inside the stack, as before; nothing is opened on the server.
+#
+# Setup, secrets and variables: docs/deployment.md, "Deploy otomatis (GitHub Actions)".
+name: Deploy
+
+on:
+  push:
+    branches: [personal-edition]
+  # A redeploy of the branch by hand, e.g. after changing the ENV_PRODUCTION secret.
+  workflow_dispatch:
+
+# The GitHub token can read the code and nothing else, unless a job asks for more.
+permissions:
+  contents: read
+
+# One deploy at a time, in push order: two quick pushes must not deploy out of order.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Nothing is built or deployed unless lint and every test pass.
+  test:
+    if: github.ref == 'refs/heads/personal-edition'
+    uses: ./.github/workflows/node-ci.yml
+
+  images:
+    needs: test
+    uses: ./.github/workflows/docker-image.yml
+    permissions:
+      contents: read
+      packages: write
+
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Secrets for the server live in this environment; its protection rules (e.g. a required
+    # reviewer) apply to every deploy.
+    environment: production
+    permissions:
+      contents: read
+      # The server pulls the images with this job's own token, which expires with the job.
+      packages: read
+
+    steps:
+      # Without the host key fingerprint, the deploy would connect to whatever answers at the host
+      # and hand it every secret. It is public, so it is a variable: only the "SHA256:..." part,
+      # of the key type the SSH action negotiates (ECDSA first, then RSA, then ed25519). On the
+      # server:  ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub
+      - name: Check the deploy settings are set
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
+          SSH_HOST_FINGERPRINT: ${{ vars.SSH_HOST_FINGERPRINT }}
+        run: |
+          missing=""
+          for name in TAILSCALE_AUTHKEY SSH_HOST SSH_USERNAME SSH_KEY ENV_PRODUCTION SSH_HOST_FINGERPRINT; do
+            [ -n "$(printenv "$name")" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Set these in the production environment (Settings > Environments):$missing"
+            exit 1
+          fi
+          # The image names are set by this workflow; an old line in the secret would override
+          # nothing here but would confuse whoever reads the file on the server.
+          if printf '%s\n' "$ENV_PRODUCTION" | grep -Eq '^(API|MIGRATE|WEB|BACKUP)_IMAGE='; then
+            echo "::error::Remove the *_IMAGE lines from the ENV_PRODUCTION secret; the deploy sets them."
+            exit 1
+          fi
+
+      # The compose file and the helper script go to the server with each deploy, so the server
+      # needs no copy of the repository.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: |
+            docker-compose.prod.yml
+            deploy/dc
+          sparse-checkout-cone-mode: false
+
+      - name: Pack the compose files
+        run: |
+          echo "COMPOSE_B64=$(base64 -w0 docker-compose.prod.yml)" >> "$GITHUB_ENV"
+          echo "DC_B64=$(base64 -w0 deploy/dc)" >> "$GITHUB_ENV"
+
+      # Use an ephemeral, pre-approved, tagged key, so each run's device removes itself and the
+      # tailnet's access rules can limit it to SSH on the VPS.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+        env:
+          # Passed as variables, not pasted into the script: the action quotes them, so a $ or `
+          # in a value stays literal.
+          APP_ENV_FILE: ${{ secrets.ENV_PRODUCTION }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          API_IMAGE: ${{ needs.images.outputs.api }}
+          MIGRATE_IMAGE: ${{ needs.images.outputs.migrate }}
+          WEB_IMAGE: ${{ needs.images.outputs.web }}
+          BACKUP_IMAGE: ${{ needs.images.outputs.backup }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/srv/cashflow' }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          fingerprint: ${{ vars.SSH_HOST_FINGERPRINT }}
+          command_timeout: 15m
+          envs: APP_ENV_FILE,GHCR_USER,GHCR_TOKEN,API_IMAGE,MIGRATE_IMAGE,WEB_IMAGE,BACKUP_IMAGE,DEPLOY_DIR,COMPOSE_B64,DC_B64
+          script: |
+            # Stop at the first failing step: a failed pull must not carry on to recreate the
+            # containers from whatever images happen to be on the host.
+            set -eu
+
+            mkdir -p "$DEPLOY_DIR/deploy"
+            cd "$DEPLOY_DIR"
+            printf '%s' "$COMPOSE_B64" | base64 -d > docker-compose.prod.yml
+            printf '%s' "$DC_B64" | base64 -d > deploy/dc
+            chmod 755 deploy/dc
+
+            # However the script ends: no registry login left on the host.
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
+            # The env file holds every secret: readable by this user only. It stays on the
+            # server (deploy/dc logs, backups and restores read it), and the previous one is kept
+            # to roll back to.
+            umask 077
+            [ -f deploy/.env ] && cp deploy/.env deploy/.env.previous
+            {
+              printf '%s\n' "$APP_ENV_FILE"
+              echo "API_IMAGE=$API_IMAGE"
+              echo "MIGRATE_IMAGE=$MIGRATE_IMAGE"
+              echo "WEB_IMAGE=$WEB_IMAGE"
+              echo "BACKUP_IMAGE=$BACKUP_IMAGE"
+            } > deploy/.env
+
+            echo "Deploying $API_IMAGE"
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            deploy/dc pull migrate api web backup cloudflared
+            docker logout ghcr.io >/dev/null
+
+            # Migrations run first (the api waits for them), then every long-running service must
+            # report healthy. The same command the smoke test uses.
+            if ! deploy/dc up -d --no-build --remove-orphans --wait --wait-timeout 180 api web backup cloudflared; then
+              echo "The new version did not come up:"
+              deploy/dc ps -a || true
+              deploy/dc logs --tail 40 migrate api web || true
+              if [ -f deploy/.env.previous ]; then
+                # Back to the images that were running. A migration that already ran is not
+                # undone: if the previous version cannot work with it, fix forward instead.
+                echo "Rolling back to the previous version."
+                cp deploy/.env.previous deploy/.env
+                deploy/dc up -d --no-build --remove-orphans api web backup cloudflared || true
+              fi
+              exit 1
+            fi
+            [ "$(docker inspect --format '{{.State.ExitCode}}' cashflow-migrate-1)" = "0" ] || {
+              echo "Migrations failed:"; deploy/dc logs --tail 40 migrate; exit 1;
+            }
+            deploy/dc ps
+
+            # Each deploy leaves the previous build's images behind; left alone they fill the
+            # disk. Every image of this app that no container uses is removed (Docker refuses to
+            # remove one in use), and other services' images on the host are not touched.
+            repo="${API_IMAGE%-api@*}"
+            docker image ls --format '{{.Repository}} {{.ID}}' \
+              | awk -v prefix="$repo-" 'index($1, prefix) == 1 { print $2 }' | sort -u \
+              | xargs -r docker image rm >/dev/null 2>&1 || true
+            docker image prune -f >/dev/null || true

@@ -90,6 +90,8 @@ export interface Transaction {
   /** Cicilan yang dibayar transaksi ini. */
   installment: NamedRef | null
   isTransfer: boolean
+  /** Penyesuaian saldo dari "Cocokkan saldo": hanya bisa dibatalkan, tidak dihitung di dasbor. */
+  isAdjustment: boolean
   transferGroupId: string | null
   createdBy: NamedRef
   voidedBy: NamedRef | null

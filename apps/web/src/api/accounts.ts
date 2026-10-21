@@ -1,5 +1,5 @@
 import { request } from './http'
-import type { Account, AccountOption, AccountType, PageParams, Paginated } from './types'
+import type { Account, AccountOption, AccountType, PageParams, Paginated, Transaction } from './types'
 
 /** `null` diperlakukan sama dengan tidak diisi (nilai dari dropdown yang dikosongkan). */
 export interface AccountFilters {
@@ -31,4 +31,20 @@ export function updateAccount(id: string, input: UpdateAccountInput): Promise<Ac
 /** Akun aktif untuk dipilih saat mencatat transaksi; tersedia untuk semua peran, tanpa saldo. */
 export function listAccountOptions(): Promise<AccountOption[]> {
   return request('/accounts/options')
+}
+
+/** Hasil "Cocokkan saldo"; `transaction` null bila saldonya sudah cocok. */
+export interface ReconcileResult {
+  previousBalance: string
+  actualBalance: string
+  difference: string
+  transaction: Transaction | null
+}
+
+/** `actualBalance` string digit, boleh diawali `-`. */
+export function reconcileAccount(
+  id: string,
+  input: { actualBalance: string; description?: string },
+): Promise<ReconcileResult> {
+  return request(`/accounts/${id}/reconcile`, { method: 'POST', body: input })
 }

@@ -18,6 +18,7 @@ import { useToggleActive } from '@/composables/useToggleActive'
 import { ACCOUNT_TYPE_OPTIONS, ACTIVE_OPTIONS, accountTypeLabel } from '@/lib/labels'
 import { formatRupiah } from '@/lib/money'
 import AccountFormDialog from './AccountFormDialog.vue'
+import ReconcileDialog from './ReconcileDialog.vue'
 
 const notify = useNotify()
 
@@ -38,6 +39,14 @@ const selected = ref<Account | null>(null)
 function openForm(account: Account | null): void {
   selected.value = account
   formOpen.value = true
+}
+
+const reconcileOpen = ref(false)
+const reconciling = ref<Account | null>(null)
+
+function openReconcile(account: Account): void {
+  reconciling.value = account
+  reconcileOpen.value = true
 }
 
 function onSaved(account: Account): void {
@@ -110,6 +119,13 @@ onMounted(list.reload)
       <template #body="{ data }: { data: Account }">
         <div class="flex justify-end gap-1">
           <RowActionButton
+            v-if="data.isActive"
+            icon="pi pi-equals"
+            :label="`Cocokkan saldo ${data.name}`"
+            :test-id="`reconcile-${data.id}`"
+            @click="openReconcile(data)"
+          />
+          <RowActionButton
             icon="pi pi-pencil"
             :label="`Ubah ${data.name}`"
             :test-id="`edit-${data.id}`"
@@ -122,4 +138,5 @@ onMounted(list.reload)
   </PagedTable>
 
   <AccountFormDialog v-model:visible="formOpen" :account="selected" @saved="onSaved" />
+  <ReconcileDialog v-if="reconciling" v-model:visible="reconcileOpen" :account="reconciling" @reconciled="list.reload" />
 </template>

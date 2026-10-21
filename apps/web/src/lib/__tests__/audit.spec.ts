@@ -50,6 +50,7 @@ describe('audit labels', () => {
     'LOGIN',
     'DELETE',
     'AI_REVIEW',
+    'ADJUST',
     'LOGIN_FAILED',
     'LOGOUT',
     'TOKEN_REUSE',

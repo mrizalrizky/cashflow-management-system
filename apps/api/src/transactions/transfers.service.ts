@@ -32,8 +32,8 @@ export class TransfersService {
     return this.prisma.$transaction(async (tx) => {
       await this.assertValid(tx, dto);
       const [outCategoryId, inCategoryId] = await Promise.all([
-        systemCategoryId(tx, 'OUT'),
-        systemCategoryId(tx, 'IN'),
+        systemCategoryId(tx, 'OUT', 'transfer'),
+        systemCategoryId(tx, 'IN', 'transfer'),
       ]);
 
       const shared = {

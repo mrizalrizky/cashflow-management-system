@@ -29,6 +29,7 @@ defineProps<{ transactions: Transaction[] }>()
         <p class="text-sm text-surface-500">
           {{ formatCalendarDate(transaction.transactionDate) }}
           <Tag v-if="transaction.isTransfer" severity="info" value="Transfer" class="ml-1" />
+          <Tag v-if="transaction.isAdjustment" severity="secondary" value="Penyesuaian" class="ml-1" />
         </p>
       </div>
       <div class="flex items-center gap-3">

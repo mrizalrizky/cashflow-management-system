@@ -7,7 +7,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { IsCalendarDate } from '../../common/calendar-date.js';
-import { IsPositiveMoneyString } from '../../common/money.js';
+import { IsMoneyString, IsPositiveMoneyString } from '../../common/money.js';
 import { IsName } from '../../common/name.js';
 import { IntersectionType } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../common/pagination.js';
@@ -75,6 +75,17 @@ export class UpdateTransactionDto {
   @IsOptional()
   @IsUUID()
   installmentId?: string | null;
+}
+
+/** "Cocokkan saldo": saldo sebenarnya akun, boleh minus (mis. kartu kredit). */
+export class ReconcileDto {
+  @IsMoneyString({ allowNegative: true })
+  actualBalance: string;
+
+  /** Bawaan "Penyesuaian saldo". */
+  @IsOptionalNotNull()
+  @IsName(TEXT_MAX)
+  description?: string;
 }
 
 /** Alasan pembatalan (void). */

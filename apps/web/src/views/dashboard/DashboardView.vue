@@ -18,6 +18,7 @@ import { useTransactionOptions } from '@/composables/useTransactionOptions'
 import { formatCalendarDate } from '@/lib/format'
 import { accountTypeLabel } from '@/lib/labels'
 import PeriodPicker from './PeriodPicker.vue'
+import ReconcileDialog from '@/views/master-data/ReconcileDialog.vue'
 import TransactionFormDialog from '@/views/transactions/TransactionFormDialog.vue'
 import RecentTransactions from './RecentTransactions.vue'
 
@@ -66,6 +67,14 @@ const categories = computed(() =>
 // Mencatat pengeluaran langsung dari dasbor; form-nya sama dengan di halaman Transaksi.
 const options = useTransactionOptions()
 const recording = ref(false)
+
+/** Akun yang sedang dicocokkan saldonya. */
+const reconciling = ref<{ id: string; name: string; balance: string } | null>(null)
+const reconcileOpen = ref(false)
+function openReconcile(account: { id: string; name: string; balance: string }): void {
+  reconciling.value = account
+  reconcileOpen.value = true
+}
 
 onMounted(reload)
 </script>
@@ -170,7 +179,20 @@ onMounted(reload)
                 <span class="text-sm text-surface-500"> · {{ accountTypeLabel(account.type) }}</span>
                 <Tag v-if="!account.isActive" severity="secondary" value="Nonaktif" class="ml-2" />
               </span>
-              <MoneyText :amount="account.balance" class="font-medium" />
+              <span class="flex items-center gap-1">
+                <MoneyText :amount="account.balance" class="font-medium" />
+                <Button
+                  v-if="account.isActive"
+                  icon="pi pi-equals"
+                  severity="secondary"
+                  variant="text"
+                  rounded
+                  size="small"
+                  :aria-label="`Cocokkan saldo ${account.name}`"
+                  :data-testid="`reconcile-${account.id}`"
+                  @click="openReconcile(account)"
+                />
+              </span>
             </li>
           </ul>
         </section>
@@ -182,6 +204,7 @@ onMounted(reload)
     </div>
   </template>
 
+  <ReconcileDialog v-if="reconciling" v-model:visible="reconcileOpen" :account="reconciling" @reconciled="reload" />
   <TransactionFormDialog
     v-model:visible="recording"
     :transaction="null"

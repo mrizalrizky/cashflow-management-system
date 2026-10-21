@@ -408,3 +408,26 @@ describe('DashboardView: recording an expense', () => {
     expect(getDashboard).not.toHaveBeenCalled()
   })
 })
+
+describe('DashboardView: matching a balance', () => {
+  it('offers "Cocokkan saldo" for active accounts, and reloads after an adjustment', async () => {
+    vi.mocked(accountsApi.reconcileAccount).mockResolvedValue({
+      previousBalance: '14500000',
+      actualBalance: '14000000',
+      difference: '-500000',
+      transaction: null,
+    })
+    const { wrapper } = await mountDashboard()
+    expect(wrapper.find('[data-testid="reconcile-a-lama"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="reconcile-a-bank"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('Cocokkan saldo Bank Utama')
+    await wrapper.get('#actual-balance').setValue('14000000')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(accountsApi.reconcileAccount).toHaveBeenCalledWith('a-bank', expect.objectContaining({ actualBalance: '14000000' }))
+    expect(getDashboard).toHaveBeenCalledTimes(2)
+  })
+})

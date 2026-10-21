@@ -16,6 +16,7 @@ export type AuditAction =
   | 'DELETE'
   | 'VOID'
   | 'TRANSFER'
+  | 'ADJUST'
   | 'ATTACH'
   | 'DETACH'
   | 'EXPORT'

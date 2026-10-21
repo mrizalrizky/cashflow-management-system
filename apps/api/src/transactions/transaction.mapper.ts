@@ -8,7 +8,7 @@ const PERSON = { select: { id: true, name: true } } as const;
 /** Transaksi selalu dimuat bersama relasi yang ditampilkan; hanya kolom yang perlu. */
 export const TRANSACTION_INCLUDE = {
   account: { select: { id: true, name: true } },
-  category: { select: { id: true, name: true } },
+  category: { select: { id: true, name: true, is_system: true } },
   installment: { select: { id: true, name: true } },
   created_by: PERSON,
   voided_by: PERSON,
@@ -44,6 +44,8 @@ export interface TransactionResponse {
   /** Cicilan yang dibayar transaksi ini. */
   installment: Named | null;
   isTransfer: boolean;
+  /** Penyesuaian saldo dari "Cocokkan saldo": tidak dihitung di dasbor, hanya bisa dibatalkan. */
+  isAdjustment: boolean;
   transferGroupId: string | null;
   createdBy: Named;
   voidedBy: Named | null;
@@ -84,12 +86,18 @@ export function toAuditSnapshot(tx: TransactionWithRelations): Record<string, un
   };
 }
 
+/** Kategori sistem di luar transfer: penyesuaian saldo. */
+function isAdjustment(tx: TransactionWithRelations): boolean {
+  return tx.category.is_system && tx.transfer_group_id === null;
+}
+
 /** Bentuk transaksi yang dinilai oleh policy. */
 export function toPolicySubject(tx: TransactionWithRelations): PolicySubject {
   return {
     status: tx.status,
     createdById: tx.created_by_id,
     isTransfer: tx.transfer_group_id !== null,
+    isAdjustment: isAdjustment(tx),
   };
 }
 
@@ -102,9 +110,10 @@ export function toTransactionResponse(tx: TransactionWithRelations): Transaction
     description: tx.description,
     status: tx.status,
     account: tx.account,
-    category: tx.category,
+    category: { id: tx.category.id, name: tx.category.name },
     installment: tx.installment,
     isTransfer: tx.transfer_group_id !== null,
+    isAdjustment: isAdjustment(tx),
     transferGroupId: tx.transfer_group_id,
     createdBy: tx.created_by,
     voidedBy: tx.voided_by,

@@ -21,6 +21,21 @@ test('adding accounts and categories', async ({ page }) => {
     await expect(row.getByText('Rp 1.500.000')).toHaveCount(2)
   })
 
+  await test.step('"Cocokkan saldo" records the difference, so the balance matches', async () => {
+    const row = page.getByRole('row').filter({ hasText: 'Kas Uji' })
+    await row.getByRole('button', { name: 'Cocokkan saldo Kas Uji' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Cocokkan saldo Kas Uji' })
+    await dialog.getByLabel('Saldo sebenarnya (Rp)').fill('1.400.000')
+    await expect(dialog.getByTestId('reconcile-preview')).toHaveText(
+      'Selisih -Rp 100.000, dicatat sebagai Selisih keluar.',
+    )
+    await dialog.getByRole('button', { name: 'Simpan' }).click()
+    await expect(dialog).toBeHidden()
+
+    await expect(row).toContainText('Rp 1.400.000')
+  })
+
   await test.step('and a category, which appears under its type', async () => {
     await page.getByRole('tab', { name: 'Kategori' }).click()
     await page.getByRole('button', { name: 'Tambah kategori' }).click()

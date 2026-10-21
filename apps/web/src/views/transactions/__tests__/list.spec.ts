@@ -275,6 +275,11 @@ describe('TransactionsView', () => {
     expect(wrapper.text()).toContain('Beli semen')
   })
 
+  it('marks a balance adjustment', async () => {
+    const { wrapper } = await mountList([makeTransaction({ id: 't-adj', description: 'Koreksi BCA', isAdjustment: true })])
+    expect(wrapper.get('tbody tr').text()).toContain('Penyesuaian')
+  })
+
   it('offers both actions and a switch that hides transfers', async () => {
     const { wrapper } = await mountList()
 

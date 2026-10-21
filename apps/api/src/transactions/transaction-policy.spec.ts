@@ -1,7 +1,7 @@
 import { permissionsFor, PolicySubject } from './transaction-policy.js';
 
 function subject(overrides: Partial<PolicySubject> = {}): PolicySubject {
-  return { status: 'APPROVED', createdById: 'u-1', isTransfer: false, ...overrides };
+  return { status: 'APPROVED', createdById: 'u-1', isTransfer: false, isAdjustment: false, ...overrides };
 }
 
 describe('permissionsFor', () => {
@@ -23,5 +23,14 @@ describe('permissionsFor', () => {
       canAttach: false,
       canVoid: true,
     });
+  });
+
+  it('only lets a balance adjustment be voided, never edited', () => {
+    expect(permissionsFor(subject({ isAdjustment: true }))).toEqual({
+      canEdit: false,
+      canAttach: false,
+      canVoid: true,
+    });
+    expect(permissionsFor(subject({ isAdjustment: true, status: 'VOID' })).canVoid).toBe(false);
   });
 });

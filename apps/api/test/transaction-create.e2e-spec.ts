@@ -48,6 +48,7 @@ describe('POST /transactions', () => {
       category: { id: world.expense.id, name: 'Material Uji' },
       installment: null,
       isTransfer: false,
+      isAdjustment: false,
       transferGroupId: null,
       createdBy: { id: world.owner.user.id, name: 'Pemilik' },
       voidedBy: null,

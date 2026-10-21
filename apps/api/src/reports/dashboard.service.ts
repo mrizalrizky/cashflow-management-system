@@ -27,7 +27,7 @@ export class DashboardService {
 
   async company(query: { from?: string; to?: string }): Promise<CompanyDashboardResponse> {
     const period = resolvePeriod(query, todayInJakarta());
-    const filter = { period, excludeTransfers: true };
+    const filter = { period, excludeInternal: true };
 
     const [accounts, totals, monthly, expenseByCategory, recent] =
       await Promise.all([

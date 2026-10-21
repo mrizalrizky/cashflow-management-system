@@ -215,3 +215,11 @@ Keputusan desain utama ada di `docs/superpowers/specs/2026-10-06-cashflow-mvp-de
 
 - **Seed tidak lagi membuat akun dan kategori awal** (permintaan pemilik): akun dan kategori dibuat sendiri di Master data. Keputusan "Akun dan kategori awal diganti untuk keperluan pribadi" di bagian Edisi pribadi (P1) tidak berlaku lagi.
 - **Kategori transfer ("Transfer Masuk", "Transfer Keluar") dibuat oleh transfer pertama**, bukan oleh seed, dengan upsert supaya dua transfer pertama yang bersamaan tidak menggandakannya. Kedua nama itu selalu dicadangkan, jadi kategori buatan pemilik tidak bisa memakainya lebih dulu.
+
+## Cocokkan saldo
+
+- **Pemilik mengetik saldo sebenarnya sebuah akun; selisihnya dicatat sebagai satu transaksi** bertanggal hari ini, berkategori sistem "Selisih Keluar" (kurang) atau "Selisih Masuk" (lebih), dengan keterangan bawaan "Penyesuaian saldo". Saldo sudah sama: tidak ada yang dicatat. Untuk yang lupa atau malas mencatat, tanpa harus mengingat rinciannya.
+- **Penyesuaian tidak dihitung di dasbor** (total, grafik bulanan, per kategori) dan di ringkasan keuangan untuk AI, tetapi mengubah saldo akun. Dasbor kini mengecualikan semua transaksi berkategori sistem, sehingga transfer dan penyesuaian diperlakukan sama; tidak perlu kolom baru.
+- **Penyesuaian hanya bisa dibatalkan (void), tidak diubah**; salah ketik dibatalkan lalu dicocokkan lagi. Akun nonaktif tidak bisa dicocokkan. Baris akun dikunci selama pencocokan supaya dua permintaan bersamaan tidak mencatat selisih dua kali. Ditulis ke log audit sebagai `ADJUST`, dengan saldo sebelum dan sesudah.
+- **Kategori "Selisih Masuk" dan "Selisih Keluar" dibuat saat pertama dipakai** dan namanya dicadangkan, sama seperti kategori transfer.
+- Di luar ruang lingkup: mencocokkan pada tanggal lampau, mengisi otomatis dari aplikasi bank, membagi selisih ke beberapa kategori.

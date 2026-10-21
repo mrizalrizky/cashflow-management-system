@@ -29,7 +29,7 @@ export class FinanceSummaryService {
     const thisMonth = today.slice(0, 7);
     const months = Array.from({ length: AVERAGE_MONTHS }, (_unused, i) => addMonths(thisMonth, i - AVERAGE_MONTHS));
     const period = { from: `${months[0]}-01`, to: lastDayOf(months[AVERAGE_MONTHS - 1]!) };
-    const totals = await this.reports.totals(this.prisma, { period, excludeTransfers: true });
+    const totals = await this.reports.totals(this.prisma, { period, excludeInternal: true });
     const divisor = BigInt(AVERAGE_MONTHS);
 
     return {

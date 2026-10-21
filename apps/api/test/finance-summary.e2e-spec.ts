@@ -56,7 +56,14 @@ describe('finance summary for the wishlist review', () => {
     await record('IN', 50_000_000n, '2026-06-30');
     await record('IN', 50_000_000n, '2026-10-01');
     await record('OUT', 7_000_000n, '2026-08-11', { status: 'VOID' });
-    await record('OUT', 7_000_000n, '2026-08-12', { transferGroupId: '00000000-0000-4000-8000-000000000001' });
+    // Transfer dan penyesuaian saldo memakai kategori sistem; keduanya bukan pengeluaran.
+    const transferOut = await createCategory(ctx.prisma, { name: 'Transfer Keluar', type: 'OUT', isSystem: true });
+    const adjustmentOut = await createCategory(ctx.prisma, { name: 'Selisih Keluar', type: 'OUT', isSystem: true });
+    await record('OUT', 7_000_000n, '2026-08-12', {
+      categoryId: transferOut.id,
+      transferGroupId: '00000000-0000-4000-8000-000000000001',
+    });
+    await record('OUT', 4_000_000n, '2026-08-13', { categoryId: adjustmentOut.id });
 
     const summary = await summarize();
     expect(summary.months).toEqual(['2026-07', '2026-08', '2026-09']);

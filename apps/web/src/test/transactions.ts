@@ -61,6 +61,7 @@ export function makeTransaction(
     category: { id: MATERIAL.id, name: MATERIAL.name },
     installment: null,
     isTransfer: false,
+    isAdjustment: false,
     transferGroupId: null,
     createdBy: { id: 'u-staf', name: 'Sari' },
     voidedBy: null,

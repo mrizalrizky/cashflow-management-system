@@ -63,6 +63,12 @@ describe('AccountsTab', () => {
     return mountView(AccountsTab, { withOverlays: true })
   }
 
+  it('offers "Cocokkan saldo" on active accounts only', async () => {
+    const { wrapper } = await mountTab()
+    expect(wrapper.find('[data-testid="reconcile-a-kas"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="reconcile-a-lama"]').exists()).toBe(false)
+  })
+
   afterEach(() => {
     vi.useRealTimers()
   })

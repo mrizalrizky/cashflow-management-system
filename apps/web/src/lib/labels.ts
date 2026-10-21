@@ -62,6 +62,7 @@ const auditActions = openLabelSet({
   DELETE: 'Menghapus',
   VOID: 'Void',
   TRANSFER: 'Transfer antar akun',
+  ADJUST: 'Penyesuaian saldo',
   ATTACH: 'Menambah bukti',
   DETACH: 'Menghapus bukti',
   EXPORT: 'Mengekspor',

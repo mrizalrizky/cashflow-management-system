@@ -7,8 +7,8 @@ import { monthsInPeriod, Period } from './report-period.js';
 /** Transaksi mana yang ikut sebuah laporan. Yang dihitung selalu hanya yang APPROVED. */
 export interface ReportFilter {
   period?: Period;
-  /** Laporan perusahaan tidak menghitung transfer antar akun sebagai pemasukan atau pengeluaran. */
-  excludeTransfers?: boolean;
+  /** Tanpa transaksi berkategori sistem: transfer antar akun dan penyesuaian saldo bukan pemasukan atau pengeluaran. */
+  excludeInternal?: boolean;
 }
 
 export interface TypeTotals {
@@ -30,7 +30,7 @@ export interface MonthTotals extends TypeTotals {
 function toWhere(filter: ReportFilter): Prisma.TransactionWhereInput {
   return {
     status: 'APPROVED',
-    ...(filter.excludeTransfers ? { transfer_group_id: null } : {}),
+    ...(filter.excludeInternal ? { category: { is_system: false } } : {}),
     ...(filter.period
       ? {
           transaction_date: {
@@ -86,7 +86,7 @@ export class CashflowReportService {
       );
   }
 
-  /** Arus kas tiap bulan dalam periode, tanpa transfer. Bulan tanpa transaksi berisi nol. */
+  /** Arus kas tiap bulan dalam periode, tanpa transfer dan penyesuaian saldo. Bulan tanpa transaksi berisi nol. */
   async monthly(db: Db, period: Period): Promise<MonthTotals[]> {
     // Dikelompokkan langsung pada kolom tanggal kalender. Cast ke `timestamp` (tanpa zona)
     // memastikan zona waktu sesi database tidak ikut campur.
@@ -94,7 +94,7 @@ export class CashflowReportService {
       SELECT to_char(transaction_date::timestamp, 'YYYY-MM') AS month, type::text AS type, SUM(amount)::text AS total
       FROM transactions
       WHERE status = 'APPROVED'
-        AND transfer_group_id IS NULL
+        AND category_id NOT IN (SELECT id FROM categories WHERE is_system)
         AND transaction_date BETWEEN ${period.from}::date AND ${period.to}::date
       GROUP BY 1, 2`);
 

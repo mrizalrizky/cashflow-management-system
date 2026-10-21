@@ -9,6 +9,7 @@ export interface PolicySubject {
   status: TxStatus;
   createdById: string;
   isTransfer: boolean;
+  isAdjustment: boolean;
 }
 
 export interface TransactionPermissions {
@@ -25,7 +26,8 @@ export const EDITABLE_STATUSES: readonly TxStatus[] = ['APPROVED'];
 
 export function permissionsFor(tx: PolicySubject): TransactionPermissions {
   const recorded = tx.status === 'APPROVED';
-  // Sisi transfer tidak diubah sendiri; hanya dibatalkan bersama pasangannya.
-  if (tx.isTransfer) return { canEdit: false, canAttach: false, canVoid: recorded };
+  // Sisi transfer tidak diubah sendiri; hanya dibatalkan bersama pasangannya. Penyesuaian saldo
+  // juga tidak diubah: salah ketik dibatalkan, lalu saldonya dicocokkan lagi.
+  if (tx.isTransfer || tx.isAdjustment) return { canEdit: false, canAttach: false, canVoid: recorded };
   return { canEdit: recorded, canAttach: recorded, canVoid: recorded };
 }

@@ -111,7 +111,7 @@ jobs:
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/srv/cashflow' }}
         with:
           host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          port: ${{ vars.SSH_PORT || 22 }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           fingerprint: ${{ vars.SSH_HOST_FINGERPRINT }}
